@@ -1,0 +1,245 @@
+package net.runelite.client.plugins.microbot.woodcuttingplus;
+
+import net.runelite.api.Client;
+import net.runelite.api.Perspective;
+import net.runelite.api.Skill;
+import net.runelite.api.coords.LocalPoint;
+import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.woodcuttingplus.enums.ForestryEvents;
+import net.runelite.client.plugins.microbot.woodcuttingplus.enums.WoodcuttingTree;
+import net.runelite.client.ui.FontManager;
+import net.runelite.client.ui.overlay.OverlayPanel;
+import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.components.ButtonComponent;
+import net.runelite.client.ui.overlay.components.LineComponent;
+import net.runelite.client.ui.overlay.components.TitleComponent;
+
+import javax.inject.Inject;
+import java.awt.*;
+import java.text.NumberFormat;
+import java.time.Duration;
+import java.time.Instant;
+
+import static net.runelite.client.ui.overlay.OverlayUtil.renderPolygon;
+
+public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
+    private static final Color WHITE_TRANSLUCENT = new Color(255, 255, 255, 127);
+    private static final Color TITLE_COLOR = new Color(0, 170, 0);
+    private static final Color HEADER_COLOR = new Color(140, 220, 140);
+    private static final Color NORMAL_TEXT_COLOR = Color.WHITE;
+    private static final Color HIGHLIGHT_COLOR = new Color(255, 235, 145);
+
+    private final AutoWoodcuttingPlusConfig config;
+    private final Client client;
+    private final AutoWoodcuttingPlusPlugin plugin;
+
+    private Instant startTime;
+    private int startXp;
+    private int startLevel;
+    private int logsChopped;
+    private boolean firstRun = false;
+
+    // v0.5.1: Pause button toggles Microbot.pauseAllScripts (global flag).
+    // v0.5.6: public final so AutoWoodcuttingPlusPlugin.startUp() can call hookMouseListener().
+    public final ButtonComponent pauseButton;
+
+    @Inject
+    AutoWoodcuttingPlusOverlay(AutoWoodcuttingPlusPlugin plugin, AutoWoodcuttingPlusConfig config, Client client) {
+        super(plugin);
+        this.plugin = plugin;
+        this.config = config;
+        this.client = client;
+        setPosition(OverlayPosition.TOP_LEFT);
+        setNaughty();
+
+        pauseButton = new ButtonComponent("Pause");
+        pauseButton.setPreferredSize(new Dimension(100, 25));
+        pauseButton.setParentOverlay(this);
+        pauseButton.setFont(FontManager.getRunescapeBoldFont());
+        pauseButton.setOnClick(() -> {
+            Microbot.log("AutoWoodcuttingPlus: pause button click received -- toggling pauseAllScripts");
+            Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
+        });
+    }
+
+    public void resetStats() {
+        startTime = Instant.now();
+        startXp = client.getSkillExperience(Skill.WOODCUTTING);
+        startLevel = client.getRealSkillLevel(Skill.WOODCUTTING);
+        logsChopped = 0;
+    }
+
+    public void incrementLogsChopped() {
+        logsChopped++;
+    }
+
+    @Override
+    public Dimension render(Graphics2D graphics) {
+        if (Microbot.isLoggedIn() && !firstRun) {
+            resetStats();
+            firstRun = true;
+        }
+        try {
+            panelComponent.setPreferredSize(new Dimension(240, 350));
+            // v0.5.2: no clear -- preserves click-target registry for the Pause button.
+
+            // Title
+            panelComponent.getChildren().add(TitleComponent.builder()
+                    .text("Micro Woodcutting v" + AutoWoodcuttingPlusPlugin.version)
+                    .color(TITLE_COLOR)
+                    .build());
+
+            // Status (v0.5.1: show [PAUSED] when the global pause flag is on)
+            String displayStatus = Microbot.pauseAllScripts.get()
+                    ? "[PAUSED]"
+                    : this.plugin.AutoWoodcuttingPlusScript.woodcuttingScriptState.toString();
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Status:")
+                    .right(displayStatus)
+                    .rightColor(HIGHLIGHT_COLOR)
+                    .build());
+            var forestry = config.enableForestry() ? plugin.currentForestryEvent != ForestryEvents.NONE ? plugin.currentForestryEvent.toString() : "None" : "Disabled";
+            if (forestry != null && !forestry.equals("None") && !forestry.equals("Disabled")) {
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("Forestry Event:")
+                        .right(forestry)
+                        .rightColor(HIGHLIGHT_COLOR)
+                        .build());
+            }
+            
+            // display forestry event completion counter when forestry is enabled
+            if (config.enableForestry()) {
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("Events Completed:")
+                        .right(String.valueOf(plugin.getCompletedForestryEventCount()))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+            }
+            // Current tree
+            WoodcuttingTree tree = plugin.getSelectedTree();
+            if (tree != null) {
+                String treeLabel = tree.toString();
+                if (config.progressiveMode()) {
+                    treeLabel += " (Progressive)";
+                }
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("Tree:")
+                        .right(treeLabel)
+                        .rightColor(HIGHLIGHT_COLOR)
+                        .build());
+            }
+
+            // Add a separator
+            panelComponent.getChildren().add(LineComponent.builder().left("").build());
+
+            // Stats Header
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Statistics")
+                    .leftColor(HEADER_COLOR)
+                    .build());
+
+            // Current level
+            int currentLevel = client.getRealSkillLevel(Skill.WOODCUTTING);
+            int currentXp = client.getSkillExperience(Skill.WOODCUTTING);
+            int xpGained = currentXp - startXp;
+
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Level:")
+                    .right(currentLevel + (currentLevel > startLevel ? " (+" + (currentLevel - startLevel) + ")" : ""))
+                    .rightColor(NORMAL_TEXT_COLOR)
+                    .build());
+
+            // XP Info
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("XP Gained:")
+                    .right(NumberFormat.getInstance().format(xpGained))
+                    .rightColor(NORMAL_TEXT_COLOR)
+                    .build());
+
+            // Calculate XP per hour
+            long secondsElapsed = Duration.between(startTime, Instant.now()).getSeconds();
+            if (secondsElapsed > 0) {
+                double xpPerHour = (double) xpGained / secondsElapsed * 3600;
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("XP/Hour:")
+                        .right(NumberFormat.getInstance().format((long) xpPerHour))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+            }
+
+            // Logs chopped
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Logs Chopped:")
+                    .right(String.valueOf(logsChopped))
+                    .rightColor(NORMAL_TEXT_COLOR)
+                    .build());
+
+            // Time running
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Time Running:")
+                    .right(formatDuration(Duration.between(startTime, Instant.now())))
+                    .rightColor(NORMAL_TEXT_COLOR)
+                    .build());
+
+            // v0.5.0: target-level progress line.
+            if (config.targetLevel() > 0) {
+                int toGo = Math.max(0, config.targetLevel() - currentLevel);
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("Target:")
+                        .right(config.targetLevel() + (toGo > 0 ? " (" + toGo + " to go)" : " (reached)"))
+                        .rightColor(HIGHLIGHT_COLOR)
+                        .build());
+            }
+
+            // Add a separator
+            panelComponent.getChildren().add(LineComponent.builder().left("").build());
+
+            // v0.5.4: Pause button added unconditionally to win the click-bounds registration
+            // race against the first render. See AutoMiningPlusOverlay v0.5.4 comment for detail.
+            pauseButton.setText(Microbot.pauseAllScripts.get() ? "Resume" : "Pause");
+            panelComponent.getChildren().add(pauseButton);
+
+            // Script Settings
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Settings")
+                    .leftColor(HEADER_COLOR)
+                    .build());
+
+            // Reset option 1
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Prime Action:")
+                    .right(config.primaryAction().toString())
+                    .rightColor(NORMAL_TEXT_COLOR)
+                    .build());
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Secondary Action:")
+                    .right(config.secondaryAction().toString())
+                    .rightColor(NORMAL_TEXT_COLOR)
+                    .build());
+
+            // Display area boundary
+            if (config.distanceToStray() < 21) {
+                LocalPoint lp = LocalPoint.fromWorld(client, AutoWoodcuttingPlusScript.getReturnPoint(config));
+                if (lp != null) {
+                    Polygon poly = Perspective.getCanvasTileAreaPoly(client, lp, config.distanceToStray() * 2);
+
+                    if (poly != null) {
+                        renderPolygon(graphics, poly, WHITE_TRANSLUCENT);
+                    }
+                }
+            }
+
+        } catch (Exception ex) {
+            Microbot.logStackTrace(this.getClass().getSimpleName(), ex);
+        }
+        return super.render(graphics);
+    }
+
+    private String formatDuration(Duration duration) {
+        long hours = duration.toHours();
+        long minutes = duration.toMinutesPart();
+        long seconds = duration.toSecondsPart();
+
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+    }
+}
