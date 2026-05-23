@@ -247,6 +247,26 @@ Reference implementations that have this correct: `AIOFighterPlugin.startUp()` (
 
 This is the standard Microbot pattern (AIO Fighter uses it). Don't create a per-plugin pause flag; defer to the global one.
 
+**CRITICAL (v0.5.7): the boolean flip alone does NOT stop the walker.** `Rs2Walker.walkTo()` schedules a separate WebWalker task that runs on its own executor, independent of the script's main loop. The script's tick poll catches the boolean and returns early, but any in-flight walk continues to its goal. To actually stop the bot, the overlay click handler must call `Rs2Walker.setTarget(null)` in the pause-on branch:
+
+```java
+pauseButton.setOnClick(() -> {
+    Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
+    if (Microbot.pauseAllScripts.get()) {
+        Rs2Walker.setTarget(null);   // <-- kills in-flight WebWalker
+        pauseButton.setText("Resume");
+    } else {
+        pauseButton.setText("Pause");
+    }
+});
+```
+
+**Lifecycle hygiene (v0.5.7):** call `Microbot.pauseAllScripts.compareAndSet(true, false)` in BOTH `startUp()` and `shutDown()`. Without this:
+- `startUp()` miss: if user paused in a previous session, the plugin starts paused with no obvious indication.
+- `shutDown()` miss: if user disables the plugin while paused, the flag leaks to other plugins they enable next.
+
+~30 other Hub plugins do this idiom. Reference: `AIOFighterPlugin:132`.
+
 ### Pause without nuking session metrics
 
 User toggles pause (via overlay button → `Microbot.pauseAllScripts`). The tick early-exits without doing any work or transitioning state. `startTimeMillis` / `startSkillXp` / `actionsCompleted` are NOT reset. Toggle off and the existing flow picks back up.

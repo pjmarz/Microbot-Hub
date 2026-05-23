@@ -4,6 +4,14 @@ Auto-walking-and-smelting "Plus" fork of upstream AutoSmelting. Part of the Skil
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.5.7] — 2026-05-23
+
+### Fixed
+- **Pause now actually stops the bot.** Added `Rs2Walker.setTarget(null)` to the overlay pause-click handler to interrupt the in-flight WebWalker. Without this, the script's main loop paused correctly but the walker kept walking. See AutoMiningPlusPlugin v0.5.7 CHANGELOG for the full diagnosis.
+
+### Added
+- `Microbot.pauseAllScripts.compareAndSet(true, false)` in `startUp()` and `shutDown()`. Lifecycle hygiene matching ~30 other Hub plugins.
+
 ## [0.5.6] — 2026-05-23
 
 ### Fixed

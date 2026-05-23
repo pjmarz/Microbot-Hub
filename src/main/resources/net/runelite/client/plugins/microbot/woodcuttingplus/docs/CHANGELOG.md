@@ -4,6 +4,14 @@ Auto-chopping-and-handling-logs "Plus" fork of upstream AutoWoodcutting v1.8.3. 
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.5.7] — 2026-05-23
+
+### Fixed
+- **Pause now actually stops the bot.** Added `Rs2Walker.setTarget(null)` to the overlay pause-click handler to interrupt the in-flight WebWalker. See AutoMiningPlusPlugin v0.5.7 CHANGELOG for full diagnosis.
+
+### Added
+- `Microbot.pauseAllScripts.compareAndSet(true, false)` in `startUp()` and `shutDown()`.
+
 ## [0.5.6] — 2026-05-23
 
 ### Fixed

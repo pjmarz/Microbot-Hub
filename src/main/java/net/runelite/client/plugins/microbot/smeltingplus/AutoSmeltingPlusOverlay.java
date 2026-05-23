@@ -3,6 +3,7 @@ package net.runelite.client.plugins.microbot.smeltingplus;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
 import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -49,6 +50,12 @@ public class AutoSmeltingPlusOverlay extends OverlayPanel {
         pauseButton.setOnClick(() -> {
             Microbot.log("AutoSmeltingPlus: pause button click received -- toggling pauseAllScripts");
             Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
+            if (Microbot.pauseAllScripts.get()) {
+                // v0.5.7: kill in-flight walker. Matches AIO Fighter (AIOFighterInfoOverlay:39).
+                // Without this, Rs2Walker keeps walking on its own executor after the script
+                // main loop pauses.
+                Rs2Walker.setTarget(null);
+            }
         });
     }
 

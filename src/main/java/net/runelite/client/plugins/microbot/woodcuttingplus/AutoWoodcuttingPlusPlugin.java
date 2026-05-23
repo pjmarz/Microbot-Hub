@@ -50,7 +50,7 @@ import static net.runelite.client.plugins.microbot.util.Global.sleepUntil;
 )
 @Slf4j
 public class AutoWoodcuttingPlusPlugin extends Plugin {
-    public static final String version = "0.5.6";
+    public static final String version = "0.5.7";
     @Inject
     @Getter(AccessLevel.MODULE)
     public AutoWoodcuttingPlusScript AutoWoodcuttingPlusScript;
@@ -92,6 +92,8 @@ public class AutoWoodcuttingPlusPlugin extends Plugin {
 
     @Override
     protected void startUp() throws AWTException {
+        // v0.5.7: clear any stale pause flag from a previous session.
+        Microbot.pauseAllScripts.compareAndSet(true, false);
         if (overlayManager != null) {
             overlayManager.add(woodcuttingOverlay);
             // v0.5.6: see AutoMiningPlusPlugin v0.5.6 -- hookMouseListener wires setOnClick
@@ -104,6 +106,8 @@ public class AutoWoodcuttingPlusPlugin extends Plugin {
     }
 
     protected void shutDown() {
+        // v0.5.7: clear flag so other plugins enabled after us don't inherit our paused state.
+        Microbot.pauseAllScripts.compareAndSet(true, false);
         AutoWoodcuttingPlusScript.shutdown();
         this.removeEvents();
         ritualCircles.clear();

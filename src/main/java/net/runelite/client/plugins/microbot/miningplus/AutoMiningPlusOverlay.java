@@ -3,6 +3,7 @@ package net.runelite.client.plugins.microbot.miningplus;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
 import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -26,6 +27,12 @@ import java.time.Duration;
  * v0.5.6: AIOFighterPlugin source revealed the missing call: ButtonComponent requires
  *   {@code pauseButton.hookMouseListener()} from the parent Plugin's startUp(), after
  *   overlayManager.add(). Restored full overlay; the hook lives in {@link AutoMiningPlusPlugin}.
+ * v0.5.7: kill in-flight walker on pause via {@code Rs2Walker.setTarget(null)}. v0.5.6 fixed
+ *   click registration; v0.5.7 fixes the actual pause behavior. Symptom: bot kept walking to
+ *   bank after pause click. Root cause: WebWalker runs on its own executor and doesn't honor
+ *   {@code Microbot.pauseAllScripts}. AIO Fighter pattern (AIOFighterInfoOverlay:39) calls
+ *   {@code Rs2Walker.setTarget(null)} in the pause-on branch; we missed this in the v0.5.1
+ *   borrow. Diagnosis hit on the first source-read this time.
  */
 public class AutoMiningPlusOverlay extends OverlayPanel {
     private static final Color TITLE_COLOR = new Color(0, 170, 0);
@@ -57,6 +64,10 @@ public class AutoMiningPlusOverlay extends OverlayPanel {
         pauseButton.setOnClick(() -> {
             Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
             if (Microbot.pauseAllScripts.get()) {
+                // v0.5.7: kill in-flight walker. Matches AIO Fighter (AIOFighterInfoOverlay:39).
+                // Without this, Rs2Walker keeps walking on its own executor after the script's
+                // main loop pauses.
+                Rs2Walker.setTarget(null);
                 pauseButton.setText("Resume");
             } else {
                 pauseButton.setText("Pause");

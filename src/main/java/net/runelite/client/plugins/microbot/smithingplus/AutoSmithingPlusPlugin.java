@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.PluginConstants;
 import net.runelite.client.ui.overlay.OverlayManager;
 
@@ -24,7 +25,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoSmithingPlusPlugin extends Plugin {
-    public static final String version = "0.5.6";
+    public static final String version = "0.5.7";
 
     @Inject
     private AutoSmithingPlusConfig config;
@@ -45,6 +46,8 @@ public class AutoSmithingPlusPlugin extends Plugin {
 
     @Override
     protected void startUp() throws AWTException {
+        // v0.5.7: clear any stale pause flag from a previous session.
+        Microbot.pauseAllScripts.compareAndSet(true, false);
         if (overlayManager != null) {
             overlayManager.add(overlay);
             // v0.5.6: see AutoMiningPlusPlugin v0.5.6 -- hookMouseListener is what actually
@@ -56,6 +59,8 @@ public class AutoSmithingPlusPlugin extends Plugin {
 
     @Override
     protected void shutDown() {
+        // v0.5.7: clear flag so other plugins enabled after us don't inherit our paused state.
+        Microbot.pauseAllScripts.compareAndSet(true, false);
         script.shutdown();
         if (overlay != null) {
             overlay.pauseButton.unhookMouseListener();

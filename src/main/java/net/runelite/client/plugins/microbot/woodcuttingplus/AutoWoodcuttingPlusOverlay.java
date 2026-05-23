@@ -5,6 +5,7 @@ import net.runelite.api.Perspective;
 import net.runelite.api.Skill;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.woodcuttingplus.enums.ForestryEvents;
 import net.runelite.client.plugins.microbot.woodcuttingplus.enums.WoodcuttingTree;
 import net.runelite.client.ui.FontManager;
@@ -59,6 +60,12 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
         pauseButton.setOnClick(() -> {
             Microbot.log("AutoWoodcuttingPlus: pause button click received -- toggling pauseAllScripts");
             Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
+            if (Microbot.pauseAllScripts.get()) {
+                // v0.5.7: kill in-flight walker. Matches AIO Fighter (AIOFighterInfoOverlay:39).
+                // Without this, Rs2Walker keeps walking on its own executor after the script
+                // main loop pauses.
+                Rs2Walker.setTarget(null);
+            }
         });
     }
 

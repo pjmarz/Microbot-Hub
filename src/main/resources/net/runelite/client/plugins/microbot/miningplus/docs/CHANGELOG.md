@@ -4,6 +4,16 @@ Auto-walking-and-mining "Plus" fork of upstream AutoMining. Part of the Skill Pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Semver-flavored (`0.x` = pre-stable, `1.0.0` = upstream-PR ready).
 
+## [0.5.7] — 2026-05-23
+
+### Fixed
+- **Pause now actually stops the bot.** v0.5.6 fixed the button click registration, but the script kept walking to bank after pause was clicked. Symptom (caught during Pete's soak): button text toggles correctly to "Resume", `Microbot.pauseAllScripts` flips to true, script's main 100ms tick polls the flag and returns early — but the WebWalker runs on a separate executor and doesn't honor `pauseAllScripts`. In-flight walks continue to completion.
+- Root cause: missing `Rs2Walker.setTarget(null)` call in the pause-on branch of the overlay click handler. AIO Fighter source (`AIOFighterInfoOverlay.java:39`) calls it explicitly. We copied the boolean toggle and text update during the v0.5.1 borrow but missed the walker interrupt.
+- Diagnosis approach: source-diff against AIO Fighter (the known-working precedent) before any speculative fixes. Found the missing line on first read. Total time from bug report to fix-in-source: ~15 min, vs. the 5 wrong theories of v0.5.1-v0.5.5.
+
+### Added
+- `Microbot.pauseAllScripts.compareAndSet(true, false)` in both `startUp()` and `shutDown()`. Lifecycle hygiene that matches ~30 other Hub plugins. Without it, a paused session could leak state into the next plugin Pete enables.
+
 ## [0.5.6] — 2026-05-23
 
 ### Fixed
