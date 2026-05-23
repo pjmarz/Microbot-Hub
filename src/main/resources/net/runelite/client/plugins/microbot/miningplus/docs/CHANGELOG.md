@@ -1,0 +1,122 @@
+# AutoMiningPlus Changelog
+
+Auto-walking-and-mining "Plus" fork of upstream AutoMining. Part of the Skill Plus Template (SPT) lineage; see `template/TEMPLATE.md` and `template/PATTERNS.md` in the Hub repo for shared conventions.
+
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Semver-flavored (`0.x` = pre-stable, `1.0.0` = upstream-PR ready).
+
+## [0.5.6] — 2026-05-23
+
+### Fixed
+- **Pause button now actually works.** v0.5.1 introduced the overlay button but clicks passed through to the game world for 5 iterations. Root cause: `ButtonComponent.setOnClick(lambda)` only stores the lambda; the parent Plugin must explicitly call `overlay.pauseButton.hookMouseListener()` after `overlayManager.add()` to wire it into RuneLite's mouse dispatch. AIO Fighter's source (`AIOFighterPlugin.startUp()` lines 143-144) revealed the missing call.
+- Field visibility: `pauseButton` changed from `private final` to `public final` so the Plugin can call `hookMouseListener()`.
+
+### Changed
+- Button text reads "Resume" (not "Unpause") when paused (Pete's preference).
+
+## [0.5.1 - 0.5.5] — 2026-05-22/23 (dead-end iterations)
+
+Five intermediate versions chasing the same click-through bug. Kept here for posterity; nothing else from these versions ships in v0.5.6. The journey:
+- **v0.5.1**: refactored Pause from config checkbox to overlay button. Button rendered but didn't accept clicks.
+- **v0.5.2**: removed `panelComponent.getChildren().clear()` from render (was wiping click registry, allegedly). Still broken.
+- **v0.5.3**: added diagnostic log to onClick handler. No log fired → click never reached the handler.
+- **v0.5.4**: moved button add outside conditional render branch (race-condition theory). Still broken.
+- **v0.5.5**: stripped overlay to minimal Title + Button (ruled out render complexity). Still broken.
+- **v0.5.6**: found `hookMouseListener()` requirement in AIO Fighter source. Fixed.
+
+## [0.5.0] — 2026-05-22
+
+## [0.5.0] — 2026-05-22
+
+Cross-plugin v0.5.0: Target Level + Pause shipped across all 4 Plus plugins.
+
+### Added
+- `targetLevel` config (int, default 0 = disabled). When Mining level reaches the target, the script runs one cleanup pass (bank if `useBank` on, drop otherwise) then shuts down. Uses a `shutdownAfterCleanup` flag intercepted before state-flip-back in the RESETTING branch.
+- `paused` config (boolean, default false). Tick early-exits without resetting session metrics. Toggle on/off without restarting the plugin.
+- Overlay shows `Target: X (Y to go)` when `targetLevel > 0`; status shows `[PAUSED]` when paused.
+
+## [0.4.2] — 2026-05-22
+
+### Changed
+- Default `itemsToBank` expanded via OSRS Wiki Mining/Mineable_items sweep: `"ore, uncut, coal, clay, basalt, essence, ash, shard, geode, salt, limestone, granite, sandstone, amethyst, pay-dirt"`. Forward-compat for Tier B Rocks expansion (BLURITE/BARRONITE/etc.) when those Rocks enum entries eventually ship.
+
+## [0.4.1] — 2026-05-22
+
+### Fixed
+- Coal/Clay/Basalt deposit gotcha. Mining coal at Al Kharid with default settings caused a bank↔mine oscillation. Default `itemsToBank = "ore"` didn't match `"Coal"` (no "ore" suffix), so the deposit predicate matched zero items, bank closed empty, walker returned to find inventory still full. Loop forever.
+- Script now auto-augments the deposit filter with the active rock's first word at deposit time: `activeRock.getName().split(" ")[0].toLowerCase()`. `Rocks.COAL.getName()` = `"coal rocks"` → first word `"coal"` → substring-matches `"Coal"`. Generic across all rocks.
+
+### Changed
+- Default `itemsToBank` expanded from `"ore"` to `"ore, uncut, coal, clay, basalt"` as belt-and-suspenders.
+
+## [0.4.0] — 2026-05-22
+
+Wiki-driven data expansion cycle Phase A. F2P-first re-audit of every location enum.
+
+### Fixed
+- `MINING_GUILD_FALADOR` bank coord was `(3013, 3355, 0)` — IDENTICAL to `FALADOR_EAST`. Stale-seed bug. Picking "Mining Guild" silently routed the walker to Falador East's booth. New coord `(3046, 9760, 0)` targets the underground bank chest. Live-verification deferred until a P2P account with 60 Mining is available.
+- `AL_KHARID_ARENA` (Fadli's bank) coord was `(3315, 3242, 0)`, sending walker to a NW residential building far from the arena. Live-verified by Pete: corrected to `(3383, 3269, 0)` at the bank chest. Wiki Fadli page map confirms approximately 3382, 3270.
+
+### Added
+- `FEROX_ENCLAVE` bank entry (F2P, Wilderness gateway). Warning: Rs2Walker may path through lvl 1-2 Wilderness on approach.
+- Rimmington Mine entry (F2P, 2 tin + 5 copper + 6 iron + 2 clay + 2 gold rocks per wiki — best F2P gold spot pre-Crafting Guild).
+- Edgeville Dungeon Mine entry (F2P, 7 rock types). Low utility per wiki (monsters dense, far from bank); flagged in inline comments.
+- Varrock Central (Horvik's, 2 anvils) + Varrock East (2 anvils south of bank) anvil entries to the shared `AnvilLocationOption`.
+- New `tools/wiki-audit-banks.ps1` (was missing previously).
+- Audit log entries on `MiningRockLocations.java` and `BankLocationOption.java`.
+
+### Investigated and rejected (wiki proved initial assumptions wrong)
+- Ferox Enclave has NO furnace (only bank/chapel/pub).
+- Mining Guild F2P side has NO bank chest (only shops + rocks).
+- No Al Kharid or Edgeville anvil exists in OSRS.
+- Corsair Cove deposit box is P2P-gated (Corsair Curse quest); deferred to Phase B.
+
+## [0.3.3] — 2026-05-21
+
+### Added
+- Fadli's Al Kharid Arena bank (initially with approximate coord; corrected at v0.4.0). F2P, ~75 tiles from Al Kharid Mine vs ~150 to south-city bank.
+
+## [0.3.2] — 2026-05-21
+
+### Changed
+- Display names shortened across `BankLocationOption`, `MineLocationOption` to fit the RuneLite dropdown width without truncation. `(Members)` → `(P2P)`, "bank" suffix dropped where redundant.
+
+## [0.3.1] — 2026-05-21
+
+### Changed
+- Switched from `Rs2GameObject.findReachableObject` (slow BFS reachability check per candidate, painful on crowded mines) to `Microbot.getRs2TileObjectCache().query().within(...).withName(...).nearestOnClientThread()`. Verified 82 ores in 10:23 = 12,522 XP/hr at Al Kharid iron post-switch.
+
+## [0.3.0] — 2026-05-21
+
+Polish-Cycle 2 (cross-plugin overlay + threshold work).
+
+### Added
+- Runtime stats overlay: uptime, Mining XP gained, XP/hr, ores mined, level + delta, status.
+- `stopAfterMinutes` and `stopAfterXp` config items. Auto-shutdown thresholds.
+- Per-plugin getter accessors on the Script (`getStartTimeMillis()`, `getStartSkillXp()`, etc.) for the overlay to read.
+
+## [0.1.0 → 0.1.11] — 2026-05-14
+
+Pilot #1 v0.1.x rapid-iteration cycle.
+
+- 0.1.0: MVP — `mineLocation` dropdown + auto-walk to chosen mine.
+- 0.1.1: UX polish — AUTO_BEST walks; deterministic picks; wrong-ore status warning.
+- 0.1.2: Data fix — Lumbridge tin/copper ↔ mithril/adamantite swap (user-caught bug).
+- 0.1.3: Full data audit via `tools/wiki-audit-mines.ps1` — 15 corrections; final 17 OK / 0 mismatch / 0 not found.
+- 0.1.4: Bank routing — `BankLocationOption` dropdown with 17 banks.
+- 0.1.5: Removed 5-tile anchor cap (caused yo-yo walking between rocks).
+- 0.1.6: State-gated anchor check (`ensureConfiguredLocation` skipped during RESETTING).
+- 0.1.7: Startup state — auto-flip to RESETTING if inv is full at toggle.
+- 0.1.8/9: Speed mode — `Rs2AntibanSettings.antibanEnabled = false` single-flag toggle.
+- 0.1.10: Pace — `waitForXpDrop` replaced with `sleepUntil(isAnimating, 1200)`.
+- 0.1.11: Anchor fix — `initialPlayerLocation` re-pinned to `activeLocation.getWorldPoint()` per tick.
+
+## Recommended companion plugins
+
+- **EventDismissPlus v0.1.0+** — global random event handler. Enable alongside AutoMiningPlus to auto-handle Genie lamps (auto-applied to Mining when you're mining), Sandwich Lady food drops, Strange Plant fruit pickup, and dismiss the rest with a human-like 2-5s delay. Without it, random events stall the mining loop and the bot looks more suspicious (no engagement = behavioral signal). See `eventdismissplus/docs/CHANGELOG.md`.
+
+## Deferred / candidate work
+
+- **v0.6.0 candidate**: Polish Cycle C — dual `walkBack` mode (`INITIAL_LOCATION` vs `LAST_LOCATION` ported from AutoWoodcuttingPlus). Track last productive rock; route bank-trip walk-back through `getReturnPoint(config)`.
+- **v0.7.0+ candidate**: Tier B Rocks expansion. Add Rocks enum entries for walkable F2P + P2P content: BLURITE, BARRONITE, LIMESTONE, GRANITE, SANDSTONE, AMETHYST, DAEYALT. Each gets a Rocks entry + MineLocationOption + MiningRockLocations rows.
+- **v0.8.0+ candidate**: Tier C teleport-gated rocks (RUNE_ESSENCE + PURE_ESSENCE). Adds Aubury teleport handling to the script.
+- **v1.0.0 graduation**: ≥20 hours throwaway uptime; docs page; PR to `chsami/Microbot-Hub` `development` branch.
