@@ -4,6 +4,21 @@ Random event handling as a global companion plugin for any other Microbot Hub pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.1.1] — 2026-05-23
+
+### Fixed
+
+- **Mysterious Old Man Maze variant looped indefinitely.** Soak surfaced (2026-05-23): the bot clicked Talk-to, hit the Maze prompt's two-option dialog ("Sure, I like exploring mazes" / "Sorry, I'm busy"), then exited the dialogue handler because `advanceDialogueClicks` only knew how to click `Continue` buttons. The Old Man stayed standing, `validate()` re-fired, and the handler re-entered for another round. Chat log showed `handled Mysterious Old Man (session total: 5)`, then `... total: 6`, then `... total: 7` in 12 sec — three "successful handles" that didn't progress.
+- Root cause: `advanceDialogueClicks` was a pure Continue-clicker. Maze variant interrupts the gift flow with options. v0.1.0 plan called this out as a known risk (`"Rarely teleports to Maze; if so, dismiss + log (Maze solver is v0.4.0)"`) but the decline path wasn't actually wired.
+
+### Changed
+
+- `advanceDialogueClicks` rewritten as a loop that handles both Continue clicks AND the "Sorry, I'm busy" option. When the Maze prompt fires, the handler picks "Sorry, I'm busy" and logs `EventDismissPlus: declined Maze prompt`. Other accept-and-acknowledge events (Sandwich Lady, Drunken Dwarf, Rick Turpentine, Dr Jekyll, Frog Prince) don't use that exact option text, so the new branch is Maze-specific in practice.
+
+### Verification
+
+Next time the Old Man's Maze variant fires during soak, expect a single `declined Maze prompt` log line + a clean exit. No more 3-in-12-sec loop. Bot continues its main script without manual intervention.
+
 ## [0.1.0] — 2026-05-22
 
 Pilot #5 MVP. Tier B engagement scope.

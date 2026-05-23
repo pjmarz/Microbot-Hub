@@ -198,9 +198,26 @@ public class RandomEventNpcHandler implements BlockingEvent {
 
     private void advanceDialogueClicks(int maxClicks) {
         int safety = Math.max(0, maxClicks);
-        while (Rs2Dialogue.hasContinue() && safety-- > 0) {
-            Rs2Dialogue.clickContinue();
-            Global.sleep(Rs2Random.between(400, 900));
+        while (safety-- > 0) {
+            if (Rs2Dialogue.hasContinue()) {
+                Rs2Dialogue.clickContinue();
+                Global.sleep(Rs2Random.between(400, 900));
+                continue;
+            }
+            // v0.1.1: Mysterious Old Man's Maze variant interrupts the gift flow
+            // with a two-option dialog ("Sure, I like exploring mazes" / "Sorry,
+            // I'm busy"). Decline politely -- the Maze solver is v0.4.0 scope.
+            // Other accept-and-acknowledge events (Sandwich Lady, Drunken Dwarf,
+            // Rick Turpentine, Dr Jekyll, Frog Prince) don't use that option text,
+            // so this branch is Maze-specific in practice.
+            if (Rs2Dialogue.hasDialogueOption("Sorry, I'm busy")) {
+                Rs2Dialogue.clickOption("Sorry, I'm busy");
+                Microbot.log("EventDismissPlus: declined Maze prompt");
+                Global.sleep(Rs2Random.between(400, 900));
+                continue;
+            }
+            // No actionable state -- dialogue ended.
+            break;
         }
     }
 
