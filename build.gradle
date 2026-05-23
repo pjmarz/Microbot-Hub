@@ -181,6 +181,14 @@ afterEvaluate {
     ext.validPlugins = validPlugins
     ext.allPlugins = allPlugins
 
+    // Exclude every plugin folder from the default `main` source set. Each plugin will
+    // build in its own per-plugin source set (configured below via configurePluginSourceSet).
+    // Without this, `compileJava` scans every plugin's source and fails as soon as a single
+    // upstream plugin is incompatible with the chosen microbot client version.
+    allPlugins.each { plugin ->
+        sourceSets.main.java.exclude("net/runelite/client/plugins/microbot/${plugin.dir.name}/**")
+    }
+
     def pluginPublications = []
 
     validPlugins.each { plugin ->
@@ -192,6 +200,13 @@ afterEvaluate {
 
         // Create JAR task using the configuration
         def jarTask = tasks.register("${plugin.name}Jar", ShadowJar, project.ext.getPluginJarTaskConfig(plugin, pluginConfigName))
+
+        // The default jar config pulls plugin classes from sourceSets.main.output. We exclude
+        // plugin folders from `main` above so each plugin compiles only in its own source set.
+        // Re-source the jar from that per-plugin source set's output.
+        jarTask.configure {
+            from(sourceSets["${plugin.sourceSetName}"].output)
+        }
 
         // Add to build dependencies
         tasks.named("build") {
