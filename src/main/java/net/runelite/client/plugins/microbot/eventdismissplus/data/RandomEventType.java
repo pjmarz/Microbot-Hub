@@ -26,6 +26,15 @@ package net.runelite.client.plugins.microbot.eventdismissplus.data;
  *       from OSRS Wiki research (see plan file). Strange Plant deliberately excluded --
  *       it's a GameObject, not an NPC, handled separately by StrangePlantHandler.
  *       Prison Pete deferred to v0.2.0 (balloon-animal minigame, more than a dialogue).</li>
+ *   <li><b>2026-05-23 (v0.2.0):</b> Catalog-only entries added for the Mime random event NPCs
+ *       (Niles / Miles / Giles). Pete encountered Niles during soak; default-dismiss handled
+ *       it cleanly. Full engagement (mimic 5 emotes) requires animation recognition; deferred
+ *       to v0.3.0 with the OCR-based events. Adding the names here documents we know about
+ *       them without changing the engagement switch behavior (they're not in {@code
+ *       shouldEngage} switch, so {@code default: return false} dismisses).</li>
+ *   <li><b>2026-05-23 (v0.2.0):</b> Prison Pete + Freaky Forester still deferred. Both
+ *       require multi-step engagement (balloon pop / chicken-catching mini-quest) that's
+ *       higher complexity than v0.2.0's "light polish" theme. Bundled into v0.3.0 with OCR.</li>
  * </ul>
  *
  * <h2>Known gaps</h2>
@@ -50,7 +59,15 @@ public enum RandomEventType {
     FROG_PRINCESS("Frog Princess", false),          // appears for male players
     RICK_TURPENTINE("Rick Turpentine", false),
     DR_JEKYLL_NO_PERIOD("Dr Jekyll", false),
-    DR_JEKYLL_PERIOD("Dr. Jekyll", false);
+    DR_JEKYLL_PERIOD("Dr. Jekyll", false),
+    // v0.2.0: Mime event NPCs. One of these three fires per Mime event;
+    // player must mimic 5 emotes the leader performs. Catalog-only -- the
+    // engagement switch in RandomEventNpcHandler doesn't include them, so
+    // default-dismiss handles them cleanly. Full engagement is v0.3.0+ scope
+    // (requires animation recognition for the emote-mimic loop).
+    MIME_NILES("Niles", false),
+    MIME_MILES("Miles", false),
+    MIME_GILES("Giles", false);
 
     private final String npcName;
     private final boolean givesLamp;

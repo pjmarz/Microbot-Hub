@@ -56,6 +56,18 @@ public interface EventDismissPlusConfig extends Config {
         return 5000;
     }
 
+    @ConfigItem(
+            keyName = "globalSkipChance",
+            name = "Random Skip Chance %",
+            description = "v0.2.0: probability (0-100) of skipping engagement and just dismissing, even when the per-event toggle is ON. Adds variability for antiban -- humans don't engage every random event. 0 = never skip (always engage when configured), 100 = always skip.",
+            position = 2,
+            section = generalSection
+    )
+    @Range(min = 0, max = 100)
+    default int globalSkipChance() {
+        return 0;
+    }
+
     // --- Per-event engagement toggles ---
 
     @ConfigItem(keyName = "engageGenie", name = "Engage Genie", description = "Rub lamp + apply to active skill. Off = dismiss.", position = 0, section = engagementSection)

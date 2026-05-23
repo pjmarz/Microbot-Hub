@@ -4,6 +4,31 @@ Random event handling as a global companion plugin for any other Microbot Hub pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.2.0] — 2026-05-23
+
+Light polish minor: behavioral variability + analytics foundation + catalog hygiene. Heavier event engagement (Freaky Forester full quest, Prison Pete balloon-animal, OCR for Quiz Master / Mime) deferred to v0.3.0 as the "complex events" minor.
+
+### Added
+
+- **Random skip chance** (`globalSkipChance` config, default 0). Probability 0-100 of skipping engagement and just dismissing, even when the per-event toggle is ON. Real humans don't engage every random event; some get skipped due to being busy / focused on the main activity. Antiban depth without per-event slider clutter. Roll is independent per-event, logged with the actual roll value for verifiability (`random skip (antiban roll 47/30)` log line means the 47 roll passed the threshold of 30, so engage proceeded).
+- **CSV event log** at `~/.runelite/eventdismissplus-events.csv`. Append-only, thread-safe, includes:
+  - Timestamp (ISO-8601 UTC)
+  - Event name (e.g. "Mysterious Old Man", "Freaky Forester", "Niles")
+  - Action: `ENGAGE`, `DISMISS`, or `DECLINE`
+  - Outcome: `OK` or `ERROR`
+  - Note: free-text (e.g. "Maze prompt", "random skip (antiban roll)", exception message on error)
+  Foundation for v0.3.0+ analytics: drop-rate empirical study, frequency-of-events over long soak, engagement-vs-dismiss validation, error-rate triage.
+- **Catalog entries for Mime event NPCs**: `MIME_NILES`, `MIME_MILES`, `MIME_GILES` (Niles + Miles + Giles). Pete encountered Niles during soak 2026-05-23; default-dismiss handled it cleanly. Catalog entry documents the name so it's not "unknown" in code reviews. Full engagement (mimic 5 emotes) requires animation recognition and is v0.3.0+ scope.
+
+### Changed
+
+- Maze decline (introduced v0.1.1) now logs to the CSV file as `DECLINE` action with note "Maze prompt". Analytics can distinguish Old Man gift variant (`ENGAGE`) from Maze variant (`DECLINE`) for empirical rate measurement.
+- Exception handlers now log to CSV as `ERROR` outcome with the exception message in the note field. Easier post-soak triage.
+
+### Notes for v0.2.0 → v0.3.0 transition
+
+CSV log accumulates from this version on. After a week or two of soak data, the file becomes the empirical basis for v0.3.0 priorities: which events should we engage (high frequency / high reward), which should we keep dismissing (low frequency / low reward), which need new handlers (currently ERROR-rate or unknown-but-frequent).
+
 ## [0.1.1] — 2026-05-23
 
 ### Fixed

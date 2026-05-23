@@ -6,6 +6,7 @@ import net.runelite.client.plugins.microbot.BlockingEventPriority;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.api.npc.models.Rs2NpcModel;
 import net.runelite.client.plugins.microbot.eventdismissplus.EventDismissPlusConfig;
+import net.runelite.client.plugins.microbot.eventdismissplus.EventDismissPlusEventLog;
 import net.runelite.client.plugins.microbot.eventdismissplus.EventDismissPlusScript;
 import net.runelite.client.plugins.microbot.eventdismissplus.data.RandomEventType;
 import net.runelite.client.plugins.microbot.util.Global;
@@ -77,14 +78,35 @@ public class RandomEventNpcHandler implements BlockingEvent {
 
         boolean engage = shouldEngage(name);
 
+        // v0.2.0: random skip chance for antiban. Even if we WOULD engage, roll a die
+        // and force-dismiss with the configured probability. Real humans don't engage
+        // every event; some skip due to being busy / focused on their main activity.
+        String skipNote = null;
+        if (engage && config.globalSkipChance() > 0) {
+            int roll = Rs2Random.between(1, 101);
+            if (roll <= config.globalSkipChance()) {
+                Microbot.log("EventDismissPlus: random skip (antiban roll " + roll + "/" + config.globalSkipChance() + ") for " + name);
+                engage = false;
+                skipNote = "random skip (antiban roll)";
+            }
+        }
+
         try {
             if (engage) {
                 engage(npc, name);
+                EventDismissPlusEventLog.append(name, EventDismissPlusEventLog.Action.ENGAGE,
+                        EventDismissPlusEventLog.Outcome.OK, "");
             } else {
                 dismiss(npc);
+                EventDismissPlusEventLog.append(name, EventDismissPlusEventLog.Action.DISMISS,
+                        EventDismissPlusEventLog.Outcome.OK, skipNote == null ? "" : skipNote);
             }
         } catch (Exception ex) {
             Microbot.log("RandomEventNpcHandler error handling " + name + ": " + ex.getMessage());
+            EventDismissPlusEventLog.append(name,
+                    engage ? EventDismissPlusEventLog.Action.ENGAGE : EventDismissPlusEventLog.Action.DISMISS,
+                    EventDismissPlusEventLog.Outcome.ERROR,
+                    ex.getMessage() == null ? "" : ex.getMessage());
             // Fall back to dismiss on any unexpected exception
             try {
                 dismiss(npc);
@@ -213,6 +235,12 @@ public class RandomEventNpcHandler implements BlockingEvent {
             if (Rs2Dialogue.hasDialogueOption("Sorry, I'm busy")) {
                 Rs2Dialogue.clickOption("Sorry, I'm busy");
                 Microbot.log("EventDismissPlus: declined Maze prompt");
+                // v0.2.0: log Maze decline separately so analytics can distinguish
+                // Old Man gift variant (ENGAGE) from Maze variant (DECLINE).
+                EventDismissPlusEventLog.append("Mysterious Old Man",
+                        EventDismissPlusEventLog.Action.DECLINE,
+                        EventDismissPlusEventLog.Outcome.OK,
+                        "Maze prompt");
                 Global.sleep(Rs2Random.between(400, 900));
                 continue;
             }
