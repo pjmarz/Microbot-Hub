@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microbot Agent Server Dashboard</title>
+    <!-- Inline empty favicon to suppress the 404 in serve.ps1 logs. -->
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+    <!-- v0.4.0: Chart.js for the XP-over-time chart. CDN ~80KB. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+    <header>
+        <h1>Microbot Agent Server</h1>
+        <div class="status-bar">
+            <span id="connection-status" class="status-disconnected">Connecting...</span>
+            <span id="last-poll">Last poll: never</span>
+            <button id="settings-btn">Settings</button>
+        </div>
+    </header>
+
+    <div id="settings-panel" class="hidden">
+        <h3>Settings</h3>
+        <label>
+            Server URL:
+            <input type="text" id="server-url" value="http://127.0.0.1:8081">
+        </label>
+        <label>
+            Auth token (leave blank if not required):
+            <input type="password" id="auth-token" placeholder="bearer token">
+        </label>
+        <label>
+            Poll interval (sec):
+            <input type="number" id="poll-interval" value="5" min="1" max="60">
+        </label>
+        <div class="settings-actions">
+            <button id="save-settings">Save</button>
+            <button id="reset-events">Clear event log</button>
+            <button id="close-settings">Close</button>
+        </div>
+    </div>
+
+    <main>
+        <section id="player-section">
+            <h2>Player</h2>
+            <table class="kv-table">
+                <tbody>
+                    <tr><th>Name</th><td id="player-name">--</td></tr>
+                    <tr><th>Combat level</th><td id="player-combat">--</td></tr>
+                    <tr><th>Logged in</th><td id="player-logged-in">--</td></tr>
+                    <tr><th>Game state</th><td id="player-game-state">--</td></tr>
+                    <tr><th>World</th><td id="player-world">--</td></tr>
+                    <tr><th>Profile</th><td id="player-profile">--</td></tr>
+                    <tr><th>Session duration</th><td id="player-session">--</td></tr>
+                    <tr><th>Position</th><td id="player-position">--</td></tr>
+                    <tr><th>Animation</th><td id="player-animation">--</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="scripts-section">
+            <h2>Active Scripts</h2>
+            <table class="scripts-table">
+                <thead>
+                    <tr>
+                        <th>Plugin</th>
+                        <th>Status</th>
+                        <th>Runtime</th>
+                        <th class="action-col">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="scripts-body">
+                    <tr><td colspan="4" class="empty">No active scripts</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="plus-quickstart-section">
+            <h2>Plus Plugins <span class="muted">(quick start / stop)</span></h2>
+            <div id="plus-quickstart-grid" class="plus-quickstart-grid">
+                <div class="empty">Waiting for data</div>
+            </div>
+        </section>
+
+        <section id="inventory-section">
+            <h2>Inventory <span class="muted" id="inventory-summary">--</span></h2>
+            <div id="inventory-grid" class="inventory-grid">
+                <div class="empty">Waiting for data</div>
+            </div>
+        </section>
+
+        <section id="skills-section">
+            <h2>Skills <span class="muted">(delta since page load &middot; XP/hr 5-min rolling)</span></h2>
+            <table class="skills-table">
+                <thead>
+                    <tr>
+                        <th>Skill</th>
+                        <th>Level</th>
+                        <th>XP</th>
+                        <th class="delta-col">+Δ</th>
+                        <th class="rate-col">XP/hr</th>
+                    </tr>
+                </thead>
+                <tbody id="skills-body">
+                    <tr><td colspan="5" class="empty">Waiting for data</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="nearby-npcs-section">
+            <h2>
+                Nearby NPCs
+                <span class="muted" id="nearby-npcs-summary">--</span>
+                <span class="section-controls">
+                    <label class="control-label">Max <input type="number" id="npc-max-distance" min="1" max="200" value="20" class="control-input"> tiles</label>
+                </span>
+            </h2>
+            <div id="nearby-npcs-list" class="nearby-npcs-list">
+                <div class="empty">Waiting for data</div>
+            </div>
+        </section>
+
+        <section id="watchdog-section">
+            <h2>Watchdog <span class="muted" id="watchdog-summary">--</span></h2>
+            <table class="watchdog-table">
+                <tbody>
+                    <tr><th>Status</th><td id="watchdog-status">--</td></tr>
+                    <tr><th>Last event</th><td id="watchdog-last-event">--</td></tr>
+                    <tr><th>Last restart</th><td id="watchdog-last-restart">--</td></tr>
+                    <tr><th>Total restarts</th><td id="watchdog-total-restarts">--</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="xp-chart-section">
+            <h2>
+                XP Over Time
+                <span class="section-controls">
+                    <label class="control-label">Skill <select id="xp-chart-skill" class="control-input"></select></label>
+                    <label class="control-label">Window <select id="xp-chart-window" class="control-input">
+                        <option value="300000">5 min</option>
+                        <option value="900000">15 min</option>
+                        <option value="1800000" selected>30 min</option>
+                        <option value="3600000">1 hour</option>
+                        <option value="14400000">4 hours</option>
+                        <option value="86400000">24 hours</option>
+                    </select></label>
+                </span>
+            </h2>
+            <div class="chart-wrapper">
+                <canvas id="xp-chart"></canvas>
+            </div>
+        </section>
+
+        <section id="eventdismiss-stats-section">
+            <h2>Event Dismiss Stats <span class="muted" id="eventdismiss-summary">--</span></h2>
+            <table class="eventdismiss-table">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th class="num">Engaged</th>
+                        <th class="num">Dismissed</th>
+                        <th class="num">Declined</th>
+                        <th class="num">Errors</th>
+                        <th class="num">Total</th>
+                    </tr>
+                </thead>
+                <tbody id="eventdismiss-stats-body">
+                    <tr><td colspan="6" class="empty">Waiting for data</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="events-section">
+            <h2>Event Log <span class="muted">(last 10)</span></h2>
+            <ul id="events-list">
+                <li class="empty">No events yet</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer>
+        <span class="muted">tools/agentserver/dashboard/ v0.4.0 &middot; polling /state, /skills, /scripts, /login, /inventory, /npcs &middot; reading /watchdog-log, /eventdismiss-log, /history/log</span>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
