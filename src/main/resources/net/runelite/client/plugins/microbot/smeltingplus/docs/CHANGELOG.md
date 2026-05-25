@@ -4,6 +4,26 @@ Auto-walking-and-smelting "Plus" fork of upstream AutoSmelting. Part of the Skil
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.5.9] — 2026-05-25
+
+Cleanup bundle. Closes two small gaps before the long v1.0.0 soak: one non-functional enum entry, one lifecycle leak.
+
+### Removed
+
+- **MOLTEN_GLASS** entry from `Bars.java`. The deposit-filter fix in v0.5.8 made the bot's banking behavior safe for it, but the actual smelt path was never functional: `AutoSmeltingPlusScript.smeltAtFurnace` clicks `Rs2Widget.clickWidget(activeBar.getName())` which assumes the smelt widget has a Molten glass option (it doesn't — glassblowing uses use-item-on-furnace, not the smelt widget). Better to remove the foot-gun than leave it. `Bars.java` audit log + new Known gaps section document the removal and explain what a future glassblowing fork would need (separate widget path + sand/ash/empty-bucket inventory handling).
+
+### Fixed
+
+- **`Rs2Walker.disableTeleports` leak.** `AutoSmeltingPlusScript.run()` sets the global static flag to `true` (anchor logic depends on Rs2Walker not inserting unexpected teleports into routes) but never reset it. After plugin shutdown, any other plugin that uses Rs2Walker would inherit `disableTeleports=true` and walk overland when it meant to teleport. Same lifecycle-leak shape as the `pauseAllScripts` flag fixed in v0.5.7. Single-line fix: reset to `false` in `shutdown()` before `super.shutdown()`.
+
+### Cross-plugin note
+
+- AutoSmithingPlus has the same `Rs2Walker.disableTeleports` leak at line 89 of its script. Flagging for its own v0.5.9 bump when the Smithing pilot rolls. AutoMiningPlus and AutoWoodcuttingPlus don't touch the flag and are unaffected.
+
+### Rationale
+
+After v0.5.9 the recommended-patterns checklist from `template/TEMPLATE.md` is fully covered for Smelting. No documented roadmap items remain unblocked: the only deferred candidate (v0.6.0+ cross-plugin smelt coordination) is gated on MiningPlus v0.6.0 LAST_LOCATION mode, which doesn't exist yet. Remaining v1.0.0 gates are pure process: 20-hour throwaway uptime + README + upstream PR (sequence after EventDismissPlus per the recommended ordering).
+
 ## [0.5.8] — 2026-05-25
 
 Closes the v0.4.1 deferred audit. Fixes a deposit-filter gap for non-"bar"-suffix smelting outputs.

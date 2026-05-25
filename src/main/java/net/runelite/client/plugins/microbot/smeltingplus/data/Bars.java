@@ -28,6 +28,25 @@ import java.util.Map;
  *       positive caused by table-structure formatting; level 15 verified manually on the wiki.
  *       Required by Cycle A's new progressive-smelt feature, which keys off
  *       {@code getRequiredSmithingLevel()}.</li>
+ *   <li><b>2026-05-25 (v0.5.9):</b> Dropped MOLTEN_GLASS entry. The default
+ *       {@code itemsToBank="bar"} filter missed it (fixed generically in v0.5.8 via
+ *       auto-augment), but the underlying smelt path was never functional either:
+ *       glassblowing in OSRS uses a use-item-on-furnace interaction, not the smelt widget
+ *       that {@code AutoSmeltingPlusScript.smeltAtFurnace} invokes. Enum is now 9 of 9 actual
+ *       metal bars. See Known gaps below.</li>
+ * </ul>
+ *
+ * <h2>Known gaps</h2>
+ * <ul>
+ *   <li><b>Glassblowing not supported.</b> Molten glass production (Bucket of sand + Soda ash
+ *       to Molten glass) uses a use-item-on-furnace interaction, not the smelt widget.
+ *       Re-adding it requires a separate widget path in {@code smeltAtFurnace} plus
+ *       inventory composition handling (sand + ash to glass + empty bucket).</li>
+ *   <li><b>Cannonballs are handled by upstream AutoCannonballSmelter</b>, not here. Steel bar
+ *       to cannonball uses an Edgeville-furnace-specific mould interaction; out of scope.</li>
+ *   <li><b>Silver/Gold jewellery</b> (rings, necklaces, amulets) uses jewellery moulds at a
+ *       furnace via a separate widget. The existing upstream {@code crafting/jewelry} plugin
+ *       is the cleaner home for that flow.</li>
  * </ul>
  */
 @Getter
@@ -41,8 +60,7 @@ public enum Bars {
     GOLD("Gold bar", ItemID.GOLD_BAR,  40, Map.of(Ores.GOLD, 1)),
     MITHRIL("Mithril bar", ItemID.MITHRIL_BAR,  50, Map.of(Ores.MITHRIL, 1, Ores.COAL, 4)),
     ADAMANTITE("Adamantite bar", ItemID.ADAMANTITE_BAR,  70, Map.of(Ores.ADAMANTITE, 1, Ores.COAL, 6)),
-    RUNITE("Runite bar", ItemID.RUNITE_BAR,  85, Map.of(Ores.RUNITE, 1, Ores.COAL, 8)),
-    MOLTEN_GLASS("Molten glass", ItemID.MOLTEN_GLASS,  1, Map.of(Ores.SODA_ASH, 1, Ores.BUCKET_OF_SAND, 1)),;;
+    RUNITE("Runite bar", ItemID.RUNITE_BAR,  85, Map.of(Ores.RUNITE, 1, Ores.COAL, 8));
 
     private final String name;
     private final int id;

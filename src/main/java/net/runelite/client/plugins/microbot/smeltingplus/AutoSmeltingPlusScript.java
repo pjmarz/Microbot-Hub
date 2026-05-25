@@ -210,6 +210,9 @@ public class AutoSmeltingPlusScript extends Script {
 
     @Override
     public void shutdown() {
+        // v0.5.9: reset disableTeleports flag set in run() so it doesn't leak to other plugins
+        // sharing Rs2Walker. Same lifecycle-hygiene shape as the v0.5.7 pauseAllScripts reset.
+        Rs2Walker.disableTeleports = false;
         super.shutdown();
         Rs2Antiban.resetAntibanSettings();
     }
