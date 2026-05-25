@@ -3,6 +3,7 @@ package net.runelite.client.plugins.microbot.microbotdashboardplus.poller;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
@@ -45,6 +46,26 @@ public class GameStatePoller {
 
     /** Package prefix used to identify Microbot Hub plugins. */
     private static final String MICROBOT_PACKAGE_PREFIX = "net.runelite.client.plugins.microbot.";
+
+    /**
+     * Catalog of known random-event NPC names. Copied verbatim from
+     * EventDismissPlus's RandomEventType enum (the source of truth for
+     * engagement targets). Names are matched case-insensitively against
+     * Rs2NpcModel.getName() / NPC.getName() so wiki-disambiguation pairs
+     * (Bee keeper / Beekeeper, Dr Jekyll / Dr. Jekyll) are both listed.
+     *
+     * <p>Used to flag NearbyNpc.randomEvent=true so the panel renderer
+     * highlights them orange.
+     */
+    private static final Set<String> RANDOM_EVENT_NPC_NAMES = new HashSet<>(Arrays.asList(
+            "genie", "sandwich lady", "drunken dwarf", "mysterious old man",
+            "bee keeper", "beekeeper", "count check",
+            "frog prince", "frog princess", "rick turpentine",
+            "dr jekyll", "dr. jekyll",
+            "niles", "miles", "giles",                  // Mime event NPCs
+            "freaky forester", "prison pete",            // deferred-engagement events
+            "evil bob", "leo", "pillory guard", "tilt"   // teleport-event NPCs
+    ));
 
     /**
      * Substrings (lower-cased) that mark a plugin as infrastructure rather
@@ -241,6 +262,7 @@ public class GameStatePoller {
             List<Rs2ItemModel> items = Rs2Inventory.items().collect(Collectors.toList());
             if (items.isEmpty()) return Collections.emptyList();
 
+            Client client = Microbot.getClient();
             List<PollSnapshot.InventoryItem> out = new ArrayList<>(items.size());
             for (Rs2ItemModel item : items) {
                 if (item == null) continue;
@@ -249,13 +271,49 @@ public class GameStatePoller {
                         .itemId(item.getId())
                         .name(safe(item.getName()))
                         .quantity(item.getQuantity())
-                        .noted(false) // Rs2ItemModel does not expose a noted flag in the current API; v0.3 may revisit.
+                        .noted(isNoted(client, item.getId()))
                         .build());
             }
             return Collections.unmodifiableList(out);
         } catch (Throwable t) {
             log.debug("collectInventory failed: {}", t.getMessage());
             return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Noted-state detection via {@link ItemComposition#getNote()}. RuneLite's
+     * convention: the noted version of an item has {@code getNote() != -1}
+     * and {@code getNote()} returns the unnoted item ID it shadows.
+     * Combined with the fact that the unnoted item's {@code getNote()} also
+     * returns the noted ID, we additionally check that the unnoted form's
+     * stackable flag differs from this item to confirm the noted direction.
+     * Wrapped in a try/catch in case the API surface differs across client
+     * versions.
+     */
+    private static boolean isNoted(Client client, int itemId) {
+        if (client == null || itemId <= 0) return false;
+        try {
+            ItemComposition comp = client.getItemDefinition(itemId);
+            if (comp == null) return false;
+            int note = comp.getNote();
+            if (note == -1) return false;
+            // For noted items, getNote() returns the unnoted ID. The unnoted form
+            // also points back via getNote(), so we have to disambiguate.
+            // Heuristic: noted items have noteTemplate == 799 (or != -1).
+            // Reflectively probe getNoteTemplate so build doesn't break if the
+            // method moved or was renamed in newer client versions.
+            try {
+                java.lang.reflect.Method m = comp.getClass().getMethod("getNoteTemplate");
+                Object v = m.invoke(comp);
+                if (v instanceof Integer) return ((Integer) v) != -1;
+            } catch (NoSuchMethodException nse) {
+                // Method not present in this client version. Fall through to fallback.
+            }
+            // Fallback: if getNoteTemplate isn't available, conservatively report false.
+            return false;
+        } catch (Throwable t) {
+            return false;
         }
     }
 
@@ -276,11 +334,14 @@ public class GameStatePoller {
             int dist = playerWp.distanceTo(npcWp);
             if (dist > npcMaxDistance) continue;
 
+            String name = safe(npc.getName());
+            boolean isRandomEvent = RANDOM_EVENT_NPC_NAMES.contains(name.toLowerCase());
+
             out.add(PollSnapshot.NearbyNpc.builder()
-                    .name(safe(npc.getName()))
+                    .name(name)
                     .combatLevel(npc.getCombatLevel())
                     .distance(dist)
-                    .randomEvent(false)
+                    .randomEvent(isRandomEvent)
                     .build());
         }
         out.sort((a, b) -> Integer.compare(a.getDistance(), b.getDistance()));

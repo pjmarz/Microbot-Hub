@@ -1,6 +1,7 @@
 package net.runelite.client.plugins.microbot.microbotdashboardplus.panels;
 
 import net.runelite.api.Skill;
+import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.data.PollSnapshot;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.data.XpHistory;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.poller.GameStatePoller;
@@ -44,6 +45,10 @@ public class XpChartPanel extends DashboardSection {
     };
     private static final int DEFAULT_WINDOW_INDEX = 2; // 30 min
 
+    private static final String CONFIG_GROUP = "MicrobotDashboardPlus";
+    private static final String K_CHART_SKILL = "chartSkill";
+    private static final String K_CHART_WINDOW_INDEX = "chartWindowIndex";
+
     private final Skill[] selectableSkills;
     private final JComboBox<Skill> skillCombo;
     private final JComboBox<WindowChoice> windowCombo;
@@ -67,9 +72,13 @@ public class XpChartPanel extends DashboardSection {
         skillCombo = new JComboBox<>(selectableSkills);
         skillCombo.setPreferredSize(new Dimension(110, 20));
         skillCombo.setRenderer(new SkillRenderer());
-        Skill defaultSkill = findDefault(selectableSkills, Skill.MINING);
+        Skill defaultSkill = restoreSkill(findDefault(selectableSkills, Skill.MINING));
         skillCombo.setSelectedItem(defaultSkill);
-        skillCombo.addActionListener(e -> canvas.repaint());
+        skillCombo.addActionListener(e -> {
+            Object sel = skillCombo.getSelectedItem();
+            if (sel instanceof Skill) persistString(K_CHART_SKILL, ((Skill) sel).name());
+            canvas.repaint();
+        });
         addHeaderControl(skillCombo);
 
         JLabel windowLbl = new JLabel("Window");
@@ -79,8 +88,11 @@ public class XpChartPanel extends DashboardSection {
 
         windowCombo = new JComboBox<>(WINDOWS);
         windowCombo.setPreferredSize(new Dimension(90, 20));
-        windowCombo.setSelectedIndex(DEFAULT_WINDOW_INDEX);
-        windowCombo.addActionListener(e -> canvas.repaint());
+        windowCombo.setSelectedIndex(restoreWindowIndex());
+        windowCombo.addActionListener(e -> {
+            persistString(K_CHART_WINDOW_INDEX, Integer.toString(windowCombo.getSelectedIndex()));
+            canvas.repaint();
+        });
         addHeaderControl(windowCombo);
 
         // Body.
@@ -102,6 +114,40 @@ public class XpChartPanel extends DashboardSection {
     private static Skill findDefault(Skill[] skills, Skill preferred) {
         for (Skill s : skills) if (s == preferred) return s;
         return skills.length == 0 ? null : skills[0];
+    }
+
+    // -----------------------------------------------------------------
+    // Persistence
+    // -----------------------------------------------------------------
+
+    private Skill restoreSkill(Skill fallback) {
+        try {
+            String raw = Microbot.getConfigManager().getConfiguration(CONFIG_GROUP, K_CHART_SKILL);
+            if (raw == null || raw.isEmpty()) return fallback;
+            Skill found = Skill.valueOf(raw);
+            for (Skill s : selectableSkills) if (s == found) return s;
+            return fallback;
+        } catch (Throwable t) {
+            return fallback;
+        }
+    }
+
+    private int restoreWindowIndex() {
+        try {
+            String raw = Microbot.getConfigManager().getConfiguration(CONFIG_GROUP, K_CHART_WINDOW_INDEX);
+            if (raw == null || raw.isEmpty()) return DEFAULT_WINDOW_INDEX;
+            int idx = Integer.parseInt(raw);
+            if (idx < 0 || idx >= WINDOWS.length) return DEFAULT_WINDOW_INDEX;
+            return idx;
+        } catch (Throwable t) {
+            return DEFAULT_WINDOW_INDEX;
+        }
+    }
+
+    private static void persistString(String key, String value) {
+        try {
+            Microbot.getConfigManager().setConfiguration(CONFIG_GROUP, key, value);
+        } catch (Throwable ignored) { /* config not ready -- swallow */ }
     }
 
     @Override

@@ -62,7 +62,7 @@ import java.awt.image.BufferedImage;
 @Slf4j
 public class MicrobotDashboardPlusPlugin extends Plugin {
 
-    public static final String version = "0.2.1";
+    public static final String version = "0.2.2";
 
     @Inject
     private MicrobotDashboardPlusConfig config;
@@ -157,18 +157,36 @@ public class MicrobotDashboardPlusPlugin extends Plugin {
     }
 
     /**
-     * Programmatic 16x16 RuneLite-green "D" icon. Avoids needing a PNG
-     * resource for v0.2.0; v1.0.0 ships a proper icon.
+     * Programmatic 16x16 dashboard icon. v0.2.2 polish: dark background with
+     * a small "rising chart line" in RuneLite green to evoke the dashboard.
+     * A hand-designed PNG icon (16x16 + 32x32, hosted on chsami.github.io)
+     * lands in v1.0.0 with the upstream PR-prep artwork pass.
      */
     private static BufferedImage buildPlaceholderIcon() {
         BufferedImage img = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         try {
-            g.setColor(new Color(0x00AA00));
+            g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                    java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // Dark rounded background.
+            g.setColor(new Color(0x2B, 0x2B, 0x2B));
             g.fillRoundRect(0, 0, 16, 16, 4, 4);
-            g.setColor(Color.WHITE);
-            g.setFont(new Font("SansSerif", Font.BOLD, 12));
-            g.drawString("D", 4, 13);
+
+            // Subtle border.
+            g.setColor(new Color(0x44, 0x44, 0x44));
+            g.drawRoundRect(0, 0, 15, 15, 4, 4);
+
+            // Rising chart line in RuneLite green.
+            g.setColor(new Color(0x00, 0xAA, 0x00));
+            g.setStroke(new java.awt.BasicStroke(1.5f));
+            // Polyline: low-left up to high-right.
+            int[] xs = {3, 6,  8, 11, 13};
+            int[] ys = {12, 9, 10,  5,  4};
+            g.drawPolyline(xs, ys, xs.length);
+
+            // Small dot at the right endpoint for emphasis.
+            g.fillOval(12, 3, 3, 3);
         } finally {
             g.dispose();
         }

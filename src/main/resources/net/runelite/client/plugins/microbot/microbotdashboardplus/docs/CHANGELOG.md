@@ -4,6 +4,25 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.2.2] — 2026-05-25
+
+Small QoL polish bundle before v0.3.0 feature work. Five carry-forward items from the v0.2.1 CHANGELOG.
+
+### Added
+
+- **Random-event NPC highlighting** in Nearby NPCs. Catalog of known event names (Genie, Sandwich lady, Bee keeper, Mysterious Old Man, Niles/Miles/Giles, Freaky Forester, Evil Bob, Leo, etc.) copied from EventDismissPlus's RandomEventType enum. Case-insensitive match. Matching rows render orange via the existing `NearbyNpc.randomEvent=true` path.
+- **Window size + position persistence**. `DashboardWindow` saves bounds to ConfigManager keys `windowX/Y/Width/Height` on `componentMoved`/`componentResized`. Restores on construct, with a sanity check that the saved position intersects at least one visible monitor (handles multi-monitor disconnect cleanly). Falls back to centered 1100x800 if no saved bounds.
+- **Per-section persistence for the XP chart**. Skill (enum name) and window-index choices saved to config on combo change. Restored on construct. The chart now remembers what you were looking at across launcher restarts.
+- **Inventory noted-state detection**. `GameStatePoller.isNoted()` reads `ItemComposition.getNote()` + reflectively probes `getNoteTemplate()` (defensive against client API drift). Sets `PollSnapshot.InventoryItem.noted=true` when the item is the noted form. `InventoryPanel` already styles noted items in orange italic.
+- **Polished plugin icon**. Replaced the simple "D" placeholder with a dashboard glyph: dark rounded background + RuneLite-green rising-line chart + dot at the right endpoint. Still programmatic (no PNG resource yet); a hand-designed PNG ships in v1.0.0 alongside the upstream-PR cardUrl artwork.
+
+### Carried forward to v0.3.0
+
+- Discord webhook for level-up / random-event notifications
+- Compact mode toggle
+- Per-section visibility config
+- Alert thresholds (Mining hits 60 → notify)
+
 ## [0.2.1] — 2026-05-25
 
 Polish bundle. Fills the v0.2.0 placeholders with real data.

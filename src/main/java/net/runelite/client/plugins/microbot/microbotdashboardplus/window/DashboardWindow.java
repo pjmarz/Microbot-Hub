@@ -17,6 +17,8 @@ import net.runelite.client.plugins.microbot.microbotdashboardplus.poller.GameSta
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 
+import net.runelite.client.plugins.microbot.Microbot;
+
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -31,6 +33,8 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -64,14 +68,21 @@ public class DashboardWindow extends JFrame {
     private final JLabel statusLabel = new JLabel("Connecting...");
     private final JLabel lastPollLabel = new JLabel("Last poll: never");
 
+    private static final String CONFIG_GROUP = "MicrobotDashboardPlus";
+    private static final String K_WIN_X = "windowX";
+    private static final String K_WIN_Y = "windowY";
+    private static final String K_WIN_W = "windowWidth";
+    private static final String K_WIN_H = "windowHeight";
+
     public DashboardWindow(GameStatePoller poller) {
         super("Microbot Dashboard Plus");
         this.poller = poller;
 
         setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
         setMinimumSize(new Dimension(900, 600));
-        setSize(1100, 800);
-        setLocationRelativeTo(null);
+
+        restoreWindowBounds();
+        installBoundsPersistenceListener();
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -94,6 +105,81 @@ public class DashboardWindow extends JFrame {
             toFront();
             requestFocus();
         });
+    }
+
+    // ---------------------------------------------------------------------
+    // Bounds persistence
+    // ---------------------------------------------------------------------
+
+    private void restoreWindowBounds() {
+        Integer x = readInt(K_WIN_X);
+        Integer y = readInt(K_WIN_Y);
+        Integer w = readInt(K_WIN_W);
+        Integer h = readInt(K_WIN_H);
+        if (w == null || h == null || w < 600 || h < 400) {
+            // No saved bounds (or sanity-fail) -- use defaults.
+            setSize(1100, 800);
+            setLocationRelativeTo(null);
+            return;
+        }
+        setSize(w, h);
+        if (x != null && y != null && isOnVisibleScreen(x, y, w, h)) {
+            setLocation(x, y);
+        } else {
+            setLocationRelativeTo(null);
+        }
+    }
+
+    private static boolean isOnVisibleScreen(int x, int y, int w, int h) {
+        try {
+            java.awt.Rectangle visible = new java.awt.Rectangle();
+            for (java.awt.GraphicsDevice gd : java.awt.GraphicsEnvironment
+                    .getLocalGraphicsEnvironment().getScreenDevices()) {
+                visible = visible.union(gd.getDefaultConfiguration().getBounds());
+            }
+            // Require at least 100x100 of the saved window to land inside any monitor.
+            java.awt.Rectangle saved = new java.awt.Rectangle(x, y, Math.max(100, w), Math.max(100, h));
+            return visible.intersects(saved);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private void installBoundsPersistenceListener() {
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentMoved(ComponentEvent e) { saveBounds(); }
+            @Override
+            public void componentResized(ComponentEvent e) { saveBounds(); }
+        });
+    }
+
+    private void saveBounds() {
+        try {
+            writeInt(K_WIN_X, getX());
+            writeInt(K_WIN_Y, getY());
+            writeInt(K_WIN_W, getWidth());
+            writeInt(K_WIN_H, getHeight());
+        } catch (Throwable t) {
+            log.debug("saveBounds failed: {}", t.getMessage());
+        }
+    }
+
+    private static Integer readInt(String key) {
+        try {
+            String raw = Microbot.getConfigManager().getConfiguration(CONFIG_GROUP, key);
+            return raw == null || raw.isEmpty() ? null : Integer.parseInt(raw);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static void writeInt(String key, int value) {
+        try {
+            Microbot.getConfigManager().setConfiguration(CONFIG_GROUP, key, Integer.toString(value));
+        } catch (Throwable ignored) {
+            // ConfigManager not yet ready in some lifecycle edge cases; swallow.
+        }
     }
 
     public void disposeWindow() {
@@ -213,7 +299,7 @@ public class DashboardWindow extends JFrame {
         footer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         footer.setBorder(new EmptyBorder(4, 10, 4, 10));
 
-        JLabel info = new JLabel("MicrobotDashboardPlus v0.2.1 - in-process poller, no HTTP");
+        JLabel info = new JLabel("MicrobotDashboardPlus v0.2.2 - in-process poller, no HTTP");
         info.setForeground(Color.GRAY);
         info.setFont(FontManager.getRunescapeSmallFont());
         footer.add(info);
