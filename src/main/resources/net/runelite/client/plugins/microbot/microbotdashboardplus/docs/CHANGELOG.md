@@ -4,6 +4,14 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [1.0.0] — 2026-05-25
+
+Version bump for upstream PR readiness. No functional changes since 0.3.4.
+
+### Changed
+
+- `version` constant in `MicrobotDashboardPlusPlugin` bumped to `1.0.0`. Footer string in `DashboardWindow` and sidebar subtitle in `DashboardPanel` updated to match.
+
 ## [0.3.4] — 2026-05-25
 
 UX cleanup. Removed architecture-detail strings that aren't relevant to end users.
