@@ -4,6 +4,19 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.3.1] — 2026-05-25
+
+Pre-v1.0.0 polish before upstream PR prep. Three small items.
+
+### Added
+
+- **In-dashboard alert banner**. Yellow strip at the top of the floating window (below the header) that appears when an alert threshold crosses. Dismissable. Fires regardless of Discord configuration, so users without a webhook still see threshold crossings. Implemented via a new `GameStatePoller.setBannerCallback(Consumer<String>)` hook called whenever a threshold fires; `DashboardWindow.showAlertBanner()` routes to the EDT and shows the banner. Hidden by default; max height 32px so it doesn't push the section grid down by much.
+
+### Changed
+
+- **Discord webhook URL field is now masked** in the config panel. Added `secret = true` to the `ConfigItem` so the value renders as dots in the UI. Helps prevent accidental leakage in screenshots. The value still persists in the config file like any other string -- this is a UI-level mask only.
+- **Active Scripts filter** now excludes "Test Runner" via the `"test runner"`/`"testrunner"` substrings in `INFRA_NAME_SUBSTRINGS`. Quest Helper and Mouse Macro Recorder remain visible: those are legitimate user-facing plugins, not dev infrastructure. Pete observed Test Runner leaking through in v0.3.0; v0.3.1 catches it without expanding the heuristic too aggressively.
+
 ## [0.3.0] — 2026-05-25
 
 Feature release: per-section visibility, Discord webhook notifications, and per-skill alert thresholds.

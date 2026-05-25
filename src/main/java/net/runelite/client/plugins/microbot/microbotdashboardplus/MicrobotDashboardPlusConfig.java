@@ -123,7 +123,8 @@ public interface MicrobotDashboardPlusConfig extends Config {
             name = "Discord webhook URL",
             description = "Paste a Discord channel webhook URL (https://discord.com/api/webhooks/...). Leave blank to disable Discord notifications. Treat this URL as a secret -- do not share it.",
             position = 0,
-            section = notificationsSection
+            section = notificationsSection,
+            secret = true
     )
     default String discordWebhookUrl() {
         return "";

@@ -85,7 +85,9 @@ public class GameStatePoller {
             "web walker",   // covers "[M] Web Walker" and any package "WebWalker*"
             "webwalker",    // covers simple class names without spaces
             "minventory",   // "[M] MInventory Setups"
-            "microbot dashboard plus" // the dashboard itself
+            "microbot dashboard plus", // the dashboard itself
+            "test runner",  // dev-infrastructure: shouldn't appear as a user script
+            "testrunner"
     };
 
     /**
@@ -128,6 +130,14 @@ public class GameStatePoller {
     private boolean notifyLevelUp = true;
     private boolean notifyRandomEvent = true;
     private boolean notifyAlerts = true;
+
+    /**
+     * Optional UI-side alert callback. Fired with a short message ("Mining
+     * reached level 60") whenever an alert threshold crosses, regardless of
+     * Discord configuration. DashboardWindow registers one to drive the
+     * in-window banner.
+     */
+    private Consumer<String> bannerCallback;
 
     private ScheduledExecutorService executor;
     private ScheduledFuture<?> scheduledTask;
@@ -186,6 +196,9 @@ public class GameStatePoller {
     }
     public void setAlertThresholds(String csv) {
         if (alertManager != null) alertManager.setThresholdsFromConfig(csv);
+    }
+    public void setBannerCallback(Consumer<String> bannerCallback) {
+        this.bannerCallback = bannerCallback;
     }
 
     public void refreshNow() {
@@ -257,8 +270,15 @@ public class GameStatePoller {
         if (alertManager != null && alertManager.checkCrossing(skill, to)) {
             alertFired = true;
             Integer threshold = alertManager.thresholdFor(skill);
+            String alertMsg = skillName + " reached level " + threshold + "!";
             if (notifyAlerts && notifier != null) {
-                notifier.send("ALERT: " + skillName + " reached level " + threshold + "!");
+                notifier.send("ALERT: " + alertMsg);
+            }
+            // Always fire the UI banner on a threshold crossing, even if
+            // Discord is off or not configured.
+            if (bannerCallback != null) {
+                try { bannerCallback.accept(alertMsg); }
+                catch (Throwable t) { log.debug("Banner callback threw: {}", t.getMessage()); }
             }
         }
         if (!alertFired && notifyLevelUp && notifier != null) {

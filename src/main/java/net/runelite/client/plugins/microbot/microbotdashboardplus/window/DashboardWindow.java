@@ -20,6 +20,8 @@ import net.runelite.client.ui.FontManager;
 
 import net.runelite.client.plugins.microbot.Microbot;
 
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -74,6 +76,10 @@ public class DashboardWindow extends JFrame {
     private final JLabel statusLabel = new JLabel("Connecting...");
     private final JLabel lastPollLabel = new JLabel("Last poll: never");
 
+    /** Alert banner: yellow strip at top, hidden by default, shown when threshold crosses. */
+    private JPanel alertBanner;
+    private JLabel alertBannerText;
+
     private static final String CONFIG_GROUP = "MicrobotDashboardPlus";
     private static final String K_WIN_X = "windowX";
     private static final String K_WIN_Y = "windowY";
@@ -95,11 +101,21 @@ public class DashboardWindow extends JFrame {
         root.setBackground(ColorScheme.DARK_GRAY_COLOR);
         root.setBorder(new EmptyBorder(8, 12, 8, 12));
 
-        root.add(buildHeader(), BorderLayout.NORTH);
+        // North = header + (hidden) alert banner stacked vertically.
+        JPanel northContainer = new JPanel();
+        northContainer.setLayout(new BoxLayout(northContainer, BoxLayout.Y_AXIS));
+        northContainer.setOpaque(false);
+        northContainer.add(buildHeader());
+        northContainer.add(buildAlertBanner());
+        root.add(northContainer, BorderLayout.NORTH);
+
         root.add(buildSectionScroll(), BorderLayout.CENTER);
         root.add(buildFooter(), BorderLayout.SOUTH);
 
         setContentPane(root);
+
+        // Wire poller banner callback once everything's built.
+        poller.setBannerCallback(this::showAlertBanner);
 
         snapshotListener = this::applySnapshot;
         poller.addListener(snapshotListener);
@@ -330,12 +346,57 @@ public class DashboardWindow extends JFrame {
         parent.add(section, c);
     }
 
+    private JPanel buildAlertBanner() {
+        alertBanner = new JPanel(new BorderLayout(8, 0));
+        alertBanner.setBackground(new Color(0xD4, 0xA0, 0x17)); // RuneLite warning gold
+        alertBanner.setBorder(new EmptyBorder(6, 12, 6, 8));
+
+        alertBannerText = new JLabel("");
+        alertBannerText.setForeground(new Color(0x1E, 0x1E, 0x1E));
+        alertBannerText.setFont(FontManager.getRunescapeBoldFont());
+        alertBanner.add(alertBannerText, BorderLayout.CENTER);
+
+        JButton dismiss = new JButton("Dismiss");
+        dismiss.setFont(FontManager.getRunescapeSmallFont());
+        dismiss.setBackground(new Color(0x66, 0x4D, 0x09));
+        dismiss.setForeground(Color.WHITE);
+        dismiss.setFocusPainted(false);
+        dismiss.setBorderPainted(false);
+        dismiss.addActionListener(e -> hideAlertBanner());
+        alertBanner.add(dismiss, BorderLayout.EAST);
+
+        alertBanner.setVisible(false);
+        // Bound the height so the BoxLayout doesn't stretch it.
+        alertBanner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+        return alertBanner;
+    }
+
+    /** Called from the poller's banner callback (any thread). Switches to EDT internally. */
+    public void showAlertBanner(String message) {
+        SwingUtilities.invokeLater(() -> {
+            if (alertBanner == null || alertBannerText == null) return;
+            alertBannerText.setText("🎯  " + (message == null ? "Threshold reached" : message));
+            alertBanner.setVisible(true);
+            revalidate();
+            repaint();
+        });
+    }
+
+    public void hideAlertBanner() {
+        SwingUtilities.invokeLater(() -> {
+            if (alertBanner == null) return;
+            alertBanner.setVisible(false);
+            revalidate();
+            repaint();
+        });
+    }
+
     private JPanel buildFooter() {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT));
         footer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         footer.setBorder(new EmptyBorder(4, 10, 4, 10));
 
-        JLabel info = new JLabel("MicrobotDashboardPlus v0.3.0 - in-process poller, no HTTP");
+        JLabel info = new JLabel("MicrobotDashboardPlus v0.3.1 - in-process poller, no HTTP");
         info.setForeground(Color.GRAY);
         info.setFont(FontManager.getRunescapeSmallFont());
         footer.add(info);
