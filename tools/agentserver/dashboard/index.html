@@ -74,6 +74,13 @@
             </table>
         </section>
 
+        <section id="plus-quickstart-section">
+            <h2>Plus Plugins <span class="muted">(quick start / stop)</span></h2>
+            <div id="plus-quickstart-grid" class="plus-quickstart-grid">
+                <div class="empty">Waiting for data</div>
+            </div>
+        </section>
+
         <section id="inventory-section">
             <h2>Inventory <span class="muted" id="inventory-summary">--</span></h2>
             <div id="inventory-grid" class="inventory-grid">
@@ -82,7 +89,7 @@
         </section>
 
         <section id="skills-section">
-            <h2>Skills <span class="muted">(delta since page load)</span></h2>
+            <h2>Skills <span class="muted">(delta since page load &middot; XP/hr 5-min rolling)</span></h2>
             <table class="skills-table">
                 <thead>
                     <tr>
@@ -99,6 +106,25 @@
             </table>
         </section>
 
+        <section id="nearby-npcs-section">
+            <h2>Nearby NPCs <span class="muted" id="nearby-npcs-summary">--</span></h2>
+            <div id="nearby-npcs-list" class="nearby-npcs-list">
+                <div class="empty">Waiting for data</div>
+            </div>
+        </section>
+
+        <section id="watchdog-section">
+            <h2>Watchdog <span class="muted" id="watchdog-summary">--</span></h2>
+            <table class="watchdog-table">
+                <tbody>
+                    <tr><th>Status</th><td id="watchdog-status">--</td></tr>
+                    <tr><th>Last event</th><td id="watchdog-last-event">--</td></tr>
+                    <tr><th>Last restart</th><td id="watchdog-last-restart">--</td></tr>
+                    <tr><th>Total restarts</th><td id="watchdog-total-restarts">--</td></tr>
+                </tbody>
+            </table>
+        </section>
+
         <section id="events-section">
             <h2>Event Log <span class="muted">(last 10)</span></h2>
             <ul id="events-list">
@@ -108,7 +134,7 @@
     </main>
 
     <footer>
-        <span class="muted">tools/agentserver/dashboard/ v0.2.0 &middot; polling /state, /skills, /scripts, /login, /inventory</span>
+        <span class="muted">tools/agentserver/dashboard/ v0.3.0 &middot; polling /state, /skills, /scripts, /login, /inventory, /npcs &middot; reading /watchdog-log</span>
     </footer>
 
     <script src="app.js"></script>

@@ -16,7 +16,8 @@
 param(
     [int]$Port = 8088,
     [int]$AgentPort = 8081,
-    [string]$TokenPath = "$env:USERPROFILE\.runelite\.agent-token"
+    [string]$TokenPath = "$env:USERPROFILE\.runelite\.agent-token",
+    [string]$WatchdogLogPath = "$env:USERPROFILE\.runelite\microbot-watchdog.csv"
 )
 
 $root = $PSScriptRoot
@@ -142,6 +143,35 @@ function Send-Proxy($ctx, $relPath) {
     }
 }
 
+# v0.3.0: serve the watchdog CSV log so the dashboard can render restart
+# history. Returns the file contents as text/csv. Empty body if the file
+# doesn't exist yet (watchdog hasn't been started, or it ran but never logged).
+function Send-WatchdogLog($ctx) {
+    $resp = $ctx.Response
+    if (Test-Path -LiteralPath $WatchdogLogPath) {
+        try {
+            $content = Get-Content -LiteralPath $WatchdogLogPath -Raw
+            if ($null -eq $content) { $content = "" }
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($content)
+            $resp.ContentType = "text/csv; charset=utf-8"
+            $resp.ContentLength64 = $bytes.Length
+            $resp.OutputStream.Write($bytes, 0, $bytes.Length)
+            Write-Host "200 GET /watchdog-log ($($bytes.Length) bytes)"
+        } catch {
+            $resp.StatusCode = 500
+            $msg = [System.Text.Encoding]::UTF8.GetBytes("Read failed: $($_.Exception.Message)")
+            $resp.OutputStream.Write($msg, 0, $msg.Length)
+            Write-Host "500 GET /watchdog-log ($($_.Exception.Message))"
+        }
+    } else {
+        # File doesn't exist yet. Return empty 200 (not 404) so the dashboard
+        # can render an "unavailable" state instead of treating it as an error.
+        $resp.ContentType = "text/csv; charset=utf-8"
+        $resp.ContentLength64 = 0
+        Write-Host "200 GET /watchdog-log (no file yet)"
+    }
+}
+
 try {
     while ($listener.IsListening) {
         $ctx = $listener.GetContext()
@@ -153,6 +183,9 @@ try {
             } elseif ($relPath -eq 'api') {
                 # Edge case: /api with no trailing slash → forward to root.
                 Send-Proxy $ctx ''
+            } elseif ($relPath -eq 'watchdog-log') {
+                # v0.3.0: serve the watchdog CSV directly.
+                Send-WatchdogLog $ctx
             } else {
                 Send-StaticFile $ctx $relPath
             }

@@ -60,6 +60,42 @@ let lastLogin = null;          // Most recent /login (currentWorld, profile, etc
 let lastInventoryCounts = null; // Map<itemName, totalQty> for diff
 let events = [];               // Ring buffer
 let stoppingClassNames = new Set();  // className -> in-flight Stop request (UI disable)
+let startingClassNames = new Set();  // className -> in-flight Start request
+
+// v0.3.0: rolling XP/hr — per-skill ring buffer of {ts, xp} samples.
+// Windowed rate replaces session-average so BreakHandler breaks (no XP gained
+// during a break) don't drag the rate down for the rest of the session.
+const XP_RING_WINDOW_MS = 5 * 60 * 1000;   // 5 minutes
+const xpRingBuffer = new Map();             // skillName -> [{ts, xp}]
+
+// v0.3.0: known Plus plugins for the Quick Start panel. Hardcoded ordered list
+// so the panel is stable and useful even when scripts API doesn't expose all
+// of them as installed.
+const PLUS_PLUGINS = [
+    { name: 'Auto Mining Plus',     className: 'net.runelite.client.plugins.microbot.miningplus.AutoMiningPlusPlugin' },
+    { name: 'Auto Smelting Plus',   className: 'net.runelite.client.plugins.microbot.smeltingplus.AutoSmeltingPlusPlugin' },
+    { name: 'Auto Smithing Plus',   className: 'net.runelite.client.plugins.microbot.smithingplus.AutoSmithingPlusPlugin' },
+    { name: 'Auto Woodcutting Plus',className: 'net.runelite.client.plugins.microbot.woodcuttingplus.AutoWoodcuttingPlusPlugin' },
+    { name: 'Event Dismiss Plus',   className: 'net.runelite.client.plugins.microbot.eventdismissplus.EventDismissPlusPlugin' },
+];
+
+// v0.3.0: random event NPC names to highlight in the Nearby NPCs panel.
+// Matches the v0.1.x EventDismissPlus catalog plus Mime trio + Freaky Forester.
+const RANDOM_EVENT_NPC_NAMES = new Set([
+    'Genie',
+    'Sandwich lady', 'Sandwich Lady',
+    'Drunken Dwarf', 'Drunken dwarf',
+    'Mysterious Old Man', 'Mysterious old man',
+    'Bee keeper', 'Beekeeper',
+    'Count Check',
+    'Frog Prince', 'Frog Princess',
+    'Rick Turpentine',
+    'Dr Jekyll', 'Dr. Jekyll',
+    'Niles', 'Miles', 'Giles',
+    'Freaky Forester',
+    'Prison Pete',
+    'Strange Plant',  // also a GameObject; if it appears as NPC we still highlight
+]);
 
 // ============================================================================
 // Init
@@ -85,6 +121,22 @@ function attachStopScriptHandlers() {
         if (!className) return;
         await stopScript(className, btn);
     });
+
+    // v0.3.0: same delegation pattern for the Plus Quick Start panel.
+    const plusGrid = document.getElementById('plus-quickstart-grid');
+    if (plusGrid) {
+        plusGrid.addEventListener('click', async (ev) => {
+            const btn = ev.target.closest('.start-plus-btn, .stop-script-btn');
+            if (!btn) return;
+            const className = btn.dataset.classname;
+            if (!className) return;
+            if (btn.classList.contains('start-plus-btn')) {
+                await startScript(className, btn);
+            } else {
+                await stopScript(className, btn);
+            }
+        });
+    }
 }
 
 async function stopScript(className, btn) {
@@ -112,10 +164,40 @@ async function stopScript(className, btn) {
     } catch (err) {
         pushEvent(`Stop ERROR: ${err.message}`);
     } finally {
-        // Trigger an immediate re-poll so the table reflects the change faster
-        // than the next scheduled tick.
         setTimeout(() => {
             stoppingClassNames.delete(className);
+            poll();
+        }, 1500);
+    }
+}
+
+/**
+ * v0.3.0: POST /scripts/start with a className. Mirrors stopScript flow.
+ */
+async function startScript(className, btn) {
+    startingClassNames.add(className);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Starting...';
+    }
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (settings.authToken) headers['X-Agent-Token'] = settings.authToken;
+        const resp = await fetch(settings.serverUrl + '/scripts/start', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ className: className }),
+        });
+        if (resp.ok) {
+            pushEvent(`Start requested: ${className.split('.').pop()}`);
+        } else {
+            pushEvent(`Start FAILED (HTTP ${resp.status}): ${className.split('.').pop()}`);
+        }
+    } catch (err) {
+        pushEvent(`Start ERROR: ${err.message}`);
+    } finally {
+        setTimeout(() => {
+            startingClassNames.delete(className);
             poll();
         }, 1500);
     }
@@ -187,13 +269,15 @@ async function poll() {
     try {
         // Fetch all endpoints in parallel. /login carries the world number,
         // profile name, member status, and login duration -- none of which
-        // are in /state. /inventory drives the new inventory panel + diff log.
-        const [state, skills, scripts, login, inventory] = await Promise.all([
+        // are in /state. /inventory drives the inventory panel + diff log.
+        // /npcs drives the Nearby NPCs panel (v0.3.0).
+        const [state, skills, scripts, login, inventory, npcs] = await Promise.all([
             fetchEndpoint('/state'),
             fetchEndpoint('/skills'),
             fetchEndpoint('/scripts'),
             fetchEndpoint('/login'),
             fetchEndpoint('/inventory').catch(() => null),  // tolerate logged-out
+            fetchEndpoint('/npcs').catch(() => null),
         ]);
 
         setConnected(true);
@@ -203,8 +287,10 @@ async function poll() {
         // or malformed data without crashing.
         renderPlayer(state, login);
         renderScripts(scripts);
+        renderPlusQuickStart(scripts);     // v0.3.0
         renderSkills(skills);
         renderInventory(inventory);
+        renderNearbyNpcs(npcs);            // v0.3.0
 
         // Diff against previous tick to surface notable changes as events.
         diffAndPushEvents(state, scripts, login, inventory);
@@ -215,6 +301,11 @@ async function poll() {
     } catch (err) {
         setConnected(false, err.message);
     }
+
+    // v0.3.0: watchdog status fetched separately from a non-proxied endpoint
+    // (serve.ps1 serves the CSV directly). Doesn't affect connection status to
+    // Agent Server if it fails.
+    pollWatchdog();
 }
 
 async function fetchEndpoint(path) {
@@ -362,16 +453,21 @@ function renderSkills(skills) {
     }
 
     // Capture the first snapshot as our delta baseline + session-start
-    // timestamp for the XP/hr calculation. Both reset on settings save.
+    // timestamp. Both reset on settings save.
     if (initialSkills === null) {
         initialSkills = normalizeSkills(skills);
         sessionStartMs = Date.now();
     }
 
     const current = normalizeSkills(skills);
-    const elapsedHours = sessionStartMs
-        ? Math.max((Date.now() - sessionStartMs) / 3600000, 1 / 3600)  // floor at 1 sec to avoid div-by-zero
-        : 1 / 3600;
+    const now = Date.now();
+
+    // Push samples into the rolling window (v0.3.0).
+    for (const skill of SKILL_ORDER) {
+        const cur = current[skill];
+        if (!cur) continue;
+        pushXpSample(skill, now, cur.xp);
+    }
 
     tbody.innerHTML = SKILL_ORDER.map(skill => {
         const cur = current[skill];
@@ -381,9 +477,10 @@ function renderSkills(skills) {
         const deltaClass = delta > 0 ? 'delta-positive' : 'delta-zero';
         const deltaStr = delta > 0 ? `+${delta.toLocaleString()}` : '0';
 
-        // XP/hr: extrapolate from session delta. Less reliable in the first
-        // ~30 seconds of a session but stabilizes quickly.
-        const xpPerHour = delta > 0 ? Math.round(delta / elapsedHours) : 0;
+        // v0.3.0: rolling 5-min XP/hr rate. Falls back to session-average
+        // when the window has < 30 sec of samples (so the first ticks after
+        // page load don't show wildly inaccurate numbers).
+        const xpPerHour = getRollingXpRate(skill, XP_RING_WINDOW_MS, delta, now);
         const rateClass = xpPerHour > 0 ? 'rate-cell' : 'rate-zero';
         const rateStr = xpPerHour > 0 ? xpPerHour.toLocaleString() : '0';
 
@@ -395,6 +492,59 @@ function renderSkills(skills) {
             <td class="${rateClass}">${rateStr}</td>
         </tr>`;
     }).join('');
+}
+
+/**
+ * v0.3.0: push an XP sample for one skill into the rolling ring buffer,
+ * trimming any sample older than XP_RING_WINDOW_MS.
+ */
+function pushXpSample(skillName, ts, xp) {
+    let buf = xpRingBuffer.get(skillName);
+    if (!buf) {
+        buf = [];
+        xpRingBuffer.set(skillName, buf);
+    }
+    buf.push({ ts, xp });
+    // Trim from the front while the oldest sample is outside the window.
+    const cutoff = ts - XP_RING_WINDOW_MS;
+    while (buf.length > 0 && buf[0].ts < cutoff) {
+        buf.shift();
+    }
+}
+
+/**
+ * Compute XP/hr from the rolling window. Returns 0 if no samples or no XP gained.
+ * Falls back to session-average when the window has < 30 sec of data so early
+ * polls don't extrapolate from a sample size of 2.
+ *
+ * @param sessionDelta XP gained since page load (for fallback path)
+ * @param nowMs current timestamp
+ */
+function getRollingXpRate(skillName, windowMs, sessionDelta, nowMs) {
+    const buf = xpRingBuffer.get(skillName);
+    if (!buf || buf.length < 2) {
+        // Not enough samples — fall back to session-average.
+        if (sessionStartMs && sessionDelta > 0) {
+            const sessionHours = Math.max((nowMs - sessionStartMs) / 3600000, 1 / 3600);
+            return Math.round(sessionDelta / sessionHours);
+        }
+        return 0;
+    }
+    const oldest = buf[0];
+    const newest = buf[buf.length - 1];
+    const spanMs = newest.ts - oldest.ts;
+    if (spanMs < 30000) {
+        // Window too small (< 30 sec) — fall back to session-average to avoid
+        // extrapolating a 5-sec sample to "XP/hr."
+        if (sessionStartMs && sessionDelta > 0) {
+            const sessionHours = Math.max((nowMs - sessionStartMs) / 3600000, 1 / 3600);
+            return Math.round(sessionDelta / sessionHours);
+        }
+        return 0;
+    }
+    const xpDelta = newest.xp - oldest.xp;
+    if (xpDelta <= 0) return 0;
+    return Math.round(xpDelta / (spanMs / 3600000));
 }
 
 // ============================================================================
@@ -447,6 +597,246 @@ function renderInventory(inventory) {
 
     summary.textContent = `${inventory.count}/${inventory.capacity} (${inventory.freeSlots} free)`;
     return counts;
+}
+
+// ============================================================================
+// Watchdog status (v0.3.0)
+// ============================================================================
+
+/**
+ * Fetch the watchdog CSV log from serve.ps1's /watchdog-log endpoint.
+ * Parses the CSV, extracts last event + restart count + last restart, renders.
+ * Empty file or missing endpoint → "unavailable" state (watchdog not running
+ * or no events yet). Doesn't affect Agent Server connection status.
+ */
+async function pollWatchdog() {
+    const summary = document.getElementById('watchdog-summary');
+    const status = document.getElementById('watchdog-status');
+    const lastEvent = document.getElementById('watchdog-last-event');
+    const lastRestart = document.getElementById('watchdog-last-restart');
+    const totalRestarts = document.getElementById('watchdog-total-restarts');
+    if (!summary) return;  // Section not present (shouldn't happen but defensive)
+
+    try {
+        // Use absolute /watchdog-log (NOT prefixed with /api). serve.ps1 owns
+        // this path; the Agent Server doesn't.
+        const resp = await fetch('/watchdog-log');
+        if (!resp.ok) {
+            renderWatchdogUnavailable();
+            return;
+        }
+        const text = await resp.text();
+        if (!text.trim()) {
+            renderWatchdogUnavailable();
+            return;
+        }
+        renderWatchdog(parseWatchdogCsv(text));
+    } catch {
+        renderWatchdogUnavailable();
+    }
+}
+
+function parseWatchdogCsv(text) {
+    // Format: timestamp,reason,details (header + N data rows).
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) return { rows: [] };  // header only
+
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+        // Simple CSV parse — our writer escapes commas in details to ';'.
+        const parts = lines[i].split(',');
+        if (parts.length < 2) continue;
+        rows.push({
+            timestamp: parts[0],
+            reason: parts[1],
+            details: parts.slice(2).join(','),
+        });
+    }
+    return { rows };
+}
+
+function renderWatchdog({ rows }) {
+    const summary = document.getElementById('watchdog-summary');
+    const status = document.getElementById('watchdog-status');
+    const lastEvent = document.getElementById('watchdog-last-event');
+    const lastRestart = document.getElementById('watchdog-last-restart');
+    const totalRestarts = document.getElementById('watchdog-total-restarts');
+
+    if (!rows || rows.length === 0) {
+        renderWatchdogUnavailable();
+        return;
+    }
+
+    // Latest entry = last row in the chronologically-appended CSV.
+    const newest = rows[rows.length - 1];
+    const newestAge = relativeTime(newest.timestamp);
+
+    // Restart rows = anything that is not WATCHDOG_START.
+    const restartRows = rows.filter(r => r.reason !== 'WATCHDOG_START');
+    const latestRestart = restartRows.length ? restartRows[restartRows.length - 1] : null;
+
+    // Status determination:
+    //   - newest row is WATCHDOG_START + no restarts since → OK
+    //   - any restart in last 5 min → warn
+    //   - any restart in last 1 hour → warn
+    //   - else OK
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const recentRestart = latestRestart && new Date(latestRestart.timestamp).getTime() > fiveMinAgo;
+    const restartInLastHour = latestRestart && new Date(latestRestart.timestamp).getTime() > oneHourAgo;
+
+    let statusText, statusClass;
+    if (recentRestart) {
+        statusText = `Recent restart (${relativeTime(latestRestart.timestamp)})`;
+        statusClass = 'watchdog-status-warn';
+    } else if (restartInLastHour) {
+        statusText = `Stable (last restart ${relativeTime(latestRestart.timestamp)})`;
+        statusClass = 'watchdog-status-warn';
+    } else {
+        statusText = 'Stable';
+        statusClass = 'watchdog-status-ok';
+    }
+
+    status.textContent = statusText;
+    status.className = statusClass;
+    lastEvent.textContent = `${newest.reason} (${newestAge})`;
+    lastRestart.textContent = latestRestart
+        ? `${latestRestart.reason} (${relativeTime(latestRestart.timestamp)})`
+        : 'never';
+    totalRestarts.textContent = restartRows.length.toString();
+    summary.textContent = `${restartRows.length} restart${restartRows.length === 1 ? '' : 's'}`;
+}
+
+function renderWatchdogUnavailable() {
+    const summary = document.getElementById('watchdog-summary');
+    const status = document.getElementById('watchdog-status');
+    const lastEvent = document.getElementById('watchdog-last-event');
+    const lastRestart = document.getElementById('watchdog-last-restart');
+    const totalRestarts = document.getElementById('watchdog-total-restarts');
+    if (!summary) return;
+    summary.textContent = 'not running';
+    status.textContent = 'unavailable';
+    status.className = 'watchdog-status-unavailable';
+    lastEvent.textContent = '--';
+    lastRestart.textContent = '--';
+    totalRestarts.textContent = '--';
+}
+
+/**
+ * Convert an ISO-8601 timestamp to a human "5m ago" string.
+ */
+function relativeTime(isoStr) {
+    const ts = new Date(isoStr).getTime();
+    if (isNaN(ts)) return 'unknown';
+    const diff = Date.now() - ts;
+    if (diff < 60000) return `${Math.round(diff / 1000)}s ago`;
+    if (diff < 3600000) return `${Math.round(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.round(diff / 3600000)}h ago`;
+    return `${Math.round(diff / 86400000)}d ago`;
+}
+
+// ============================================================================
+// Plus Quick Start (v0.3.0)
+// ============================================================================
+
+/**
+ * Render the Plus plugins panel. Looks up each PLUS_PLUGINS entry in the
+ * scripts response by className. Renders a row with Start (inactive) or Stop
+ * (active) button per plugin. Not-installed plugins render disabled.
+ */
+function renderPlusQuickStart(scriptsResponse) {
+    const grid = document.getElementById('plus-quickstart-grid');
+    if (!grid) return;
+
+    const list = scriptsResponse && Array.isArray(scriptsResponse.scripts)
+        ? scriptsResponse.scripts
+        : [];
+    const byClassName = new Map();
+    for (const s of list) {
+        if (s.className) byClassName.set(s.className, s);
+    }
+
+    grid.innerHTML = PLUS_PLUGINS.map(p => {
+        const installed = byClassName.has(p.className);
+        const script = byClassName.get(p.className);
+        const active = installed && script.active;
+        const stopping = stoppingClassNames.has(p.className);
+        const starting = startingClassNames.has(p.className);
+
+        let buttonHtml;
+        if (!installed) {
+            buttonHtml = '<button class="start-plus-btn" disabled title="Plugin not present">Not installed</button>';
+        } else if (active) {
+            buttonHtml = `<button class="stop-script-btn" data-classname="${escapeHtml(p.className)}" ${stopping ? 'disabled' : ''}>${stopping ? 'Stopping...' : 'Stop'}</button>`;
+        } else {
+            buttonHtml = `<button class="start-plus-btn" data-classname="${escapeHtml(p.className)}" ${starting ? 'disabled' : ''}>${starting ? 'Starting...' : 'Start'}</button>`;
+        }
+
+        const rowClass = active ? 'plus-row plus-active' : (installed ? 'plus-row' : 'plus-row plus-not-installed');
+        return `<div class="${rowClass}">
+            <span class="plus-name" title="${escapeHtml(p.className)}">${escapeHtml(p.name)}</span>
+            ${buttonHtml}
+        </div>`;
+    }).join('');
+}
+
+// ============================================================================
+// Nearby NPCs (v0.3.0)
+// ============================================================================
+
+/**
+ * Render the Nearby NPCs panel. Aggregates by name, sorts by distance (closest
+ * first), highlights random-event NPCs from the EventDismissPlus catalog.
+ */
+function renderNearbyNpcs(npcsResponse) {
+    const list = document.getElementById('nearby-npcs-list');
+    const summary = document.getElementById('nearby-npcs-summary');
+    if (!list || !summary) return;
+
+    if (!npcsResponse || !Array.isArray(npcsResponse.npcs) || npcsResponse.npcs.length === 0) {
+        list.innerHTML = '<div class="empty">No NPCs in scene</div>';
+        summary.textContent = '0';
+        return;
+    }
+
+    // Aggregate by name; track minimum distance + count.
+    const byName = new Map();
+    for (const npc of npcsResponse.npcs) {
+        if (!npc.name) continue;
+        const existing = byName.get(npc.name);
+        if (existing) {
+            existing.count += 1;
+            if (npc.distance != null && npc.distance < existing.minDistance) {
+                existing.minDistance = npc.distance;
+            }
+        } else {
+            byName.set(npc.name, {
+                name: npc.name,
+                count: 1,
+                minDistance: npc.distance != null ? npc.distance : Infinity,
+                combatLevel: npc.combatLevel || 0,
+            });
+        }
+    }
+
+    const rows = Array.from(byName.values()).sort((a, b) => a.minDistance - b.minDistance);
+
+    list.innerHTML = rows.map(npc => {
+        const isEvent = RANDOM_EVENT_NPC_NAMES.has(npc.name);
+        const rowClass = isEvent ? 'npc-row npc-random-event' : 'npc-row';
+        const distStr = npc.minDistance === Infinity ? '?' : Math.round(npc.minDistance);
+        const cbStr = npc.combatLevel > 0 ? `cb ${npc.combatLevel}` : '';
+        const meta = [`x${npc.count}`, cbStr, `${distStr}t`].filter(Boolean).join(' &middot; ');
+        return `<div class="${rowClass}">
+            <span class="npc-name">${isEvent ? '⚠ ' : ''}${escapeHtml(npc.name)}</span>
+            <span class="npc-meta">${meta}</span>
+        </div>`;
+    }).join('');
+
+    const eventCount = rows.filter(r => RANDOM_EVENT_NPC_NAMES.has(r.name)).length;
+    summary.textContent = eventCount > 0
+        ? `${npcsResponse.count} (${eventCount} random event!)`
+        : `${npcsResponse.count}`;
 }
 
 /**

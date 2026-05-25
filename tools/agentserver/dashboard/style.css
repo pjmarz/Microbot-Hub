@@ -253,9 +253,97 @@ button.stop-script-btn:disabled {
     font-style: italic;
 }
 
-#skills-section {
-    grid-row: span 2;
+#plus-quickstart-section {
+    grid-column: span 2;
 }
+
+#plus-quickstart-section .plus-quickstart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+#plus-quickstart-section .plus-row {
+    background: var(--bg-panel-alt);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 3px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+#plus-quickstart-section .plus-row.plus-active {
+    border-color: var(--status-connected);
+    background: rgba(0, 170, 0, 0.08);
+}
+#plus-quickstart-section .plus-row .plus-name {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#plus-quickstart-section .plus-row.plus-not-installed .plus-name {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+button.start-plus-btn {
+    background: #2c4e2c;
+    color: #fff;
+    border: 1px solid #3a6a3a;
+    padding: 3px 8px;
+    font-size: 11px;
+    border-radius: 3px;
+}
+button.start-plus-btn:hover { background: #3a6a3a; }
+button.start-plus-btn:disabled {
+    background: var(--bg-panel-alt);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    border-color: var(--border);
+}
+
+#nearby-npcs-section .nearby-npcs-list {
+    font-family: monospace;
+    font-size: 13px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+#nearby-npcs-section .npc-row {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--bg-panel-alt);
+    display: flex;
+    justify-content: space-between;
+}
+#nearby-npcs-section .npc-row:last-child { border-bottom: none; }
+#nearby-npcs-section .npc-row.npc-random-event {
+    color: var(--status-warning);
+    font-weight: bold;
+}
+#nearby-npcs-section .npc-row .npc-name { flex: 1; }
+#nearby-npcs-section .npc-row .npc-meta {
+    color: var(--text-muted);
+    margin-left: 12px;
+}
+
+#watchdog-section .watchdog-table th {
+    width: 40%;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 13px;
+}
+#watchdog-section .watchdog-table td {
+    color: var(--highlight);
+    font-family: monospace;
+    font-size: 13px;
+}
+#watchdog-section .watchdog-status-ok { color: var(--status-connected); }
+#watchdog-section .watchdog-status-warn { color: var(--status-warning); }
+#watchdog-section .watchdog-status-bad { color: var(--status-disconnected); }
+#watchdog-section .watchdog-status-unavailable { color: var(--text-muted); font-style: italic; }
 
 #events-section {
     grid-column: span 2;
