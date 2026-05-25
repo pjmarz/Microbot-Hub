@@ -24,6 +24,7 @@ import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
 import java.awt.event.KeyEvent;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -398,9 +399,20 @@ public class AutoSmeltingPlusScript extends Script {
         List<String> keepNames = parseCsv(config.itemsToKeep());
 
         if (!bankNames.isEmpty()) {
-            // Deposit items matching itemsToBank, but never anything in itemsToKeep.
+            // v0.5.8: auto-augment with active bar's first word so non-"bar"-suffix outputs
+            // (e.g. MOLTEN_GLASS = "Molten glass") don't slip through the default "bar" filter.
+            // Mirrors AutoMiningPlus v0.4.1 deposit-filter auto-augment. For the 9 metal bars
+            // the first word ("bronze"/"iron"/etc.) is a no-op since they already match via "bar".
+            List<String> filterNames = new ArrayList<>(bankNames);
+            if (activeBar != null && activeBar.getName() != null) {
+                String firstWord = activeBar.getName().split("\\s+")[0].toLowerCase();
+                if (!firstWord.isEmpty() && !filterNames.contains(firstWord)) {
+                    filterNames.add(firstWord);
+                }
+            }
+            // Deposit items matching the filter, but never anything in itemsToKeep.
             Rs2Bank.depositAll(i -> i.getName() != null
-                    && bankNames.stream().anyMatch(b -> i.getName().toLowerCase().contains(b))
+                    && filterNames.stream().anyMatch(b -> i.getName().toLowerCase().contains(b))
                     && keepNames.stream().noneMatch(k -> i.getName().toLowerCase().contains(k)));
         } else if (!keepNames.isEmpty()) {
             // Deposit everything except itemsToKeep.

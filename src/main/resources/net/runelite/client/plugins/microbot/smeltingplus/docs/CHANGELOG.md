@@ -4,6 +4,23 @@ Auto-walking-and-smelting "Plus" fork of upstream AutoSmelting. Part of the Skil
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.5.8] — 2026-05-25
+
+Closes the v0.4.1 deferred audit. Fixes a deposit-filter gap for non-"bar"-suffix smelting outputs.
+
+### Fixed
+
+- **Deposit silently no-ops for MOLTEN_GLASS smelt mode.** Default `itemsToBank = "bar"` substring-matches the 9 metal bars (Bronze/Blurite/Iron/Silver/Steel/Gold/Mithril/Adamantite/Runite) but misses MOLTEN_GLASS (inventory item "Molten glass", no "bar" substring). Picking MOLTEN_GLASS (or progressive selecting it) caused the bot to smelt successfully, walk back to bank, match zero inventory items in the deposit predicate, leave the bank with a full inventory, fail to withdraw new materials, and oscillate bank↔furnace forever. Same shape as the MiningPlus v0.4.0 → v0.4.1 coal bug.
+- Fix mirrors MiningPlus v0.4.1: `depositByCsv` auto-augments the filter list at deposit time with the active bar's first word. `Bars.MOLTEN_GLASS.getName()` returns "Molten glass" → first word "molten" → substring-matches inventory item "Molten glass". For the 9 metal bars the first word ("bronze"/"iron"/etc.) is a no-op since they already match via the existing "bar" substring. Belt-and-suspenders generic fix per `template/PATTERNS.md` "Deposit-filter auto-augment".
+
+### Known limitation (out of scope)
+
+- MOLTEN_GLASS likely doesn't actually smelt successfully via the existing furnace-widget interaction. `smeltAtFurnace` calls `Rs2Widget.clickWidget(activeBar.getName())` which becomes `clickWidget("Molten glass")` — the furnace smelt widget doesn't have a Molten glass option (glassblowing in OSRS uses a separate use-item-on-furnace flow). The deposit-filter fix is correct regardless; full glass support would need a separate widget path and is deferred. Flagging here so future hands don't enable MOLTEN_GLASS expecting end-to-end success.
+
+### Rationale
+
+Completes the "v0.4.1 candidate" item from the prior Deferred / candidate work section. The v0.4.1 label was written when the plugin was at v0.4.0; the actual ship version is v0.5.8 since we're past v0.5.x. First step on the AutoSmeltingPlus → v1.0.0 ramp; next is the 20-hour soak.
+
 ## [0.5.7] — 2026-05-23
 
 ### Fixed
