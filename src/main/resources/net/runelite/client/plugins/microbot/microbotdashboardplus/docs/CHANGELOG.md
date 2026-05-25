@@ -4,6 +4,19 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.3.2] — 2026-05-25
+
+Two correctness fixes caught during README-prep screenshot review.
+
+### Fixed
+
+- **XP delta + XP/hr inflation on first login after plugin start**. `GameStatePoller.buildSnapshot()` was calling `xpHistory.record(skill, currentXp)` unconditionally on every tick. On the login screen, `client.getSkillExperience()` returns `0` for every skill, so `0` became the baseline. After login, when XP jumped to real values, `delta = currentXp - 0 = currentXp` and `XP/hr` extrapolated absurd values (e.g. Mining showed `+154,537 Δ, 12,362,960 XP/hr`). Fix: gate the `xpHistory.record` call behind `loggedIn`.
+- **Level-up notification false positives on first login after plugin start**. Same root cause. `detectAndFireNotifications` established the `lastSkillLevels` baseline on the first poll regardless of login state, so logged-out levels of `0` became baseline. The first poll after login fired "Level up: Attack 0 → 43" Discord notifications for every skill (Discord spam, ~22 messages in seconds, if `notifyLevelUp` was on). Fix: defer baseline establishment until `snapshot.isLoggedIn()`.
+
+### Changed
+
+- **Dropped active-state green border on Plus Plugins rows**. The double-signal (border tint + button color) was a redundant indicator. v0.3.2 uses only the button color: green Start when stopped, red Stop when running. Row borders are uniform gray. Less visual noise.
+
 ## [0.3.1] — 2026-05-25
 
 Pre-v1.0.0 polish before upstream PR prep. Three small items.

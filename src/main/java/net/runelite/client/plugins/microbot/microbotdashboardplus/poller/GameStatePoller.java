@@ -225,12 +225,17 @@ public class GameStatePoller {
     private void detectAndFireNotifications(PollSnapshot snapshot) {
         if (snapshot == null) return;
 
-        // Level-up detection (skip first poll to establish baseline).
+        // Level-up detection. Establish baseline only after we're logged in,
+        // otherwise the login-screen 0 → real-level jump on first poll after
+        // login fires a "Level up: Attack 0 -> 43" notification for every skill.
         Map<Skill, Integer> currentLevels = snapshot.getSkillLevels();
         if (currentLevels != null && !currentLevels.isEmpty()) {
             if (!skillBaselineEstablished) {
-                lastSkillLevels.putAll(currentLevels);
-                skillBaselineEstablished = true;
+                if (snapshot.isLoggedIn()) {
+                    lastSkillLevels.putAll(currentLevels);
+                    skillBaselineEstablished = true;
+                }
+                // Skip notifications until we have a real baseline.
             } else {
                 for (Map.Entry<Skill, Integer> e : currentLevels.entrySet()) {
                     Skill skill = e.getKey();
@@ -334,7 +339,9 @@ public class GameStatePoller {
             b.worldId(client.getWorld());
             b.profileName(profileName());
 
-            // Skills.
+            // Skills. Record XP samples only while logged in; on the login
+            // screen client.getSkillExperience returns 0, which would otherwise
+            // become the baseline and inflate every delta after login.
             Map<Skill, Integer> xp = new EnumMap<>(Skill.class);
             Map<Skill, Integer> levels = new EnumMap<>(Skill.class);
             for (Skill s : Skill.values()) {
@@ -342,7 +349,9 @@ public class GameStatePoller {
                 int currentXp = client.getSkillExperience(s);
                 xp.put(s, currentXp);
                 levels.put(s, client.getRealSkillLevel(s));
-                xpHistory.record(s, currentXp);
+                if (loggedIn) {
+                    xpHistory.record(s, currentXp);
+                }
             }
             b.skillXp(Collections.unmodifiableMap(xp));
             b.skillLevels(Collections.unmodifiableMap(levels));
