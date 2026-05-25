@@ -65,12 +65,20 @@
                         <th>Plugin</th>
                         <th>Status</th>
                         <th>Runtime</th>
+                        <th class="action-col">Action</th>
                     </tr>
                 </thead>
                 <tbody id="scripts-body">
-                    <tr><td colspan="3" class="empty">No active scripts</td></tr>
+                    <tr><td colspan="4" class="empty">No active scripts</td></tr>
                 </tbody>
             </table>
+        </section>
+
+        <section id="inventory-section">
+            <h2>Inventory <span class="muted" id="inventory-summary">--</span></h2>
+            <div id="inventory-grid" class="inventory-grid">
+                <div class="empty">Waiting for data</div>
+            </div>
         </section>
 
         <section id="skills-section">
@@ -82,10 +90,11 @@
                         <th>Level</th>
                         <th>XP</th>
                         <th class="delta-col">+Δ</th>
+                        <th class="rate-col">XP/hr</th>
                     </tr>
                 </thead>
                 <tbody id="skills-body">
-                    <tr><td colspan="4" class="empty">Waiting for data</td></tr>
+                    <tr><td colspan="5" class="empty">Waiting for data</td></tr>
                 </tbody>
             </table>
         </section>
@@ -99,7 +108,7 @@
     </main>
 
     <footer>
-        <span class="muted">tools/agentserver/dashboard/ &middot; polling /state, /skills, /scripts</span>
+        <span class="muted">tools/agentserver/dashboard/ v0.2.0 &middot; polling /state, /skills, /scripts, /login, /inventory</span>
     </footer>
 
     <script src="app.js"></script>

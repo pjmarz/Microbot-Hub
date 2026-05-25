@@ -53,10 +53,13 @@ let settings = {
 
 let pollTimer = null;
 let initialSkills = null;      // First successful /skills snapshot, for delta calculation
+let sessionStartMs = null;     // Wall-clock timestamp set with initialSkills (for XP/hr)
 let lastState = null;          // Most recent /state, for diff-based event detection
 let lastScripts = null;        // Most recent /scripts, same purpose
 let lastLogin = null;          // Most recent /login (currentWorld, profile, etc.)
+let lastInventoryCounts = null; // Map<itemName, totalQty> for diff
 let events = [];               // Ring buffer
+let stoppingClassNames = new Set();  // className -> in-flight Stop request (UI disable)
 
 // ============================================================================
 // Init
@@ -66,8 +69,57 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEvents();
     renderEvents();
     attachSettingsHandlers();
+    attachStopScriptHandlers();
     startPolling();
 });
+
+// Event delegation for the Stop buttons in the Active Scripts panel. We
+// re-render the table on every poll, so attaching individual listeners would
+// leak. Delegate at the tbody level once.
+function attachStopScriptHandlers() {
+    const tbody = document.getElementById('scripts-body');
+    tbody.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('.stop-script-btn');
+        if (!btn) return;
+        const className = btn.dataset.classname;
+        if (!className) return;
+        await stopScript(className, btn);
+    });
+}
+
+async function stopScript(className, btn) {
+    // Optimistic UI: disable the button while the request is in flight, mark
+    // the className as "stopping" so re-renders during this tick keep it
+    // disabled even if the script is still reported active.
+    stoppingClassNames.add(className);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Stopping...';
+    }
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (settings.authToken) headers['X-Agent-Token'] = settings.authToken;
+        const resp = await fetch(settings.serverUrl + '/scripts/stop', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ className: className }),
+        });
+        if (resp.ok) {
+            pushEvent(`Stop requested: ${stripHtmlTags(className.split('.').pop())}`);
+        } else {
+            pushEvent(`Stop FAILED (HTTP ${resp.status}): ${className.split('.').pop()}`);
+        }
+    } catch (err) {
+        pushEvent(`Stop ERROR: ${err.message}`);
+    } finally {
+        // Trigger an immediate re-poll so the table reflects the change faster
+        // than the next scheduled tick.
+        setTimeout(() => {
+            stoppingClassNames.delete(className);
+            poll();
+        }, 1500);
+    }
+}
 
 // ============================================================================
 // Settings panel
@@ -100,8 +152,10 @@ function attachSettingsHandlers() {
         // Restart polling with new settings.
         stopPolling();
         initialSkills = null;          // Reset XP delta baseline
+        sessionStartMs = null;         // Reset XP/hr baseline
         lastState = null;
         lastScripts = null;
+        lastInventoryCounts = null;
         pushEvent('Settings updated');
         startPolling();
         panel.classList.add('hidden');
@@ -131,14 +185,15 @@ function stopPolling() {
 
 async function poll() {
     try {
-        // Fetch the four endpoints in parallel. /login carries the world
-        // number, profile name, member status, and login duration -- none of
-        // which are in /state.
-        const [state, skills, scripts, login] = await Promise.all([
+        // Fetch all endpoints in parallel. /login carries the world number,
+        // profile name, member status, and login duration -- none of which
+        // are in /state. /inventory drives the new inventory panel + diff log.
+        const [state, skills, scripts, login, inventory] = await Promise.all([
             fetchEndpoint('/state'),
             fetchEndpoint('/skills'),
             fetchEndpoint('/scripts'),
             fetchEndpoint('/login'),
+            fetchEndpoint('/inventory').catch(() => null),  // tolerate logged-out
         ]);
 
         setConnected(true);
@@ -149,9 +204,10 @@ async function poll() {
         renderPlayer(state, login);
         renderScripts(scripts);
         renderSkills(skills);
+        renderInventory(inventory);
 
         // Diff against previous tick to surface notable changes as events.
-        diffAndPushEvents(state, scripts, login);
+        diffAndPushEvents(state, scripts, login, inventory);
 
         lastState = state;
         lastScripts = scripts;
@@ -254,21 +310,19 @@ function renderScripts(scriptsResponse) {
     // Verified /scripts shape (2026-05-23): { count, scripts: [{ name,
     // className, active, enabled }] }. Some Plus plugin names arrive
     // with embedded HTML colour tags (e.g. "<html>[<font color=...>...]").
-    // The escapeHtml() in the render output strips those into visible text;
-    // we additionally strip them before display for readability.
     const list = scriptsResponse && Array.isArray(scriptsResponse.scripts)
         ? scriptsResponse.scripts
         : (Array.isArray(scriptsResponse) ? scriptsResponse : []);
 
     if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty">No scripts data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No scripts data</td></tr>';
         return;
     }
 
     const active = list.filter(s => s.active);
 
     if (active.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty">No active scripts</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No active scripts</td></tr>';
         return;
     }
 
@@ -276,7 +330,17 @@ function renderScripts(scriptsResponse) {
         const name = stripHtmlTags(s.name || s.className || '(unnamed)');
         const status = s.active ? 'running' : (s.enabled ? 'enabled' : '--');
         const runtime = s.runtimeMs ? formatRuntime(s.runtimeMs) : '--';
-        return `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(status)}</td><td>${escapeHtml(runtime)}</td></tr>`;
+        const className = s.className || '';
+        const isStopping = stoppingClassNames.has(className);
+        const buttonHtml = className
+            ? `<button class="stop-script-btn" data-classname="${escapeHtml(className)}" ${isStopping ? 'disabled' : ''}>${isStopping ? 'Stopping...' : 'Stop'}</button>`
+            : '<span class="muted">--</span>';
+        return `<tr>
+            <td>${escapeHtml(name)}</td>
+            <td>${escapeHtml(status)}</td>
+            <td>${escapeHtml(runtime)}</td>
+            <td class="action-cell">${buttonHtml}</td>
+        </tr>`;
     }).join('');
 }
 
@@ -293,16 +357,21 @@ function stripHtmlTags(s) {
 function renderSkills(skills) {
     const tbody = document.getElementById('skills-body');
     if (!skills) {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty">No skills data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No skills data</td></tr>';
         return;
     }
 
-    // Capture the first snapshot as our delta baseline.
+    // Capture the first snapshot as our delta baseline + session-start
+    // timestamp for the XP/hr calculation. Both reset on settings save.
     if (initialSkills === null) {
         initialSkills = normalizeSkills(skills);
+        sessionStartMs = Date.now();
     }
 
     const current = normalizeSkills(skills);
+    const elapsedHours = sessionStartMs
+        ? Math.max((Date.now() - sessionStartMs) / 3600000, 1 / 3600)  // floor at 1 sec to avoid div-by-zero
+        : 1 / 3600;
 
     tbody.innerHTML = SKILL_ORDER.map(skill => {
         const cur = current[skill];
@@ -312,13 +381,99 @@ function renderSkills(skills) {
         const deltaClass = delta > 0 ? 'delta-positive' : 'delta-zero';
         const deltaStr = delta > 0 ? `+${delta.toLocaleString()}` : '0';
 
+        // XP/hr: extrapolate from session delta. Less reliable in the first
+        // ~30 seconds of a session but stabilizes quickly.
+        const xpPerHour = delta > 0 ? Math.round(delta / elapsedHours) : 0;
+        const rateClass = xpPerHour > 0 ? 'rate-cell' : 'rate-zero';
+        const rateStr = xpPerHour > 0 ? xpPerHour.toLocaleString() : '0';
+
         return `<tr>
             <td>${skill}</td>
             <td>${cur.level}</td>
             <td>${cur.xp.toLocaleString()}</td>
             <td class="${deltaClass}">${deltaStr}</td>
+            <td class="${rateClass}">${rateStr}</td>
         </tr>`;
     }).join('');
+}
+
+// ============================================================================
+// Inventory rendering + diff
+// ============================================================================
+
+/**
+ * Verified /inventory shape (2026-05-25):
+ *   { count, capacity, freeSlots, full, items: [{ id, name, quantity,
+ *     slot, stackable, noted, actions }] }
+ *
+ * We aggregate by name (the same coal occupies slots 0-3 separately for
+ * unstackable items; we sum quantities). Noted items get a separate badge
+ * since they behave differently (banking only, no use-on-furnace etc.).
+ */
+function renderInventory(inventory) {
+    const grid = document.getElementById('inventory-grid');
+    const summary = document.getElementById('inventory-summary');
+
+    if (!inventory || !inventory.items) {
+        grid.innerHTML = '<div class="empty">No inventory data (logged out?)</div>';
+        summary.textContent = '--';
+        return;
+    }
+
+    // Aggregate by (name + noted) so noted/unnoted versions of the same item
+    // render as separate tiles.
+    const counts = new Map();
+    for (const item of inventory.items) {
+        const key = item.noted ? `${item.name} (noted)` : item.name;
+        const prev = counts.get(key) || { name: item.name, noted: item.noted, qty: 0 };
+        prev.qty += (item.quantity || 1);
+        counts.set(key, prev);
+    }
+
+    if (counts.size === 0) {
+        grid.innerHTML = '<div class="empty">Inventory empty</div>';
+    } else {
+        // Sort tiles alphabetically for stable layout — diff log surfaces
+        // changes; the grid is for at-a-glance state.
+        const sorted = Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+        grid.innerHTML = sorted.map(([key, info]) => {
+            const cls = info.noted ? 'inv-item inv-noted' : 'inv-item';
+            return `<div class="${cls}">
+                <span class="inv-name" title="${escapeHtml(key)}">${escapeHtml(info.name)}${info.noted ? ' (n)' : ''}</span>
+                <span class="inv-qty">${info.qty.toLocaleString()}</span>
+            </div>`;
+        }).join('');
+    }
+
+    summary.textContent = `${inventory.count}/${inventory.capacity} (${inventory.freeSlots} free)`;
+    return counts;
+}
+
+/**
+ * Compare two count maps and return a list of event strings.
+ * Each entry: { type: 'picked-up'|'used-dropped', name, qty }
+ */
+function diffInventoryCounts(prev, cur) {
+    const events = [];
+    if (!prev || !cur) return events;
+
+    const allKeys = new Set([...prev.keys(), ...cur.keys()]);
+    for (const key of allKeys) {
+        const p = prev.get(key);
+        const c = cur.get(key);
+        const prevQty = p ? p.qty : 0;
+        const curQty = c ? c.qty : 0;
+        const delta = curQty - prevQty;
+        if (delta === 0) continue;
+
+        const displayName = c ? key : (p ? key : 'Unknown');
+        if (delta > 0) {
+            events.push(`Picked up: +${delta} ${displayName}`);
+        } else {
+            events.push(`Used/dropped: ${delta} ${displayName}`);
+        }
+    }
+    return events;
 }
 
 /**
@@ -383,7 +538,7 @@ function renderEvents() {
  * meaningful changes (login/logout, script start/stop, world hop). Each
  * change becomes a one-line event in the ring buffer.
  */
-function diffAndPushEvents(state, scriptsResponse, login) {
+function diffAndPushEvents(state, scriptsResponse, login, inventory) {
     if (lastState) {
         if (state.loggedIn !== lastState.loggedIn) {
             pushEvent(state.loggedIn ? 'Logged in' : 'Logged out');
@@ -418,6 +573,24 @@ function diffAndPushEvents(state, scriptsResponse, login) {
         for (const n of wasActive) {
             if (!isActive.has(n)) pushEvent(`Stopped: ${n}`);
         }
+    }
+
+    // Inventory diff: build current counts, diff against lastInventoryCounts,
+    // push events for each item that changed. First tick after page load
+    // establishes the baseline without producing spurious events.
+    if (inventory && inventory.items) {
+        const curCounts = new Map();
+        for (const item of inventory.items) {
+            const key = item.noted ? `${item.name} (noted)` : item.name;
+            const prev = curCounts.get(key) || { name: item.name, noted: item.noted, qty: 0 };
+            prev.qty += (item.quantity || 1);
+            curCounts.set(key, prev);
+        }
+        if (lastInventoryCounts !== null) {
+            const invEvents = diffInventoryCounts(lastInventoryCounts, curCounts);
+            for (const e of invEvents) pushEvent(e);
+        }
+        lastInventoryCounts = curCounts;
     }
 }
 

@@ -168,7 +168,8 @@ th {
     font-family: monospace;
 }
 
-.skills-table .delta-col {
+.skills-table .delta-col,
+.skills-table .rate-col {
     text-align: right;
 }
 .skills-table td.delta-positive {
@@ -181,10 +182,75 @@ th {
     text-align: right;
     font-family: monospace;
 }
+.skills-table td.rate-cell {
+    color: var(--text);
+    text-align: right;
+    font-family: monospace;
+}
+.skills-table td.rate-zero {
+    color: var(--delta-zero);
+    text-align: right;
+    font-family: monospace;
+}
 
 .scripts-table td {
     font-family: monospace;
     font-size: 13px;
+}
+.scripts-table .action-col {
+    text-align: right;
+    width: 80px;
+}
+.scripts-table td.action-cell {
+    text-align: right;
+}
+button.stop-script-btn {
+    background: #5c2929;
+    color: #fff;
+    border: 1px solid #7c3939;
+    padding: 3px 8px;
+    font-size: 11px;
+    border-radius: 3px;
+}
+button.stop-script-btn:hover {
+    background: #7c3939;
+}
+button.stop-script-btn:disabled {
+    background: var(--bg-panel-alt);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+#inventory-section .inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 4px;
+    font-family: monospace;
+    font-size: 13px;
+}
+#inventory-section .inv-item {
+    background: var(--bg-panel-alt);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 3px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#inventory-section .inv-item .inv-name {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 6px;
+}
+#inventory-section .inv-item .inv-qty {
+    color: var(--highlight);
+    font-weight: bold;
+}
+#inventory-section .inv-item.inv-noted .inv-name {
+    color: var(--status-warning);
+    font-style: italic;
 }
 
 #skills-section {
