@@ -23,8 +23,10 @@ import java.util.Map;
  */
 public class XpHistory {
 
-    /** Rolling-window length for the XP/hr calculation, in ms. */
-    public static final long ROLLING_WINDOW_MS = 5 * 60 * 1000L; // 5 min
+    /** Retention window for the sample deque. Long enough to feed the 24h chart. */
+    public static final long RETENTION_WINDOW_MS = 24 * 60 * 60 * 1000L; // 24 h
+    /** Inner window used for XP/hr rate calculation. */
+    public static final long RATE_WINDOW_MS = 5 * 60 * 1000L; // 5 min
 
     private final Map<Skill, Integer> baselineXp = new EnumMap<>(Skill.class);
     private final Map<Skill, Deque<Sample>> samplesBySkill = new EnumMap<>(Skill.class);
@@ -39,8 +41,9 @@ public class XpHistory {
         Deque<Sample> samples = samplesBySkill.computeIfAbsent(skill, k -> new ArrayDeque<>());
         samples.addLast(new Sample(now, currentXp));
 
-        // Trim old samples outside the rolling window.
-        long cutoff = now - ROLLING_WINDOW_MS;
+        // Trim samples beyond the long retention window (keeps chart data
+        // available; XP/hr filters internally for the rate window).
+        long cutoff = now - RETENTION_WINDOW_MS;
         while (!samples.isEmpty() && samples.peekFirst().timestampMillis < cutoff) {
             samples.pollFirst();
         }
@@ -53,8 +56,9 @@ public class XpHistory {
     }
 
     /**
-     * Extrapolated XP/hr based on the rolling window. Returns 0 if fewer than
-     * 2 samples or if no XP has been gained in the window.
+     * Extrapolated XP/hr based on the {@link #RATE_WINDOW_MS} rolling window.
+     * Returns 0 if fewer than 2 samples in that window or if no XP has been
+     * gained in it.
      */
     public int xpPerHour(Skill skill) {
         Deque<Sample> samples = samplesBySkill.get(skill);
@@ -62,19 +66,25 @@ public class XpHistory {
             return 0;
         }
 
-        Sample first = samples.peekFirst();
+        long now = System.currentTimeMillis();
+        long rateCutoff = now - RATE_WINDOW_MS;
+
+        Sample first = null;
+        for (Sample s : samples) {
+            if (s.timestampMillis >= rateCutoff) {
+                first = s;
+                break;
+            }
+        }
+        if (first == null) return 0;
+
         Sample last = samples.peekLast();
         long elapsedMs = last.timestampMillis - first.timestampMillis;
-        if (elapsedMs <= 0) {
-            return 0;
-        }
+        if (elapsedMs <= 0) return 0;
 
         int xpDelta = last.xp - first.xp;
-        if (xpDelta <= 0) {
-            return 0;
-        }
+        if (xpDelta <= 0) return 0;
 
-        // Extrapolate to one hour.
         return (int) ((xpDelta * 3_600_000.0) / elapsedMs);
     }
 
@@ -84,11 +94,42 @@ public class XpHistory {
         samplesBySkill.clear();
     }
 
+    /**
+     * Snapshot of all samples for a skill, oldest first. Used by the XP chart
+     * for time-series rendering. Returned list is a defensive copy.
+     */
+    public java.util.List<SamplePoint> getSamples(Skill skill) {
+        Deque<Sample> samples = samplesBySkill.get(skill);
+        if (samples == null) return java.util.Collections.emptyList();
+        java.util.List<SamplePoint> out = new java.util.ArrayList<>(samples.size());
+        for (Sample s : samples) {
+            out.add(new SamplePoint(s.timestampMillis, s.xp));
+        }
+        return out;
+    }
+
+    /** Baseline XP for a skill (the first observation we ever recorded). 0 if none. */
+    public int baselineFor(Skill skill) {
+        Integer b = baselineXp.get(skill);
+        return b == null ? 0 : b;
+    }
+
     private static final class Sample {
         final long timestampMillis;
         final int xp;
 
         Sample(long timestampMillis, int xp) {
+            this.timestampMillis = timestampMillis;
+            this.xp = xp;
+        }
+    }
+
+    /** Public projection of an XP sample for chart use. */
+    public static final class SamplePoint {
+        public final long timestampMillis;
+        public final int xp;
+
+        public SamplePoint(long timestampMillis, int xp) {
             this.timestampMillis = timestampMillis;
             this.xp = xp;
         }

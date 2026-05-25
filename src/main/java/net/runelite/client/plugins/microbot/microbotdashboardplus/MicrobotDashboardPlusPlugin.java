@@ -62,7 +62,7 @@ import java.awt.image.BufferedImage;
 @Slf4j
 public class MicrobotDashboardPlusPlugin extends Plugin {
 
-    public static final String version = "0.2.0";
+    public static final String version = "0.2.1";
 
     @Inject
     private MicrobotDashboardPlusConfig config;

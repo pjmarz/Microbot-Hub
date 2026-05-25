@@ -12,6 +12,7 @@ import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.PlusPlu
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.ScriptsPanel;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.SkillsPanel;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.WatchdogPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.XpChartPanel;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.poller.GameStatePoller;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
@@ -148,6 +149,7 @@ public class DashboardWindow extends JFrame {
         WatchdogPanel watchdog = new WatchdogPanel(poller);
         EventDismissStatsPanel eventStats = new EventDismissStatsPanel(poller);
         EventLogPanel eventLog = new EventLogPanel(poller);
+        XpChartPanel xpChart = new XpChartPanel(poller);
 
         sections.add(player);
         sections.add(scripts);
@@ -156,6 +158,7 @@ public class DashboardWindow extends JFrame {
         sections.add(skills);
         sections.add(npcs);
         sections.add(watchdog);
+        sections.add(xpChart);
         sections.add(eventStats);
         sections.add(eventLog);
 
@@ -177,12 +180,13 @@ public class DashboardWindow extends JFrame {
         addSection(sectionGrid, npcs, c, 0, 3, 1);
         addSection(sectionGrid, watchdog, c, 1, 3, 1);
 
-        addSection(sectionGrid, eventStats, c, 0, 4, 2);
-        addSection(sectionGrid, eventLog, c, 0, 5, 2);
+        addSection(sectionGrid, xpChart, c, 0, 4, 2);
+        addSection(sectionGrid, eventStats, c, 0, 5, 2);
+        addSection(sectionGrid, eventLog, c, 0, 6, 2);
 
         // Push everything to the top.
         c.gridx = 0;
-        c.gridy = 6;
+        c.gridy = 7;
         c.gridwidth = 2;
         c.weighty = 1.0;
         sectionGrid.add(new JPanel() {{ setOpaque(false); }}, c);
@@ -209,7 +213,7 @@ public class DashboardWindow extends JFrame {
         footer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         footer.setBorder(new EmptyBorder(4, 10, 4, 10));
 
-        JLabel info = new JLabel("MicrobotDashboardPlus v0.2.0 - in-process poller, no HTTP");
+        JLabel info = new JLabel("MicrobotDashboardPlus v0.2.1 - in-process poller, no HTTP");
         info.setForeground(Color.GRAY);
         info.setFont(FontManager.getRunescapeSmallFont());
         footer.add(info);

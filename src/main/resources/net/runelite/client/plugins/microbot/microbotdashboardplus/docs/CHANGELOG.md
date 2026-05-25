@@ -4,6 +4,36 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.2.1] — 2026-05-25
+
+Polish bundle. Fills the v0.2.0 placeholders with real data.
+
+### Added
+
+- **XP-over-time chart** (`panels/XpChartPanel.java`). Custom Java2D paint, no external charting dep. Skill JComboBox + window JComboBox (5m / 15m / 30m / 1h / 4h / 24h) in section header. Full-width section between Watchdog and Event Dismiss Stats. Replaces the Chart.js implementation from the v0.4.0 browser dashboard.
+- **EventDismiss CSV reader** (`data/LogReaders.java`). Reads `~/.runelite/eventdismissplus-events.csv`. Aggregates per-event counts (engaged / dismissed / declined / errors / total). Cache keyed by file mtime so the poller can call every tick.
+- **Watchdog disk log reader**. Reads `~/.runelite/microbot-watchdog.csv`. Computes status (ok/warn/bad) from the latest row + WATCHDOG_START vs restart events. Same mtime-keyed cache.
+- **Inventory data wiring**. `Rs2Inventory.items()` populates `PollSnapshot.inventory`. Cell grid renders slot/name/qty per item.
+- **Per-plugin runtime tracking**. `GameStatePoller` records first-observed enabled-millis per plugin class; the Active Scripts table's Runtime column comes alive (formatted as `Xh YYm` / `Xm YYs`). Reset when a plugin disables.
+- **Sample retention extended to 24h** in `XpHistory` so the chart's 24-hour window works. XP/hr rate calc still uses the inner 5-min window via filter.
+
+### Changed
+
+- **Active Scripts filter refined** (`GameStatePoller.collectActiveScripts`). Excludes Microbot core utility classes (`MicrobotPlugin`, "Antiban") and the dashboard itself. Sidebar "Active" count drops from ~13 to the actual user-facing-script count.
+- **Plus Plugins quickstart excludes self** to avoid the user accidentally stopping the dashboard from the dashboard.
+- **EventDismissStatsPanel** rewritten as a real `JTable` (was a placeholder JLabel).
+
+### Fixed (in-cycle polish)
+
+- **Active Scripts filter**: was leaking "Antiban", "[M] Web Walker", "[M] MInventory Setups", "F2P Web Walker Harness", "GE Lumbridge Teleport Harness" through. v0.2.1 switches from exact-match exclusion to substring-based infra detection ("antiban", "harness", "web walker", "minventory") on both display name and simple class name. Verified live with Pete: sidebar `Active` count drops from 13 → 5-ish, and the table shows only user-facing scripts (Agent Server, Auto Mining Plus, Event Dismiss Plus, QoL).
+- **Section header title truncation**: "XP Over Time" was rendering as "XP Over Ti..." and "Event Dismiss Stats" as "Event Dismiss Sta..." because BorderLayout(WEST/EAST) + FlowLayout under-allocated width to the JLabel for the custom Runescape font. Rewrote `DashboardSection`'s header to use `GridBagLayout` with explicit weights (title + subtitle pinned left @ weightx=0, flex spacer @ weightx=1, controls pinned right @ weightx=0). Titles render at full natural width regardless of font metrics quirks.
+
+### Carried forward / still pending
+
+- Plugin icon remains a programmatic 16x16 green "D". Proper PNG ships in v0.2.2 with the upstream-PR-prep polish.
+- Inventory noted-state flag (`Rs2ItemModel.isNoted()` is not exposed in the current API; field always `false` for now).
+- Random-event NPC detection in NearbyNpcs (would highlight Genie / Sandwich Lady / Strange Plant in orange).
+
 ## [0.2.0] — 2026-05-25
 
 Full Swing rewrite. Graduates from browser-tab UX to a native floating RuneLite window plus a compact right-sidebar plugin panel. Eliminates the embedded HTTP server, the port binding, and the dependency on the `[M] Agent Server` plugin.

@@ -59,6 +59,9 @@ public class PollSnapshot {
     // ------- Watchdog (read from log file) -------
     WatchdogStatus watchdog;
 
+    // ------- EventDismiss stats (read from CSV) -------
+    List<EventDismissStatRow> eventDismissStats;
+
     public static PollSnapshot empty() {
         return PollSnapshot.builder()
                 .timestampMillis(System.currentTimeMillis())
@@ -74,6 +77,7 @@ public class PollSnapshot {
                 .plusPlugins(Collections.emptyList())
                 .inventory(Collections.emptyList())
                 .nearbyNpcs(Collections.emptyList())
+                .eventDismissStats(Collections.emptyList())
                 .build();
     }
 
@@ -122,5 +126,19 @@ public class PollSnapshot {
         String lastEventText;
         String lastRestartText;
         int totalRestarts;
+    }
+
+    @Value
+    @Builder
+    public static class EventDismissStatRow {
+        String eventName;
+        int engaged;
+        int dismissed;
+        int declined;
+        int errors;
+
+        public int getTotal() {
+            return engaged + dismissed + declined + errors;
+        }
     }
 }
