@@ -7,6 +7,8 @@
     <!-- Inline empty favicon to suppress the 404 in serve.ps1 logs. -->
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
+    <!-- v0.4.0: Chart.js for the XP-over-time chart. CDN ~80KB. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
     <header>
@@ -107,7 +109,13 @@
         </section>
 
         <section id="nearby-npcs-section">
-            <h2>Nearby NPCs <span class="muted" id="nearby-npcs-summary">--</span></h2>
+            <h2>
+                Nearby NPCs
+                <span class="muted" id="nearby-npcs-summary">--</span>
+                <span class="section-controls">
+                    <label class="control-label">Max <input type="number" id="npc-max-distance" min="1" max="200" value="20" class="control-input"> tiles</label>
+                </span>
+            </h2>
             <div id="nearby-npcs-list" class="nearby-npcs-list">
                 <div class="empty">Waiting for data</div>
             </div>
@@ -125,6 +133,45 @@
             </table>
         </section>
 
+        <section id="xp-chart-section">
+            <h2>
+                XP Over Time
+                <span class="section-controls">
+                    <label class="control-label">Skill <select id="xp-chart-skill" class="control-input"></select></label>
+                    <label class="control-label">Window <select id="xp-chart-window" class="control-input">
+                        <option value="300000">5 min</option>
+                        <option value="900000">15 min</option>
+                        <option value="1800000" selected>30 min</option>
+                        <option value="3600000">1 hour</option>
+                        <option value="14400000">4 hours</option>
+                        <option value="86400000">24 hours</option>
+                    </select></label>
+                </span>
+            </h2>
+            <div class="chart-wrapper">
+                <canvas id="xp-chart"></canvas>
+            </div>
+        </section>
+
+        <section id="eventdismiss-stats-section">
+            <h2>Event Dismiss Stats <span class="muted" id="eventdismiss-summary">--</span></h2>
+            <table class="eventdismiss-table">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th class="num">Engaged</th>
+                        <th class="num">Dismissed</th>
+                        <th class="num">Declined</th>
+                        <th class="num">Errors</th>
+                        <th class="num">Total</th>
+                    </tr>
+                </thead>
+                <tbody id="eventdismiss-stats-body">
+                    <tr><td colspan="6" class="empty">Waiting for data</td></tr>
+                </tbody>
+            </table>
+        </section>
+
         <section id="events-section">
             <h2>Event Log <span class="muted">(last 10)</span></h2>
             <ul id="events-list">
@@ -134,7 +181,7 @@
     </main>
 
     <footer>
-        <span class="muted">tools/agentserver/dashboard/ v0.3.0 &middot; polling /state, /skills, /scripts, /login, /inventory, /npcs &middot; reading /watchdog-log</span>
+        <span class="muted">tools/agentserver/dashboard/ v0.4.0 &middot; polling /state, /skills, /scripts, /login, /inventory, /npcs &middot; reading /watchdog-log, /eventdismiss-log, /history/log</span>
     </footer>
 
     <script src="app.js"></script>

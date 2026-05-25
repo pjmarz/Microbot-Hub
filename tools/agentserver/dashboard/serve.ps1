@@ -17,7 +17,9 @@ param(
     [int]$Port = 8088,
     [int]$AgentPort = 8081,
     [string]$TokenPath = "$env:USERPROFILE\.runelite\.agent-token",
-    [string]$WatchdogLogPath = "$env:USERPROFILE\.runelite\microbot-watchdog.csv"
+    [string]$WatchdogLogPath = "$env:USERPROFILE\.runelite\microbot-watchdog.csv",
+    [string]$EventDismissLogPath = "$env:USERPROFILE\.runelite\eventdismissplus-events.csv",
+    [string]$HistoryLogPath = "$env:USERPROFILE\.runelite\microbot-dashboard-history.jsonl"
 )
 
 $root = $PSScriptRoot
@@ -147,28 +149,92 @@ function Send-Proxy($ctx, $relPath) {
 # history. Returns the file contents as text/csv. Empty body if the file
 # doesn't exist yet (watchdog hasn't been started, or it ran but never logged).
 function Send-WatchdogLog($ctx) {
+    Send-RawFile $ctx $WatchdogLogPath "text/csv; charset=utf-8" "/watchdog-log"
+}
+
+# v0.4.0: serve the EventDismissPlus events CSV. Same pattern as watchdog log.
+function Send-EventDismissLog($ctx) {
+    Send-RawFile $ctx $EventDismissLogPath "text/csv; charset=utf-8" "/eventdismiss-log"
+}
+
+# v0.4.0: read the dashboard history JSONL file. Append-only log of tick
+# summaries written by the dashboard via POST /history/log.
+function Send-HistoryLog($ctx) {
+    Send-RawFile $ctx $HistoryLogPath "application/x-ndjson; charset=utf-8" "/history/log"
+}
+
+# v0.4.0: append a JSON line to the history log. Dashboard calls this once per
+# minute (or every N polls) to persist tick summaries for the XP chart.
+function Receive-HistoryLog($ctx) {
     $resp = $ctx.Response
-    if (Test-Path -LiteralPath $WatchdogLogPath) {
+    $req = $ctx.Request
+    try {
+        $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
+        $body = $reader.ReadToEnd()
+        $reader.Close()
+        if ([string]::IsNullOrWhiteSpace($body)) {
+            $resp.StatusCode = 400
+            $msg = [System.Text.Encoding]::UTF8.GetBytes("empty body")
+            $resp.OutputStream.Write($msg, 0, $msg.Length)
+            Write-Host "400 POST /history/log (empty body)"
+            return
+        }
+
+        # Validate it's parseable JSON (one-line-only).
         try {
-            $content = Get-Content -LiteralPath $WatchdogLogPath -Raw
+            $null = $body | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            $resp.StatusCode = 400
+            $msg = [System.Text.Encoding]::UTF8.GetBytes("invalid JSON: $($_.Exception.Message)")
+            $resp.OutputStream.Write($msg, 0, $msg.Length)
+            Write-Host "400 POST /history/log (invalid JSON)"
+            return
+        }
+
+        # Ensure parent dir exists.
+        $dir = Split-Path -Parent $HistoryLogPath
+        if (-not (Test-Path $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        }
+
+        # Append as a single line (strip any newlines in the body just in case).
+        $cleanBody = $body -replace '\r?\n', ' '
+        Add-Content -LiteralPath $HistoryLogPath -Value $cleanBody -Encoding utf8
+
+        $resp.StatusCode = 204
+        Write-Host "204 POST /history/log ($($body.Length) bytes)"
+    } catch {
+        $resp.StatusCode = 500
+        $msg = [System.Text.Encoding]::UTF8.GetBytes("Write failed: $($_.Exception.Message)")
+        $resp.OutputStream.Write($msg, 0, $msg.Length)
+        Write-Host "500 POST /history/log ($($_.Exception.Message))"
+    }
+}
+
+# Shared helper for serving a raw file at a specific path. Returns empty 200
+# (not 404) when the file doesn't exist so the dashboard can render an
+# "unavailable" state without treating it as an error.
+function Send-RawFile($ctx, $path, $contentType, $logLabel) {
+    $resp = $ctx.Response
+    if (Test-Path -LiteralPath $path) {
+        try {
+            $content = Get-Content -LiteralPath $path -Raw
             if ($null -eq $content) { $content = "" }
             $bytes = [System.Text.Encoding]::UTF8.GetBytes($content)
-            $resp.ContentType = "text/csv; charset=utf-8"
+            $resp.ContentType = $contentType
             $resp.ContentLength64 = $bytes.Length
             $resp.OutputStream.Write($bytes, 0, $bytes.Length)
-            Write-Host "200 GET /watchdog-log ($($bytes.Length) bytes)"
+            Write-Host "200 GET $logLabel ($($bytes.Length) bytes)"
         } catch {
             $resp.StatusCode = 500
             $msg = [System.Text.Encoding]::UTF8.GetBytes("Read failed: $($_.Exception.Message)")
             $resp.OutputStream.Write($msg, 0, $msg.Length)
-            Write-Host "500 GET /watchdog-log ($($_.Exception.Message))"
+            Write-Host "500 GET $logLabel ($($_.Exception.Message))"
         }
     } else {
-        # File doesn't exist yet. Return empty 200 (not 404) so the dashboard
-        # can render an "unavailable" state instead of treating it as an error.
-        $resp.ContentType = "text/csv; charset=utf-8"
+        $resp.ContentType = $contentType
         $resp.ContentLength64 = 0
-        Write-Host "200 GET /watchdog-log (no file yet)"
+        Write-Host "200 GET $logLabel (no file yet)"
     }
 }
 
@@ -176,6 +242,7 @@ try {
     while ($listener.IsListening) {
         $ctx = $listener.GetContext()
         $relPath = $ctx.Request.Url.LocalPath.TrimStart('/')
+        $method = $ctx.Request.HttpMethod
 
         try {
             if ($relPath -like 'api/*') {
@@ -186,6 +253,16 @@ try {
             } elseif ($relPath -eq 'watchdog-log') {
                 # v0.3.0: serve the watchdog CSV directly.
                 Send-WatchdogLog $ctx
+            } elseif ($relPath -eq 'eventdismiss-log') {
+                # v0.4.0: serve the EventDismissPlus CSV directly.
+                Send-EventDismissLog $ctx
+            } elseif ($relPath -eq 'history/log') {
+                # v0.4.0: history log endpoint - GET returns content, POST appends.
+                if ($method -eq 'POST') {
+                    Receive-HistoryLog $ctx
+                } else {
+                    Send-HistoryLog $ctx
+                }
             } else {
                 Send-StaticFile $ctx $relPath
             }

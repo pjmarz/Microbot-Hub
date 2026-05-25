@@ -68,6 +68,30 @@ let startingClassNames = new Set();  // className -> in-flight Start request
 const XP_RING_WINDOW_MS = 5 * 60 * 1000;   // 5 minutes
 const xpRingBuffer = new Map();             // skillName -> [{ts, xp}]
 
+// v0.4.0: history buffer used for XP-over-time chart. Per-skill array of
+// {ts, xp} samples capped at 24 hours. Seeded from disk via /history/log on
+// page load. Persisted every PERSIST_INTERVAL_MS ticks via POST /history/log.
+const HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;  // 24 hours
+const PERSIST_INTERVAL_MS = 60 * 1000;          // persist every 60 sec
+const xpHistory = new Map();                    // skillName -> [{ts, xp}]
+let lastPersistMs = 0;
+let xpChart = null;                              // Chart.js instance
+let xpChartSkill = localStorage.getItem('microbot-chart-skill') || 'Mining';
+let xpChartWindowMs = parseInt(localStorage.getItem('microbot-chart-window'), 10) || 30 * 60 * 1000;
+
+// v0.4.0: forecast-to-next-level. OSRS XP table (cumulative XP needed to
+// reach each level). Index = level (1-based), value = total XP. Computed
+// from Jagex's published formula.
+const XP_TABLE = (() => {
+    const arr = [0, 0];  // index 0 unused, index 1 = level 1 = 0 XP
+    let total = 0;
+    for (let lvl = 1; lvl < 99; lvl++) {
+        total += Math.floor(lvl + 300 * Math.pow(2, lvl / 7));
+        arr.push(Math.floor(total / 4));
+    }
+    return arr;  // arr[L] = total XP required to reach level L (max 99)
+})();
+
 // v0.3.0: known Plus plugins for the Quick Start panel. Hardcoded ordered list
 // so the panel is stable and useful even when scripts API doesn't expose all
 // of them as installed.
@@ -101,11 +125,15 @@ const RANDOM_EVENT_NPC_NAMES = new Set([
 // Init
 // ============================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadEvents();
     renderEvents();
     attachSettingsHandlers();
     attachStopScriptHandlers();
+    attachChartControls();
+    attachNpcFilterControl();
+    await loadHistoryFromDisk();
+    initXpChart();
     startPolling();
 });
 
@@ -267,10 +295,6 @@ function stopPolling() {
 
 async function poll() {
     try {
-        // Fetch all endpoints in parallel. /login carries the world number,
-        // profile name, member status, and login duration -- none of which
-        // are in /state. /inventory drives the inventory panel + diff log.
-        // /npcs drives the Nearby NPCs panel (v0.3.0).
         const [state, skills, scripts, login, inventory, npcs] = await Promise.all([
             fetchEndpoint('/state'),
             fetchEndpoint('/skills'),
@@ -283,8 +307,6 @@ async function poll() {
         setConnected(true);
         updateLastPoll();
 
-        // Render each section. Renderers are defensive — they handle missing
-        // or malformed data without crashing.
         renderPlayer(state, login);
         renderScripts(scripts);
         renderPlusQuickStart(scripts);     // v0.3.0
@@ -292,8 +314,19 @@ async function poll() {
         renderInventory(inventory);
         renderNearbyNpcs(npcs);            // v0.3.0
 
-        // Diff against previous tick to surface notable changes as events.
+        // v0.4.0: update in-memory chart buffer every poll for chart smoothness.
+        updateInMemoryHistory(skills);
+        updateXpChart();                   // v0.4.0 redraw
+
         diffAndPushEvents(state, scripts, login, inventory);
+
+        // v0.4.0: persist tick summary every PERSIST_INTERVAL_MS to disk.
+        // In-memory buffer is already updated above; this just writes to disk.
+        const nowMs = Date.now();
+        if (nowMs - lastPersistMs > PERSIST_INTERVAL_MS) {
+            persistHistorySnapshot(skills, scripts, state);
+            lastPersistMs = nowMs;
+        }
 
         lastState = state;
         lastScripts = scripts;
@@ -302,10 +335,8 @@ async function poll() {
         setConnected(false, err.message);
     }
 
-    // v0.3.0: watchdog status fetched separately from a non-proxied endpoint
-    // (serve.ps1 serves the CSV directly). Doesn't affect connection status to
-    // Agent Server if it fails.
-    pollWatchdog();
+    pollWatchdog();           // v0.3.0
+    pollEventDismissStats();  // v0.4.0
 }
 
 async function fetchEndpoint(path) {
@@ -477,21 +508,43 @@ function renderSkills(skills) {
         const deltaClass = delta > 0 ? 'delta-positive' : 'delta-zero';
         const deltaStr = delta > 0 ? `+${delta.toLocaleString()}` : '0';
 
-        // v0.3.0: rolling 5-min XP/hr rate. Falls back to session-average
-        // when the window has < 30 sec of samples (so the first ticks after
-        // page load don't show wildly inaccurate numbers).
+        // v0.3.0: rolling 5-min XP/hr rate.
         const xpPerHour = getRollingXpRate(skill, XP_RING_WINDOW_MS, delta, now);
         const rateClass = xpPerHour > 0 ? 'rate-cell' : 'rate-zero';
         const rateStr = xpPerHour > 0 ? xpPerHour.toLocaleString() : '0';
+
+        // v0.4.0: forecast to next level. Only shown when XP/hr > 0 and
+        // current level < 99 (no further levels possible).
+        const forecast = (xpPerHour > 0 && cur.level < 99)
+            ? buildForecast(cur.level, cur.xp, xpPerHour)
+            : '';
 
         return `<tr>
             <td>${skill}</td>
             <td>${cur.level}</td>
             <td>${cur.xp.toLocaleString()}</td>
             <td class="${deltaClass}">${deltaStr}</td>
-            <td class="${rateClass}">${rateStr}</td>
+            <td class="${rateClass}">${rateStr}${forecast}</td>
         </tr>`;
     }).join('');
+}
+
+/**
+ * v0.4.0: build "→ X to Lvl Y in Hh Mm" text from current level + XP + rate.
+ */
+function buildForecast(level, xp, xpPerHour) {
+    const nextLvl = level + 1;
+    if (nextLvl > 99) return '';
+    const targetXp = XP_TABLE[nextLvl];
+    if (!targetXp) return '';
+    const xpToNext = targetXp - xp;
+    if (xpToNext <= 0) return '';
+    const hoursToNext = xpToNext / xpPerHour;
+    const mins = Math.round(hoursToNext * 60);
+    const timeStr = mins < 60
+        ? `${mins}m`
+        : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+    return `<span class="forecast">→ Lvl ${nextLvl} in ${timeStr}</span>`;
 }
 
 /**
@@ -799,10 +852,17 @@ function renderNearbyNpcs(npcsResponse) {
         return;
     }
 
+    // v0.4.0: read max-distance from the input (with localStorage persistence).
+    const maxDistance = getNpcMaxDistance();
+
     // Aggregate by name; track minimum distance + count.
     const byName = new Map();
     for (const npc of npcsResponse.npcs) {
         if (!npc.name) continue;
+        // Filter by distance threshold; show all if value is 0 (treat as "no filter").
+        if (maxDistance > 0 && npc.distance != null && npc.distance > maxDistance) {
+            continue;
+        }
         const existing = byName.get(npc.name);
         if (existing) {
             existing.count += 1;
@@ -817,6 +877,12 @@ function renderNearbyNpcs(npcsResponse) {
                 combatLevel: npc.combatLevel || 0,
             });
         }
+    }
+
+    if (byName.size === 0) {
+        list.innerHTML = `<div class="empty">No NPCs within ${maxDistance} tiles</div>`;
+        summary.textContent = `0 within ${maxDistance}t (of ${npcsResponse.count})`;
+        return;
     }
 
     const rows = Array.from(byName.values()).sort((a, b) => a.minDistance - b.minDistance);
@@ -834,10 +900,402 @@ function renderNearbyNpcs(npcsResponse) {
     }).join('');
 
     const eventCount = rows.filter(r => RANDOM_EVENT_NPC_NAMES.has(r.name)).length;
+    const shownCount = rows.reduce((sum, r) => sum + r.count, 0);
     summary.textContent = eventCount > 0
-        ? `${npcsResponse.count} (${eventCount} random event!)`
-        : `${npcsResponse.count}`;
+        ? `${shownCount} shown (${eventCount} random event!)`
+        : `${shownCount} shown (${npcsResponse.count} total in scene)`;
 }
+
+/**
+ * v0.4.0: read the NPC distance filter from the input + localStorage.
+ */
+function getNpcMaxDistance() {
+    const el = document.getElementById('npc-max-distance');
+    if (el && el.value) {
+        const v = parseInt(el.value, 10);
+        if (!isNaN(v) && v >= 0) return v;
+    }
+    const stored = parseInt(localStorage.getItem('microbot-npc-max-distance'), 10);
+    return isNaN(stored) ? 20 : stored;
+}
+
+function attachNpcFilterControl() {
+    const el = document.getElementById('npc-max-distance');
+    if (!el) return;
+    const stored = parseInt(localStorage.getItem('microbot-npc-max-distance'), 10);
+    if (!isNaN(stored)) el.value = stored;
+    el.addEventListener('change', () => {
+        const v = parseInt(el.value, 10);
+        if (!isNaN(v)) {
+            localStorage.setItem('microbot-npc-max-distance', v.toString());
+            // Re-render immediately with new filter; next poll picks it up too.
+            if (lastState) {
+                fetchEndpoint('/npcs').then(renderNearbyNpcs).catch(() => {});
+            }
+        }
+    });
+}
+
+// ============================================================================
+// v0.4.0: XP-over-time chart (Chart.js)
+// ============================================================================
+
+function attachChartControls() {
+    const skillSel = document.getElementById('xp-chart-skill');
+    const windowSel = document.getElementById('xp-chart-window');
+    if (!skillSel || !windowSel) return;
+
+    // Populate skill selector with the 23 OSRS skills.
+    skillSel.innerHTML = SKILL_ORDER.map(s =>
+        `<option value="${s}" ${s === xpChartSkill ? 'selected' : ''}>${s}</option>`
+    ).join('');
+
+    windowSel.value = String(xpChartWindowMs);
+
+    skillSel.addEventListener('change', () => {
+        xpChartSkill = skillSel.value;
+        localStorage.setItem('microbot-chart-skill', xpChartSkill);
+        updateXpChart();
+    });
+    windowSel.addEventListener('change', () => {
+        xpChartWindowMs = parseInt(windowSel.value, 10);
+        localStorage.setItem('microbot-chart-window', xpChartWindowMs.toString());
+        updateXpChart();
+    });
+}
+
+function initXpChart() {
+    const canvas = document.getElementById('xp-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const ctx = canvas.getContext('2d');
+    xpChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'XP gained',
+                data: [],
+                borderColor: '#6bcf6b',
+                backgroundColor: 'rgba(107, 207, 107, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,           // realtime updates feel snappier without animation
+            scales: {
+                x: {
+                    type: 'linear',
+                    // min/max set dynamically in updateXpChart() so the axis
+                    // always spans the selected window (slides as time advances).
+                    ticks: {
+                        color: '#888',
+                        maxTicksLimit: 6,
+                        callback: (v) => {
+                            const secsAgo = Math.round((Date.now() - v) / 1000);
+                            if (secsAgo < 30) return 'now';
+                            if (secsAgo < 90) return '1m ago';
+                            const minsAgo = Math.round(secsAgo / 60);
+                            if (minsAgo < 60) return `${minsAgo}m ago`;
+                            const hrsAgo = Math.round(minsAgo / 60);
+                            return `${hrsAgo}h ago`;
+                        },
+                    },
+                    grid: { color: '#333' },
+                },
+                y: {
+                    title: { display: true, text: 'XP gained', color: '#888' },
+                    ticks: {
+                        color: '#888',
+                        callback: (v) => v.toLocaleString(),
+                    },
+                    grid: { color: '#333' },
+                },
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => {
+                            const ts = items[0].parsed.x;
+                            return new Date(ts).toLocaleTimeString();
+                        },
+                        label: (item) => `+${Math.round(item.parsed.y).toLocaleString()} XP`,
+                    },
+                },
+            },
+        },
+    });
+    updateXpChart();
+}
+
+/**
+ * Push the most recent skill XP into the history buffer and redraw the chart.
+ * "XP gained" = current XP - baseline XP (oldest sample in the visible window).
+ */
+function updateXpChart() {
+    if (!xpChart) return;
+
+    // Always set the x-axis range to the selected window so the chart slides
+    // as time advances (rather than auto-fitting to data extent only).
+    const now = Date.now();
+    xpChart.options.scales.x.min = now - xpChartWindowMs;
+    xpChart.options.scales.x.max = now;
+
+    const buf = xpHistory.get(xpChartSkill);
+    if (!buf || buf.length === 0) {
+        xpChart.data.datasets[0].data = [];
+        xpChart.data.datasets[0].label = `${xpChartSkill} (no data)`;
+        xpChart.update('none');
+        return;
+    }
+
+    // Filter to the selected window.
+    const cutoff = now - xpChartWindowMs;
+    const filtered = buf.filter(s => s.ts >= cutoff);
+    if (filtered.length === 0) {
+        xpChart.data.datasets[0].data = [];
+        xpChart.data.datasets[0].label = `${xpChartSkill} (window empty)`;
+        xpChart.update('none');
+        return;
+    }
+
+    const baselineXp = filtered[0].xp;
+    xpChart.data.datasets[0].label = `${xpChartSkill} - XP gained`;
+    xpChart.data.datasets[0].data = filtered.map(s => ({
+        x: s.ts,
+        y: s.xp - baselineXp,
+    }));
+    xpChart.update('none');
+}
+
+/**
+ * Append a single XP sample for one skill into the history buffer, trimming
+ * anything older than HISTORY_WINDOW_MS.
+ */
+function pushHistorySample(skillName, ts, xp) {
+    let buf = xpHistory.get(skillName);
+    if (!buf) {
+        buf = [];
+        xpHistory.set(skillName, buf);
+    }
+    // Dedupe: if last entry is at the same ts (within 100ms), update instead of append.
+    if (buf.length > 0 && Math.abs(buf[buf.length - 1].ts - ts) < 100) {
+        buf[buf.length - 1].xp = xp;
+    } else {
+        buf.push({ ts, xp });
+    }
+    const cutoff = ts - HISTORY_WINDOW_MS;
+    while (buf.length > 0 && buf[0].ts < cutoff) buf.shift();
+}
+
+// ============================================================================
+// v0.4.0: History persistence (POST /history/log)
+// ============================================================================
+
+/**
+ * On page load, fetch /history/log and seed xpHistory with the past 24h of
+ * samples. Lets the chart show useful data immediately rather than starting
+ * blank after every page refresh.
+ */
+async function loadHistoryFromDisk() {
+    try {
+        const resp = await fetch('/history/log');
+        if (!resp.ok) return;
+        const text = await resp.text();
+        if (!text.trim()) return;
+
+        const cutoff = Date.now() - HISTORY_WINDOW_MS;
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+        for (const line of lines) {
+            try {
+                const entry = JSON.parse(line);
+                const ts = new Date(entry.ts).getTime();
+                if (isNaN(ts) || ts < cutoff) continue;
+                if (entry.skills) {
+                    for (const [name, xp] of Object.entries(entry.skills)) {
+                        pushHistorySample(name, ts, xp);
+                    }
+                }
+            } catch {
+                // Bad line; skip
+            }
+        }
+        // Seed lastPersistMs so we don't write again immediately.
+        lastPersistMs = Date.now();
+    } catch {
+        // History endpoint unavailable (serve.ps1 old version?) — fine, dashboard
+        // still works without persistence.
+    }
+}
+
+/**
+ * Push a tick summary to xpHistory in-memory AND persist to disk every
+ * PERSIST_INTERVAL_MS. Disk persistence is throttled because every-5sec
+ * disk writes would be wasteful + chunky.
+ */
+function persistHistorySnapshot(skills, scripts, state) {
+    if (!skills || !skills.skills) return;
+    const ts = Date.now();
+    const skillMap = {};
+    for (const s of skills.skills) {
+        if (s.name) skillMap[s.name] = s.xp;
+    }
+
+    const activeCount = (scripts && scripts.scripts)
+        ? scripts.scripts.filter(s => s.active).length
+        : 0;
+    const entry = {
+        ts: new Date(ts).toISOString(),
+        skills: skillMap,
+        activeCount,
+        loggedIn: state && state.loggedIn,
+    };
+
+    // Send to serve.ps1. Fire-and-forget: dashboard doesn't wait.
+    fetch('/history/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+    }).catch(() => {
+        // Endpoint unavailable - in-memory state still works.
+    });
+}
+
+// In-memory-only update for ticks BETWEEN disk persistence (every poll
+// instead of every PERSIST_INTERVAL_MS). Keeps chart granularity high
+// without thrashing disk.
+function updateInMemoryHistory(skills) {
+    if (!skills || !skills.skills) return;
+    const ts = Date.now();
+    for (const s of skills.skills) {
+        if (s.name) pushHistorySample(s.name, ts, s.xp);
+    }
+}
+
+// ============================================================================
+// v0.4.0: Event Dismiss stats report
+// ============================================================================
+
+async function pollEventDismissStats() {
+    const body = document.getElementById('eventdismiss-stats-body');
+    const summary = document.getElementById('eventdismiss-summary');
+    if (!body || !summary) return;
+
+    try {
+        const resp = await fetch('/eventdismiss-log');
+        if (!resp.ok) {
+            renderEventDismissUnavailable();
+            return;
+        }
+        const text = await resp.text();
+        if (!text.trim()) {
+            renderEventDismissUnavailable();
+            return;
+        }
+        renderEventDismissStats(parseEventDismissCsv(text));
+    } catch {
+        renderEventDismissUnavailable();
+    }
+}
+
+function parseEventDismissCsv(text) {
+    // Header: timestamp,event_name,action,outcome,note
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+        // Naive CSV parse (our writer escapes commas in note to ';')
+        const parts = lines[i].split(',');
+        if (parts.length < 4) continue;
+        rows.push({
+            timestamp: parts[0],
+            eventName: parts[1],
+            action: parts[2],
+            outcome: parts[3],
+            note: parts.slice(4).join(','),
+        });
+    }
+    return rows;
+}
+
+function renderEventDismissStats(rows) {
+    const body = document.getElementById('eventdismiss-stats-body');
+    const summary = document.getElementById('eventdismiss-summary');
+    if (!body || !summary) return;
+
+    if (!rows || rows.length === 0) {
+        renderEventDismissUnavailable();
+        return;
+    }
+
+    // Aggregate by event name x action.
+    const stats = new Map();  // eventName -> { ENGAGE, DISMISS, DECLINE, errors, total }
+    for (const r of rows) {
+        let s = stats.get(r.eventName);
+        if (!s) {
+            s = { ENGAGE: 0, DISMISS: 0, DECLINE: 0, errors: 0, total: 0 };
+            stats.set(r.eventName, s);
+        }
+        s.total += 1;
+        if (r.outcome === 'ERROR') s.errors += 1;
+        if (r.action === 'ENGAGE') s.ENGAGE += 1;
+        else if (r.action === 'DISMISS') s.DISMISS += 1;
+        else if (r.action === 'DECLINE') s.DECLINE += 1;
+    }
+
+    // Sort by total descending.
+    const sorted = Array.from(stats.entries()).sort((a, b) => b[1].total - a[1].total);
+
+    // Compute grand totals.
+    const grand = { ENGAGE: 0, DISMISS: 0, DECLINE: 0, errors: 0, total: 0 };
+    for (const [, s] of sorted) {
+        grand.ENGAGE += s.ENGAGE;
+        grand.DISMISS += s.DISMISS;
+        grand.DECLINE += s.DECLINE;
+        grand.errors += s.errors;
+        grand.total += s.total;
+    }
+
+    const rowsHtml = sorted.map(([name, s]) =>
+        `<tr>
+            <td>${escapeHtml(name)}</td>
+            <td class="num">${s.ENGAGE}</td>
+            <td class="num">${s.DISMISS}</td>
+            <td class="num">${s.DECLINE}</td>
+            <td class="num">${s.errors}</td>
+            <td class="num">${s.total}</td>
+        </tr>`
+    ).join('');
+
+    const totalRow = `<tr class="total-row">
+        <td><strong>Total</strong></td>
+        <td class="num">${grand.ENGAGE}</td>
+        <td class="num">${grand.DISMISS}</td>
+        <td class="num">${grand.DECLINE}</td>
+        <td class="num">${grand.errors}</td>
+        <td class="num">${grand.total}</td>
+    </tr>`;
+
+    body.innerHTML = rowsHtml + totalRow;
+    summary.textContent = `${grand.total} events across ${sorted.length} types`;
+}
+
+function renderEventDismissUnavailable() {
+    const body = document.getElementById('eventdismiss-stats-body');
+    const summary = document.getElementById('eventdismiss-summary');
+    if (!body || !summary) return;
+    body.innerHTML = '<tr><td colspan="6" class="empty">No events logged yet (EventDismissPlus v0.2.0+ required)</td></tr>';
+    summary.textContent = 'no data';
+}
+
+// ============================================================================
 
 /**
  * Compare two count maps and return a list of event strings.
