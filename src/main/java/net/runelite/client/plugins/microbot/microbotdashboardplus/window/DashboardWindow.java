@@ -1,0 +1,237 @@
+package net.runelite.client.plugins.microbot.microbotdashboardplus.window;
+
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.data.PollSnapshot;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.DashboardSection;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.EventDismissStatsPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.EventLogPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.InventoryPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.NearbyNpcsPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.PlayerPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.PlusPluginsPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.ScriptsPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.SkillsPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.WatchdogPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.poller.GameStatePoller;
+import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.FontManager;
+
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
+import javax.swing.border.EmptyBorder;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
+/**
+ * Floating Swing window that hosts all dashboard sections.
+ *
+ * <p>Mirrors the RuneLite Var Inspector pattern: a top-level JFrame
+ * independent of the client window. Lifecycle is managed by the plugin;
+ * v0.2.0 closes the window via {@link WindowConstants#HIDE_ON_CLOSE} so the
+ * sidebar "Open Dashboard" button can re-show it.
+ *
+ * <p>Layout: 2-column GridBagLayout for the section grid, plus 3 full-width
+ * sections (Plus Plugins, Event Dismiss Stats, Event Log) that span both
+ * columns.
+ */
+@Slf4j
+public class DashboardWindow extends JFrame {
+
+    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter
+            .ofPattern("HH:mm:ss")
+            .withZone(ZoneId.systemDefault());
+
+    private final GameStatePoller poller;
+    private final Consumer<PollSnapshot> snapshotListener;
+    private final List<DashboardSection> sections = new ArrayList<>();
+
+    private final JLabel statusLabel = new JLabel("Connecting...");
+    private final JLabel lastPollLabel = new JLabel("Last poll: never");
+
+    public DashboardWindow(GameStatePoller poller) {
+        super("Microbot Dashboard Plus");
+        this.poller = poller;
+
+        setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
+        setMinimumSize(new Dimension(900, 600));
+        setSize(1100, 800);
+        setLocationRelativeTo(null);
+
+        JPanel root = new JPanel(new BorderLayout());
+        root.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        root.setBorder(new EmptyBorder(8, 12, 8, 12));
+
+        root.add(buildHeader(), BorderLayout.NORTH);
+        root.add(buildSectionScroll(), BorderLayout.CENTER);
+        root.add(buildFooter(), BorderLayout.SOUTH);
+
+        setContentPane(root);
+
+        snapshotListener = this::applySnapshot;
+        poller.addListener(snapshotListener);
+    }
+
+    public void showOrFocus() {
+        SwingUtilities.invokeLater(() -> {
+            if (!isVisible()) setVisible(true);
+            setState(JFrame.NORMAL);
+            toFront();
+            requestFocus();
+        });
+    }
+
+    public void disposeWindow() {
+        poller.removeListener(snapshotListener);
+        for (DashboardSection s : sections) {
+            try { s.detach(); } catch (Throwable ignored) { /* best effort */ }
+        }
+        SwingUtilities.invokeLater(() -> {
+            setVisible(false);
+            dispose();
+        });
+    }
+
+    // ---------------------------------------------------------------------
+    // Layout
+    // ---------------------------------------------------------------------
+
+    private JPanel buildHeader() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        header.setBorder(new EmptyBorder(6, 10, 6, 10));
+
+        JLabel title = new JLabel("Microbot Dashboard Plus");
+        title.setForeground(ColorScheme.BRAND_ORANGE);
+        title.setFont(FontManager.getRunescapeBoldFont());
+        header.add(title, BorderLayout.WEST);
+
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        right.setOpaque(false);
+        statusLabel.setForeground(ColorScheme.PROGRESS_INPROGRESS_COLOR);
+        statusLabel.setFont(FontManager.getRunescapeSmallFont());
+        lastPollLabel.setForeground(Color.LIGHT_GRAY);
+        lastPollLabel.setFont(FontManager.getRunescapeSmallFont());
+        right.add(statusLabel);
+        right.add(lastPollLabel);
+        header.add(right, BorderLayout.EAST);
+
+        return header;
+    }
+
+    private JScrollPane buildSectionScroll() {
+        JPanel sectionGrid = new JPanel(new GridBagLayout());
+        sectionGrid.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        sectionGrid.setBorder(new EmptyBorder(8, 0, 8, 0));
+
+        // Build real panels.
+        PlayerPanel player = new PlayerPanel(poller);
+        ScriptsPanel scripts = new ScriptsPanel(poller);
+        PlusPluginsPanel plusPlugins = new PlusPluginsPanel(poller);
+        InventoryPanel inventory = new InventoryPanel(poller);
+        SkillsPanel skills = new SkillsPanel(poller);
+        NearbyNpcsPanel npcs = new NearbyNpcsPanel(poller);
+        WatchdogPanel watchdog = new WatchdogPanel(poller);
+        EventDismissStatsPanel eventStats = new EventDismissStatsPanel(poller);
+        EventLogPanel eventLog = new EventLogPanel(poller);
+
+        sections.add(player);
+        sections.add(scripts);
+        sections.add(plusPlugins);
+        sections.add(inventory);
+        sections.add(skills);
+        sections.add(npcs);
+        sections.add(watchdog);
+        sections.add(eventStats);
+        sections.add(eventLog);
+
+        // 2-column grid with 3 full-width spans.
+        GridBagConstraints c = new GridBagConstraints();
+        c.fill = GridBagConstraints.BOTH;
+        c.insets = new Insets(4, 4, 4, 4);
+        c.weightx = 1.0;
+        c.weighty = 0;
+
+        addSection(sectionGrid, player, c, 0, 0, 1);
+        addSection(sectionGrid, scripts, c, 1, 0, 1);
+
+        addSection(sectionGrid, plusPlugins, c, 0, 1, 2);
+
+        addSection(sectionGrid, inventory, c, 0, 2, 1);
+        addSection(sectionGrid, skills, c, 1, 2, 1);
+
+        addSection(sectionGrid, npcs, c, 0, 3, 1);
+        addSection(sectionGrid, watchdog, c, 1, 3, 1);
+
+        addSection(sectionGrid, eventStats, c, 0, 4, 2);
+        addSection(sectionGrid, eventLog, c, 0, 5, 2);
+
+        // Push everything to the top.
+        c.gridx = 0;
+        c.gridy = 6;
+        c.gridwidth = 2;
+        c.weighty = 1.0;
+        sectionGrid.add(new JPanel() {{ setOpaque(false); }}, c);
+
+        JScrollPane scroll = new JScrollPane(sectionGrid,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(ColorScheme.DARK_GRAY_COLOR);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        return scroll;
+    }
+
+    private static void addSection(JPanel parent, DashboardSection section, GridBagConstraints c,
+                                   int col, int row, int span) {
+        c.gridx = col;
+        c.gridy = row;
+        c.gridwidth = span;
+        parent.add(section, c);
+    }
+
+    private JPanel buildFooter() {
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        footer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        footer.setBorder(new EmptyBorder(4, 10, 4, 10));
+
+        JLabel info = new JLabel("MicrobotDashboardPlus v0.2.0 - in-process poller, no HTTP");
+        info.setForeground(Color.GRAY);
+        info.setFont(FontManager.getRunescapeSmallFont());
+        footer.add(info);
+
+        return footer;
+    }
+
+    // ---------------------------------------------------------------------
+    // Listener
+    // ---------------------------------------------------------------------
+
+    private void applySnapshot(PollSnapshot snapshot) {
+        if (snapshot == null) return;
+
+        if (snapshot.isLoggedIn()) {
+            statusLabel.setText("Connected");
+            statusLabel.setForeground(ColorScheme.PROGRESS_COMPLETE_COLOR);
+        } else {
+            statusLabel.setText("Disconnected");
+            statusLabel.setForeground(ColorScheme.PROGRESS_ERROR_COLOR);
+        }
+
+        lastPollLabel.setText("Last poll: " + TIME_FMT.format(Instant.ofEpochMilli(snapshot.getTimestampMillis())));
+    }
+}

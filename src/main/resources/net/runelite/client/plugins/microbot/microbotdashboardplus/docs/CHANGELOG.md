@@ -1,8 +1,49 @@
 # MicrobotDashboardPlus Changelog
 
-Browser-based monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #6 of the Skill Plus Template (SPT) lineage; the first non-skilling Plus plugin. Embeds the dashboard files in the plugin JAR and starts an HTTP server inside the Microbot JVM. See `template/TEMPLATE.md` and `template/PATTERNS.md` in the Hub repo for shared conventions.
+Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #6 of the Skill Plus Template (SPT) lineage; the first non-skilling Plus plugin. As of v0.2.0 the dashboard renders into a floating RuneLite window (Var Inspector style) with a compact sidebar panel; the v0.1.x browser-tab approach has been retired. See `template/TEMPLATE.md` and `template/PATTERNS.md` in the Hub repo for shared conventions.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
+
+## [0.2.0] — 2026-05-25
+
+Full Swing rewrite. Graduates from browser-tab UX to a native floating RuneLite window plus a compact right-sidebar plugin panel. Eliminates the embedded HTTP server, the port binding, and the dependency on the `[M] Agent Server` plugin.
+
+### Changed
+
+- **Native Swing rendering**. Floating `JFrame` modeled on the RuneLite Var Inspector. Compact summary lives in the right-sidebar `PluginPanel` (Hub convention) with an "Open Dashboard" button to launch the full window. Closes cleanly with the client.
+- **In-process polling**. Background `ScheduledExecutorService` (single thread, daemon) reads game state directly via `Microbot.getClient()` + Rs2 utility APIs. Client-thread-restricted reads go through `Microbot.getClientThread().runOnClientThreadOptional()`. Listeners are invoked on the EDT via `SwingUtilities.invokeLater()`.
+- **Config simplified** from 4 fields to 3: `autoOpenDashboard`, `pollIntervalSeconds` (1-60), `npcMaxDistance` (1-200). HTTP-era fields (`serverPort`, `agentServerPort`, `devModePath`) removed.
+
+### Removed
+
+- `DashboardHttpServer.java` (embedded `com.sun.net.httpserver` HTTP server).
+- Bundled `index.html`, `style.css`, `app.js` resources.
+- Reverse-proxy `/api/*` to Agent Server. Plugin no longer reads `~/.runelite/.agent-token` or speaks HTTP at all.
+- Dev-mode override (`devModePath`). With no HTML/JS to override, the feature has no purpose.
+- "Auto-close on disconnect" countdown UX from v0.1.1. JFrame lifecycle is bound to the plugin lifecycle now; window disposes on plugin disable.
+
+### Added
+
+- `data/PollSnapshot.java` — immutable record of per-poll state.
+- `data/XpHistory.java` — rolling 5-min XP/hr per skill + baseline delta tracking.
+- `poller/GameStatePoller.java` — background poller, configurable interval, listener registry.
+- `window/DashboardWindow.java` — floating JFrame skeleton, 9-section grid placeholder layout, header (status + last poll) and footer.
+- `DashboardPanel.java` — right-sidebar `PluginPanel`: status, player, world, active-script count, "Open Dashboard" + "Refresh now" buttons.
+
+### Known limitations (this version)
+
+Section panels are placeholders ("panel under construction") in v0.2.0 ship. End-to-end architecture (poller → window + panel) is validated; the 9 real section panels (Player, Active Scripts, Plus Plugins, Inventory, Skills, Nearby NPCs, Watchdog, Event Dismiss Stats, Event Log) land iteratively in v0.2.1+.
+
+- XP-over-time chart not ported. Deferred to v0.2.x as Java2D paint (no Chart.js dependency).
+- Active scripts list is a heuristic enumeration of enabled Microbot plugins; per-plugin runtime not tracked in-process yet.
+- Watchdog status reads "unavailable" until the disk-log reader reconnects in a follow-up.
+- Plugin icon is a programmatic 16x16 "D" placeholder. v1.0.0 ships a proper PNG.
+
+### Rationale
+
+The v0.1.x "two PowerShell windows" UX was the original problem the plugin solved. v0.1.x replaced that with a browser tab, but introduced its own UX issues: sea-of-tabs on every disable/enable cycle (v0.1.1 patched), browser auto-open semantics on launcher boot, dependency on Agent Server staying enabled. Going native eliminates all three classes of issue, matches RuneLite / Microbot UI conventions, and removes the port-binding fingerprint. Costs: ~1500 LOC of HTML/CSS/JS retired, multi-device LAN viewing lost, no Chart.js for the XP visualization.
+
+The `tools/agentserver/dashboard/` source tree remains as a historical artifact and standalone PowerShell-served dev tool. Not in the plugin JAR.
 
 ## [0.1.1] — 2026-05-25
 
