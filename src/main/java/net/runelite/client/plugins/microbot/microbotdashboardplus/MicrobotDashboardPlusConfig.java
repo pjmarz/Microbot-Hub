@@ -22,10 +22,9 @@ import net.runelite.client.config.Range;
 @ConfigInformation(
     "<h2>Microbot Dashboard Plus</h2>" +
     "<h3>Version: " + MicrobotDashboardPlusPlugin.version + "</h3>" +
-    "<p>Native Swing monitoring dashboard for your Microbot session. Opens in a floating window outside the client, like RuneLite's Var Inspector.</p>" +
-    "<p>A compact summary lives in the right sidebar as a plugin panel. Click <strong>Open Dashboard</strong> to launch the full window.</p>" +
-    "<p>No HTTP server, no port conflicts, no external dependencies. Reads game state directly from the client.</p>" +
-    "<p>v0.3.0 adds Discord webhook notifications, per-section visibility, and per-skill alert thresholds.</p>"
+    "<p>Aggregate session dashboard. A floating window with ten live-updating panels covering player state, scripts, inventory, skills, NPCs, and more. A green chart-line icon in the right sidebar (while the plugin is enabled) opens the dashboard.</p>" +
+    "<p>For a full reference of panels and config options, see the <strong>Guide</strong> section inside the dashboard window.</p>" +
+    "<p>No HTTP server, no port conflicts, no external dependencies.</p>"
 )
 public interface MicrobotDashboardPlusConfig extends Config {
 
@@ -113,6 +112,9 @@ public interface MicrobotDashboardPlusConfig extends Config {
 
     @ConfigItem(keyName = "showEventLog", name = "Show Event Log", description = "Show the Event Log ring buffer section.", position = 9, section = layoutSection)
     default boolean showEventLog() { return true; }
+
+    @ConfigItem(keyName = "showGuide", name = "Show Guide", description = "Show the Guide section at the bottom of the dashboard window. Hide it once you're familiar with the panels and config options.", position = 10, section = layoutSection)
+    default boolean showGuide() { return true; }
 
     // ------------------------------------------------------------------
     // Notifications (Discord webhook)

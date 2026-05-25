@@ -67,7 +67,7 @@ public class DashboardPanel extends PluginPanel {
         title.setFont(FontManager.getRunescapeBoldFont());
         top.add(title, BorderLayout.NORTH);
 
-        JLabel sub = new JLabel("MicrobotDashboardPlus v0.3.2");
+        JLabel sub = new JLabel("MicrobotDashboardPlus v0.3.3");
         sub.setForeground(Color.GRAY);
         sub.setFont(FontManager.getRunescapeSmallFont());
         top.add(sub, BorderLayout.SOUTH);

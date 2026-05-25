@@ -6,6 +6,7 @@ import net.runelite.client.plugins.microbot.microbotdashboardplus.data.PollSnaps
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.DashboardSection;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.EventDismissStatsPanel;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.EventLogPanel;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.GuidePanel;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.InventoryPanel;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.NearbyNpcsPanel;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.PlayerPanel;
@@ -274,6 +275,7 @@ public class DashboardWindow extends JFrame {
         EventDismissStatsPanel eventStats = new EventDismissStatsPanel(poller);
         EventLogPanel eventLog = new EventLogPanel(poller);
         XpChartPanel xpChart = new XpChartPanel(poller);
+        GuidePanel guide = new GuidePanel(poller);
 
         sections.add(player);
         sections.add(scripts);
@@ -285,6 +287,7 @@ public class DashboardWindow extends JFrame {
         sections.add(xpChart);
         sections.add(eventStats);
         sections.add(eventLog);
+        sections.add(guide);
 
         // Wire each section to its config-driven visibility predicate.
         visibilityPredicates.put(player, config::showPlayer);
@@ -297,6 +300,7 @@ public class DashboardWindow extends JFrame {
         visibilityPredicates.put(xpChart, config::showXpChart);
         visibilityPredicates.put(eventStats, config::showEventDismissStats);
         visibilityPredicates.put(eventLog, config::showEventLog);
+        visibilityPredicates.put(guide, config::showGuide);
 
         applyVisibility();
 
@@ -321,10 +325,11 @@ public class DashboardWindow extends JFrame {
         addSection(sectionGrid, xpChart, c, 0, 4, 2);
         addSection(sectionGrid, eventStats, c, 0, 5, 2);
         addSection(sectionGrid, eventLog, c, 0, 6, 2);
+        addSection(sectionGrid, guide, c, 0, 7, 2);
 
         // Push everything to the top.
         c.gridx = 0;
-        c.gridy = 7;
+        c.gridy = 8;
         c.gridwidth = 2;
         c.weighty = 1.0;
         sectionGrid.add(new JPanel() {{ setOpaque(false); }}, c);
@@ -396,7 +401,7 @@ public class DashboardWindow extends JFrame {
         footer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         footer.setBorder(new EmptyBorder(4, 10, 4, 10));
 
-        JLabel info = new JLabel("MicrobotDashboardPlus v0.3.2 - in-process poller, no HTTP");
+        JLabel info = new JLabel("MicrobotDashboardPlus v0.3.3 - in-process poller, no HTTP");
         info.setForeground(Color.GRAY);
         info.setFont(FontManager.getRunescapeSmallFont());
         footer.add(info);

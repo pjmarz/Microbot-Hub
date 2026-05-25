@@ -4,6 +4,26 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.3.3] — 2026-05-25
+
+UX cleanup. Verbose config reference was pushing the in-launcher description into wall-of-text territory; moved it inside the dashboard window itself.
+
+### Added
+
+- **GuidePanel** (`panels/GuidePanel.java`). New 11th section at the bottom of the floating window. Static HTML rendered into a `JEditorPane` with a stylesheet matching the RuneLite dark theme. Contains: a per-panel legend (what each of the other ten panels shows) and a numbered config-options reference (the seven items previously crammed into ConfigInformation).
+- **showGuide** config toggle (default ON). Eleventh entry in the Layout section. Users untick once they're familiar with the dashboard.
+
+### Changed
+
+- **ConfigInformation trimmed** to three short paragraphs: what the plugin is, how to access (sidebar icon → Open Dashboard), and the architecture line. The detailed config reference now lives inside the dashboard via the Guide panel, where users are already engaging with the feature.
+- `README.md` updated to mention the in-dashboard Guide section.
+
+### Rationale
+
+Pete's feedback: "looks good, but it's VERY wordy. would we be able to cut down on this while still preserving the information? maybe we move an in-depth guide to the [dashboard] itself, under like a 'guide' or 'legend' section?"
+
+Better separation of concerns. The launcher-side ConfigInformation should answer "what is this plugin?" in seconds. The in-dashboard Guide answers "how do I use it?" with the user already in front of the dashboard. Users who don't need either can hide the Guide panel via Layout.
+
 ## [0.3.2] — 2026-05-25
 
 Two correctness fixes caught during README-prep screenshot review.
