@@ -19,14 +19,22 @@ const DEFAULTS = {
     serverUrl: '/api',
     authToken: '',             // unused when behind the serve.ps1 proxy
     pollInterval: 5,           // seconds
+    autoCloseOnDisconnect: true,
 };
 
 const LS_KEYS = {
     serverUrl: 'microbot-agent-url',
     authToken: 'microbot-agent-token',
     pollInterval: 'microbot-agent-poll-interval',
+    autoCloseOnDisconnect: 'microbot-auto-close-on-disconnect',
     events: 'microbot-agent-events',
 };
+
+// v0.1.1: auto-close tab when plugin server goes away for sustained period.
+// Prevents the "sea of tabs" UX when toggling the plugin on/off.
+const AUTO_CLOSE_AFTER_DISCONNECTS = 6;    // 6 polls × 5 sec = ~30 sec
+const AUTO_CLOSE_WARN_AT = 3;              // warn ~15 sec before close
+let consecutiveDisconnects = 0;
 
 const RING_BUFFER_MAX = 10;
 
@@ -45,10 +53,13 @@ const SKILL_ORDER = [
 // Read-or-default. Stale full-URL entries get migrated to the /api proxy default
 // so anyone who upgraded mid-session doesn't stay stuck on the old direct fetch.
 const storedUrl = localStorage.getItem(LS_KEYS.serverUrl);
+const storedAutoClose = localStorage.getItem(LS_KEYS.autoCloseOnDisconnect);
 let settings = {
     serverUrl: (storedUrl && storedUrl !== 'http://127.0.0.1:8081') ? storedUrl : DEFAULTS.serverUrl,
     authToken: localStorage.getItem(LS_KEYS.authToken) || DEFAULTS.authToken,
     pollInterval: parseInt(localStorage.getItem(LS_KEYS.pollInterval), 10) || DEFAULTS.pollInterval,
+    // v0.1.1: default ON unless user explicitly disabled
+    autoCloseOnDisconnect: storedAutoClose === null ? DEFAULTS.autoCloseOnDisconnect : (storedAutoClose === 'true'),
 };
 
 let pollTimer = null;
@@ -246,6 +257,8 @@ function attachSettingsHandlers() {
     document.getElementById('server-url').value = settings.serverUrl;
     document.getElementById('auth-token').value = settings.authToken;
     document.getElementById('poll-interval').value = settings.pollInterval;
+    const autoCloseEl = document.getElementById('auto-close-on-disconnect');
+    if (autoCloseEl) autoCloseEl.checked = settings.autoCloseOnDisconnect;
 
     btn.addEventListener('click', () => panel.classList.toggle('hidden'));
     closeBtn.addEventListener('click', () => panel.classList.add('hidden'));
@@ -254,10 +267,13 @@ function attachSettingsHandlers() {
         settings.serverUrl = document.getElementById('server-url').value.trim();
         settings.authToken = document.getElementById('auth-token').value.trim();
         settings.pollInterval = parseInt(document.getElementById('poll-interval').value, 10) || DEFAULTS.pollInterval;
+        const autoCloseEl = document.getElementById('auto-close-on-disconnect');
+        if (autoCloseEl) settings.autoCloseOnDisconnect = autoCloseEl.checked;
 
         localStorage.setItem(LS_KEYS.serverUrl, settings.serverUrl);
         localStorage.setItem(LS_KEYS.authToken, settings.authToken);
         localStorage.setItem(LS_KEYS.pollInterval, settings.pollInterval.toString());
+        localStorage.setItem(LS_KEYS.autoCloseOnDisconnect, String(settings.autoCloseOnDisconnect));
 
         // Restart polling with new settings.
         stopPolling();
@@ -363,10 +379,41 @@ function setConnected(connected, reason = '') {
     if (connected) {
         el.textContent = 'Connected';
         el.className = 'status-connected';
-    } else {
-        el.textContent = `Disconnected${reason ? ': ' + reason : ''}`;
-        el.className = 'status-disconnected';
+        consecutiveDisconnects = 0;
+        return;
     }
+
+    consecutiveDisconnects++;
+
+    // v0.1.1: auto-close tab on sustained disconnect (~30 sec at default poll).
+    // Surfaces a countdown in the status banner so the user can disable in
+    // Settings if they want the tab to stay open for debugging.
+    if (settings.autoCloseOnDisconnect && consecutiveDisconnects >= AUTO_CLOSE_AFTER_DISCONNECTS) {
+        el.textContent = 'Plugin disconnected — closing tab';
+        el.className = 'status-disconnected';
+        // Brief delay so the user sees the message, then close.
+        setTimeout(() => {
+            try {
+                window.close();
+            } catch {
+                // window.close() silently fails on user-opened tabs in some
+                // browsers. Acceptable: tab stays open, dashboard shows
+                // Disconnected indefinitely until user closes manually.
+            }
+        }, 500);
+        return;
+    }
+
+    if (settings.autoCloseOnDisconnect && consecutiveDisconnects >= AUTO_CLOSE_WARN_AT) {
+        const pollsLeft = AUTO_CLOSE_AFTER_DISCONNECTS - consecutiveDisconnects;
+        const secsLeft = pollsLeft * settings.pollInterval;
+        el.textContent = `Disconnected — closing in ${secsLeft}s`;
+        el.className = 'status-disconnected';
+        return;
+    }
+
+    el.textContent = `Disconnected${reason ? ': ' + reason : ''}`;
+    el.className = 'status-disconnected';
 }
 
 function updateLastPoll() {

@@ -4,6 +4,31 @@ Browser-based monitoring dashboard, distributed as a Microbot Hub plugin. Pilot 
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.1.1] — 2026-05-25
+
+### Fixed
+
+- **"Sea of tabs" UX**: every plugin disable + re-enable cycle was spawning a fresh browser tab without closing the prior one. After several toggles, the user accumulated multiple dashboard tabs pointing at the same plugin.
+- Dashboard now self-closes after sustained disconnect (~30 sec at default 5-sec polling). Counts consecutive failed polls; when threshold passes, calls `window.close()`.
+- Counts down in the status banner for the last 15 sec before close: `"Disconnected — closing in 15s"` → `"... in 10s"` → `"... in 5s"` → `"Plugin disconnected — closing tab"`. Gives the user time to disable the feature in Settings if they want to keep the tab open for debugging.
+- Configurable opt-out via Settings panel checkbox **"Auto-close this tab when plugin disconnects (~30 sec)"** (default ON). Persisted to localStorage.
+
+### Caveat
+
+`window.close()` silently fails for user-opened tabs (browser security blocks closing tabs the user explicitly opened, only allows it for tabs opened via JS `window.open()` or `Desktop.browse()`). Status remains "Plugin disconnected — closing tab" indefinitely in that case; user closes manually.
+
+For auto-opened tabs from the plugin's `Desktop.getDesktop().browse(...)` call, close works reliably across Chrome/Edge/Firefox tested.
+
+### Validated
+
+Pete tested v0.1.1 via dev-mode override workflow:
+1. Set `devModePath` config to `C:\Users\peter\src\Microbot-Hub\tools\agentserver\dashboard`
+2. Hard-refreshed browser (no plugin rebuild needed)
+3. Verified countdown + auto-close on plugin disable
+4. Verified fresh single tab on re-enable
+
+This double-validates the dev-mode override feature itself — the iteration loop works as designed.
+
 ## [0.1.0] — 2026-05-25
 
 Pilot #6 MVP. Hub plugin port of the PowerShell-served dashboard (`tools/agentserver/dashboard/`) developed in v0.1.0 → v0.4.0 of that tool. Same UI, same 9 dashboard sections, same feature set — distributed as a plugin instead of two PowerShell windows.

@@ -66,7 +66,7 @@ import java.net.URI;
 @Slf4j
 public class MicrobotDashboardPlusPlugin extends Plugin {
 
-    public static final String version = "0.1.0";
+    public static final String version = "0.1.1";
 
     @Inject
     private MicrobotDashboardPlusConfig config;
