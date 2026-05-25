@@ -401,7 +401,7 @@ public class DashboardWindow extends JFrame {
         footer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         footer.setBorder(new EmptyBorder(4, 10, 4, 10));
 
-        JLabel info = new JLabel("MicrobotDashboardPlus v0.3.3 - in-process poller, no HTTP");
+        JLabel info = new JLabel("v0.3.4");
         info.setForeground(Color.GRAY);
         info.setFont(FontManager.getRunescapeSmallFont());
         footer.add(info);

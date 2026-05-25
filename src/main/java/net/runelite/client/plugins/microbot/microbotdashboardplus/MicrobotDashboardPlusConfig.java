@@ -23,8 +23,7 @@ import net.runelite.client.config.Range;
     "<h2>Microbot Dashboard Plus</h2>" +
     "<h3>Version: " + MicrobotDashboardPlusPlugin.version + "</h3>" +
     "<p>Aggregate session dashboard. A floating window with ten live-updating panels covering player state, scripts, inventory, skills, NPCs, and more. A green chart-line icon in the right sidebar (while the plugin is enabled) opens the dashboard.</p>" +
-    "<p>For a full reference of panels and config options, see the <strong>Guide</strong> section inside the dashboard window.</p>" +
-    "<p>No HTTP server, no port conflicts, no external dependencies.</p>"
+    "<p>For a full reference of panels and config options, see the <strong>Guide</strong> section inside the dashboard window.</p>"
 )
 public interface MicrobotDashboardPlusConfig extends Config {
 

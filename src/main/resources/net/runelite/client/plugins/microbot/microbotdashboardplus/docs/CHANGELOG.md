@@ -4,6 +4,19 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.3.4] — 2026-05-25
+
+UX cleanup. Removed architecture-detail strings that aren't relevant to end users.
+
+### Removed
+
+- `<p>No HTTP server, no port conflicts, no external dependencies.</p>` from ConfigInformation. Mattered when comparing to the v0.1.x browser-based implementation; meaningless to a v0.3.x user who never knew there was an HTTP server.
+- "MicrobotDashboardPlus v0.3.3 - in-process poller, no HTTP" footer line in the dashboard window. Same reason. Replaced with just a small version string ("v0.3.4") in the corner so users can still tell which version they're running for bug reports.
+
+### Rationale
+
+Pete's feedback: "can we remove the 'no http server....' line from the description, along with the 'in-process poller...' line on the dashboard page? im not sure its relevant to the user, yk?" Correct read — those lines were leftover technical framing from the v0.1.x → v0.2.0 architecture transition. Now that we're past the transition, they're noise.
+
 ## [0.3.3] — 2026-05-25
 
 UX cleanup. Verbose config reference was pushing the in-launcher description into wall-of-text territory; moved it inside the dashboard window itself.
