@@ -4,6 +4,31 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.3.0] — 2026-05-25
+
+Feature release: per-section visibility, Discord webhook notifications, and per-skill alert thresholds.
+
+### Added
+
+- **Per-section visibility config** (`Layout` section, 10 boolean toggles). Each of the 9 dashboard sections (Player, Active Scripts, Plus Plugins, Inventory, Skills, Nearby NPCs, Watchdog, XP Chart, Event Dismiss Stats, Event Log) can be shown or hidden individually. `DashboardWindow.applyVisibility()` reads each predicate from config; toggling a `show*` key fires `ConfigChanged` → window re-evaluates. To approximate a "compact mode", uncheck the chart + NPC + event sections.
+- **Discord webhook notifications** (`Notifications` section). New `notify/DiscordNotifier.java`: single-thread daemon executor posts `{"content": "..."}` to the configured webhook URL with 4-second timeouts. Treats the URL as a secret — never logged on error, never returned in exception messages. Truncates message body to 1900 chars (Discord cap is 2000).
+- **Three configurable trigger types**:
+  - `notifyLevelUp` (default ON): "Level up: Mining 53 → 54"
+  - `notifyRandomEvent` (default ON): "Random event detected (1 new entry in EventDismiss log)"
+  - `notifySessionLifecycle` (default OFF): "Dashboard session started." / "Dashboard session stopped."
+- **Alert thresholds** (`Alerts` section). New `notify/AlertManager.java`. Config format: `MINING:60, WOODCUTTING:80, FISHING:70` (comma-separated SKILL:LEVEL pairs). Parser tolerates whitespace, validates skill names against the OSRS API enum, clamps levels to [1, 99], skips malformed entries with a debug log. Crossing fires exactly once per (skill, level) pair across the session; sends a "ALERT: Mining reached level 60!" Discord notification when `notifyAlerts` is on.
+
+### Changed
+
+- `GameStatePoller` now detects level transitions and EventDismiss CSV row-count diffs to drive notifications. Suppresses level-up false positives on the first poll (baseline establishment). Random-event detection uses total-row delta across snapshots, not per-row diff.
+- Config grew from 3 fields to 18 across 4 sections (Behavior / Layout / Notifications / Alerts).
+
+### Carried forward / known limitations
+
+- No in-dashboard alert banner UI; alerts only fire to Discord. A JLabel banner at the top of the floating window is queued for v0.3.1 if useful.
+- Discord URL not field-masked in the config UI; users should be aware that screenshots can leak the URL.
+- Plugin icon still programmatic (the v0.2.2 chart-line glyph). Hand-designed PNG ships in v1.0.0 with upstream-PR-prep artwork.
+
 ## [0.2.2] — 2026-05-25
 
 Small QoL polish bundle before v0.3.0 feature work. Five carry-forward items from the v0.2.1 CHANGELOG.

@@ -1,6 +1,7 @@
 package net.runelite.client.plugins.microbot.microbotdashboardplus.window;
 
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.MicrobotDashboardPlusConfig;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.data.PollSnapshot;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.DashboardSection;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.panels.EventDismissStatsPanel;
@@ -62,8 +63,13 @@ public class DashboardWindow extends JFrame {
             .withZone(ZoneId.systemDefault());
 
     private final GameStatePoller poller;
+    private final MicrobotDashboardPlusConfig config;
     private final Consumer<PollSnapshot> snapshotListener;
     private final List<DashboardSection> sections = new ArrayList<>();
+
+    /** Map of section -> the predicate that decides if it's currently visible. */
+    private final java.util.Map<DashboardSection, java.util.function.BooleanSupplier> visibilityPredicates =
+            new java.util.LinkedHashMap<>();
 
     private final JLabel statusLabel = new JLabel("Connecting...");
     private final JLabel lastPollLabel = new JLabel("Last poll: never");
@@ -74,9 +80,10 @@ public class DashboardWindow extends JFrame {
     private static final String K_WIN_W = "windowWidth";
     private static final String K_WIN_H = "windowHeight";
 
-    public DashboardWindow(GameStatePoller poller) {
+    public DashboardWindow(GameStatePoller poller, MicrobotDashboardPlusConfig config) {
         super("Microbot Dashboard Plus");
         this.poller = poller;
+        this.config = config;
 
         setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
         setMinimumSize(new Dimension(900, 600));
@@ -96,6 +103,21 @@ public class DashboardWindow extends JFrame {
 
         snapshotListener = this::applySnapshot;
         poller.addListener(snapshotListener);
+    }
+
+    /** Re-evaluate each section's visibility predicate. Call when config changes. */
+    public void applyVisibility() {
+        SwingUtilities.invokeLater(() -> {
+            for (java.util.Map.Entry<DashboardSection, java.util.function.BooleanSupplier> e
+                    : visibilityPredicates.entrySet()) {
+                boolean visible = true;
+                try { visible = e.getValue().getAsBoolean(); }
+                catch (Throwable t) { /* defensive */ }
+                e.getKey().setVisible(visible);
+            }
+            revalidate();
+            repaint();
+        });
     }
 
     public void showOrFocus() {
@@ -248,6 +270,20 @@ public class DashboardWindow extends JFrame {
         sections.add(eventStats);
         sections.add(eventLog);
 
+        // Wire each section to its config-driven visibility predicate.
+        visibilityPredicates.put(player, config::showPlayer);
+        visibilityPredicates.put(scripts, config::showActiveScripts);
+        visibilityPredicates.put(plusPlugins, config::showPlusPlugins);
+        visibilityPredicates.put(inventory, config::showInventory);
+        visibilityPredicates.put(skills, config::showSkills);
+        visibilityPredicates.put(npcs, config::showNearbyNpcs);
+        visibilityPredicates.put(watchdog, config::showWatchdog);
+        visibilityPredicates.put(xpChart, config::showXpChart);
+        visibilityPredicates.put(eventStats, config::showEventDismissStats);
+        visibilityPredicates.put(eventLog, config::showEventLog);
+
+        applyVisibility();
+
         // 2-column grid with 3 full-width spans.
         GridBagConstraints c = new GridBagConstraints();
         c.fill = GridBagConstraints.BOTH;
@@ -299,7 +335,7 @@ public class DashboardWindow extends JFrame {
         footer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         footer.setBorder(new EmptyBorder(4, 10, 4, 10));
 
-        JLabel info = new JLabel("MicrobotDashboardPlus v0.2.2 - in-process poller, no HTTP");
+        JLabel info = new JLabel("MicrobotDashboardPlus v0.3.0 - in-process poller, no HTTP");
         info.setForeground(Color.GRAY);
         info.setFont(FontManager.getRunescapeSmallFont());
         footer.add(info);

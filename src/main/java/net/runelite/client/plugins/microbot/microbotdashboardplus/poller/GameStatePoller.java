@@ -13,6 +13,8 @@ import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.data.LogReaders;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.data.PollSnapshot;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.data.XpHistory;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.notify.AlertManager;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.notify.DiscordNotifier;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
 
@@ -114,6 +116,19 @@ public class GameStatePoller {
     /** Class name -> first observed enabled-millis. Resets when plugin disables. */
     private final Map<String, Long> pluginStartMillis = new HashMap<>();
 
+    /** Per-skill last-observed level for level-up detection. */
+    private final Map<Skill, Integer> lastSkillLevels = new EnumMap<>(Skill.class);
+    private boolean skillBaselineEstablished = false;
+
+    /** Number of EventDismiss CSV rows seen on last tick; diffs feed random-event notifications. */
+    private int lastEventDismissRowTotal = -1;
+
+    private DiscordNotifier notifier;
+    private AlertManager alertManager;
+    private boolean notifyLevelUp = true;
+    private boolean notifyRandomEvent = true;
+    private boolean notifyAlerts = true;
+
     private ScheduledExecutorService executor;
     private ScheduledFuture<?> scheduledTask;
     private volatile PollSnapshot lastSnapshot = PollSnapshot.empty();
@@ -162,6 +177,17 @@ public class GameStatePoller {
     }
     public int getNpcMaxDistance() { return npcMaxDistance; }
 
+    public void setNotifier(DiscordNotifier notifier) { this.notifier = notifier; }
+    public void setAlertManager(AlertManager alertManager) { this.alertManager = alertManager; }
+    public void setNotificationToggles(boolean levelUp, boolean randomEvent, boolean alerts) {
+        this.notifyLevelUp = levelUp;
+        this.notifyRandomEvent = randomEvent;
+        this.notifyAlerts = alerts;
+    }
+    public void setAlertThresholds(String csv) {
+        if (alertManager != null) alertManager.setThresholdsFromConfig(csv);
+    }
+
     public void refreshNow() {
         if (executor != null && !executor.isShutdown()) {
             executor.submit(this::tickSafely);
@@ -172,10 +198,77 @@ public class GameStatePoller {
         try {
             PollSnapshot snapshot = buildSnapshot();
             lastSnapshot = snapshot;
+            detectAndFireNotifications(snapshot);
             notifyListeners(snapshot);
         } catch (Throwable t) {
             log.warn("Poll iteration failed: {}", t.getMessage(), t);
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Notification triggers
+    // ---------------------------------------------------------------------
+
+    private void detectAndFireNotifications(PollSnapshot snapshot) {
+        if (snapshot == null) return;
+
+        // Level-up detection (skip first poll to establish baseline).
+        Map<Skill, Integer> currentLevels = snapshot.getSkillLevels();
+        if (currentLevels != null && !currentLevels.isEmpty()) {
+            if (!skillBaselineEstablished) {
+                lastSkillLevels.putAll(currentLevels);
+                skillBaselineEstablished = true;
+            } else {
+                for (Map.Entry<Skill, Integer> e : currentLevels.entrySet()) {
+                    Skill skill = e.getKey();
+                    int newLevel = e.getValue() == null ? 0 : e.getValue();
+                    Integer prev = lastSkillLevels.get(skill);
+                    if (prev != null && newLevel > prev) {
+                        onLevelUp(skill, prev, newLevel);
+                    }
+                    lastSkillLevels.put(skill, newLevel);
+                }
+            }
+        }
+
+        // EventDismiss CSV diff -> random-event notification.
+        List<PollSnapshot.EventDismissStatRow> rows = snapshot.getEventDismissStats();
+        int totalThisTick = 0;
+        if (rows != null) {
+            for (PollSnapshot.EventDismissStatRow r : rows) totalThisTick += r.getTotal();
+        }
+        if (lastEventDismissRowTotal < 0) {
+            lastEventDismissRowTotal = totalThisTick;
+        } else if (totalThisTick > lastEventDismissRowTotal) {
+            int delta = totalThisTick - lastEventDismissRowTotal;
+            if (notifyRandomEvent && notifier != null) {
+                notifier.send("Random event detected (" + delta + " new "
+                        + (delta == 1 ? "entry" : "entries") + " in EventDismiss log)");
+            }
+            lastEventDismissRowTotal = totalThisTick;
+        }
+    }
+
+    private void onLevelUp(Skill skill, int from, int to) {
+        String skillName = capitalize(skill.getName());
+
+        // Alert threshold crossings take priority + use a louder prefix.
+        boolean alertFired = false;
+        if (alertManager != null && alertManager.checkCrossing(skill, to)) {
+            alertFired = true;
+            Integer threshold = alertManager.thresholdFor(skill);
+            if (notifyAlerts && notifier != null) {
+                notifier.send("ALERT: " + skillName + " reached level " + threshold + "!");
+            }
+        }
+        if (!alertFired && notifyLevelUp && notifier != null) {
+            notifier.send("Level up: " + skillName + " " + from + " -> " + to);
+        }
+    }
+
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
     }
 
     private void notifyListeners(PollSnapshot snapshot) {

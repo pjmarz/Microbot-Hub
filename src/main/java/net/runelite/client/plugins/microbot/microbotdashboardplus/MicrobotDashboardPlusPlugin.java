@@ -9,6 +9,8 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.PluginConstants;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.notify.AlertManager;
+import net.runelite.client.plugins.microbot.microbotdashboardplus.notify.DiscordNotifier;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.poller.GameStatePoller;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.window.DashboardWindow;
 import net.runelite.client.ui.ClientToolbar;
@@ -62,7 +64,7 @@ import java.awt.image.BufferedImage;
 @Slf4j
 public class MicrobotDashboardPlusPlugin extends Plugin {
 
-    public static final String version = "0.2.2";
+    public static final String version = "0.3.0";
 
     @Inject
     private MicrobotDashboardPlusConfig config;
@@ -74,6 +76,8 @@ public class MicrobotDashboardPlusPlugin extends Plugin {
     private DashboardPanel sidebarPanel;
     private NavigationButton navButton;
     private DashboardWindow window;
+    private DiscordNotifier notifier;
+    private AlertManager alertManager;
 
     @Provides
     MicrobotDashboardPlusConfig provideConfig(ConfigManager configManager) {
@@ -82,13 +86,30 @@ public class MicrobotDashboardPlusPlugin extends Plugin {
 
     @Override
     protected void startUp() throws AWTException {
+        // 0. Notification stack.
+        notifier = new DiscordNotifier();
+        notifier.setWebhookUrl(config.discordWebhookUrl());
+        notifier.start();
+        alertManager = new AlertManager();
+        alertManager.setThresholdsFromConfig(config.alertThresholds());
+
         // 1. Build the poller. Single-thread executor; starts immediately.
         poller = new GameStatePoller();
         poller.setNpcMaxDistance(config.npcMaxDistance());
+        poller.setNotifier(notifier);
+        poller.setAlertManager(alertManager);
+        poller.setNotificationToggles(
+                config.notifyLevelUp(),
+                config.notifyRandomEvent(),
+                config.notifyAlerts());
         poller.start(config.pollIntervalSeconds());
 
+        if (config.notifySessionLifecycle()) {
+            notifier.send("Dashboard session started.");
+        }
+
         // 2. Build the floating window (hidden until shown).
-        window = new DashboardWindow(poller);
+        window = new DashboardWindow(poller, config);
 
         // 3. Build the sidebar panel + register it.
         sidebarPanel = new DashboardPanel(poller, this::showWindow);
@@ -110,6 +131,9 @@ public class MicrobotDashboardPlusPlugin extends Plugin {
 
     @Override
     protected void shutDown() {
+        if (notifier != null && config.notifySessionLifecycle()) {
+            notifier.send("Dashboard session stopped.");
+        }
         if (window != null) {
             window.disposeWindow();
             window = null;
@@ -126,28 +150,51 @@ public class MicrobotDashboardPlusPlugin extends Plugin {
             poller.stop();
             poller = null;
         }
+        if (notifier != null) {
+            notifier.shutdown();
+            notifier = null;
+        }
+        alertManager = null;
         Microbot.log("MicrobotDashboardPlus v" + version + " stopped");
     }
 
     @Subscribe
     public void onConfigChanged(ConfigChanged event) {
         if (!"MicrobotDashboardPlus".equals(event.getGroup())) return;
-        if (poller == null) return;
+        String key = event.getKey();
 
-        switch (event.getKey()) {
-            case "pollIntervalSeconds":
-                // Cheap restart of the scheduled task; safe while listeners
-                // remain registered (they retain their references).
-                poller.stop();
-                poller.start(config.pollIntervalSeconds());
-                break;
-            case "npcMaxDistance":
-                poller.setNpcMaxDistance(config.npcMaxDistance());
-                poller.refreshNow();
-                break;
-            default:
-                // autoOpenDashboard only matters at startUp; no live action.
-                break;
+        if (poller != null) {
+            switch (key) {
+                case "pollIntervalSeconds":
+                    poller.stop();
+                    poller.start(config.pollIntervalSeconds());
+                    break;
+                case "npcMaxDistance":
+                    poller.setNpcMaxDistance(config.npcMaxDistance());
+                    poller.refreshNow();
+                    break;
+                case "alertThresholds":
+                    poller.setAlertThresholds(config.alertThresholds());
+                    break;
+                case "discordWebhookUrl":
+                    if (notifier != null) notifier.setWebhookUrl(config.discordWebhookUrl());
+                    break;
+                case "notifyLevelUp":
+                case "notifyRandomEvent":
+                case "notifyAlerts":
+                    poller.setNotificationToggles(
+                            config.notifyLevelUp(),
+                            config.notifyRandomEvent(),
+                            config.notifyAlerts());
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // Section visibility: any show* key triggers a re-evaluation.
+        if (window != null && key != null && key.startsWith("show")) {
+            window.applyVisibility();
         }
     }
 
