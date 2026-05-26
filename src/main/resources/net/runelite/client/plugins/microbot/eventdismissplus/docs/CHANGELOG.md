@@ -4,6 +4,22 @@ Random event handling as a global companion plugin for any other Microbot Hub pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.2.1] — 2026-05-26
+
+Defensive fallback for stuck lamp dialogues. Closes a real bug Pete hit while fighting Hill Giants in the Edgeville Dungeon: Bee keeper random event triggered, the handler tried to claim a lamp via the Genie-style flow (Continue → "Yes please" → skill picker) but Bee keeper's modern dialogue uses a help/decline question with different option text. The safety loop in `handleLampDialogue` exhausted without matching anything. The NPC stayed on screen, `validate()` kept returning true, and `BlockingEventManager` re-fired the handler every ~4 seconds, logging "handled Bee keeper (session total: N)" while the NPC just stood there. 5 iterations in 16 seconds before Pete intervened.
+
+### Fixed
+
+- **Lamp-dialogue safety loop falls through to common decline options.** New `tryDeclineFallback(String npcName)` method called from `handleLampDialogue` when the existing "Yes please" / skill-picker pattern doesn't match. Tries a list of decline phrasings ("Sorry, but I'd rather not help", "Sorry, I'm busy", "Buzz off", "I don't want to", "I'm too busy", "No thanks", "No, thank you") and clicks the first match. Same shape as the v0.1.1 Mysterious Old Man Maze fix, generalized across more events.
+- **`handleLampDialogue` now takes the NPC name** as a parameter so the fallback path can log which event triggered it. Caller in `engage()` updated.
+- **CSV log records lamp-fallback events** as `DECLINE` action / `OK` outcome with note `"lamp dialogue fallback, declined with '<text>'"`. Lets analytics distinguish lamp-fallback declines from regular Maze declines and from successful engagements.
+- **Hard miss logged as `DECLINE`/`ERROR`** with note `"lamp dialogue stuck, no decline option matched"`. The signal to widen the decline-text catalog or add proper engagement for the affected event.
+
+### Notes
+
+- **Generalizes beyond Bee keeper.** Count Check, Genie, and any future lamp-event whose dialogue doesn't fit the Genie pattern benefit from the same fallback. Belt-and-suspenders against Jagex shuffling dialogue text on us.
+- **Out of scope**: real Bee keeper engagement. The exact option text and reward type aren't in the catalog yet. v0.3.0 OCR/dialogue audit (already on the roadmap) could nail down the proper engage path; for now defensive decline is correct behavior. Declining a random event still satisfies "engaged with the random" from an antiban perspective (the detection signal is "never interacts", not "always accepts").
+
 ## [0.2.0] — 2026-05-23
 
 Light polish minor: behavioral variability + analytics foundation + catalog hygiene. Heavier event engagement (Freaky Forester full quest, Prison Pete balloon-animal, OCR for Quiz Master / Mime) deferred to v0.3.0 as the "complex events" minor.

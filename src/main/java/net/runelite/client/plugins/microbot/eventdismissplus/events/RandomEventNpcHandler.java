@@ -163,7 +163,7 @@ public class RandomEventNpcHandler implements BlockingEvent {
 
         RandomEventType type = RandomEventType.fromNpcName(name);
         if (type != null && type.givesLamp()) {
-            handleLampDialogue();
+            handleLampDialogue(name);
         } else {
             // Accept-and-acknowledge events (Sandwich Lady, Drunken Dwarf, Mysterious Old
             // Man, Rick Turpentine, Dr Jekyll). Just click through the dialog continues
@@ -176,8 +176,16 @@ public class RandomEventNpcHandler implements BlockingEvent {
      * Genie / Beekeeper / Count Check share the same flow: dialogue continues, then a
      * "Yes please" option appears, then a skill picker. We click through, pick "Yes
      * please" if shown, then click the active skill.
+     *
+     * <p>v0.2.1: takes the NPC name so the fallback path can log it. If the safety loop
+     * exits without claiming a lamp (e.g. Bee keeper's modern dialogue uses a
+     * help/decline question instead of the Genie-style "Yes please" + skill picker
+     * flow), falls through to {@link #tryDeclineFallback(String)} to close the dialogue
+     * via a decline option. Without this, the NPC stays on screen and
+     * BlockingEventManager re-fires the handler every few seconds (Pete's 2026-05-26
+     * Edgeville-dungeon repro: 5 "handled Bee keeper" log lines in 16 seconds).
      */
-    private void handleLampDialogue() {
+    private void handleLampDialogue(String npcName) {
         int safety = 12;
         while (safety-- > 0) {
             if (Rs2Dialogue.hasContinue()) {
@@ -208,6 +216,52 @@ public class RandomEventNpcHandler implements BlockingEvent {
             // No actionable state -- break out
             break;
         }
+        // v0.2.1: safety loop exited without claiming a lamp. The dialogue is still
+        // open (we never hit the skill-picker happy path). Fall through to common
+        // decline phrasings to close it cleanly.
+        tryDeclineFallback(npcName);
+    }
+
+    /**
+     * v0.2.1: defensive fallback for stuck lamp dialogues. Tries common decline
+     * phrasings to close the dialogue when the Genie-style flow ("Yes please" + skill
+     * picker) doesn't match the actual dialogue structure. Discovered via Bee keeper:
+     * its modern dialogue uses help/decline question text, so the existing handler's
+     * safety loop exhausted without action, the NPC stayed on screen, and
+     * BlockingEventManager looped the handler every ~4 seconds.
+     *
+     * <p>Logs to the CSV event log as DECLINE/OK on success, DECLINE/ERROR on hard
+     * miss. ERROR rows are the signal that the decline-text catalog needs widening or
+     * the event needs proper engagement.
+     */
+    private void tryDeclineFallback(String npcName) {
+        String[] declineTexts = {
+                "Sorry, but I'd rather not help",
+                "Sorry, I'm busy",
+                "Buzz off",
+                "I don't want to",
+                "I'm too busy",
+                "No thanks",
+                "No, thank you"
+        };
+        for (String text : declineTexts) {
+            if (Rs2Dialogue.hasDialogueOption(text)) {
+                Microbot.log("EventDismissPlus: " + npcName + " lamp dialogue mismatch; declined with '" + text + "'");
+                EventDismissPlusEventLog.append(npcName,
+                        EventDismissPlusEventLog.Action.DECLINE,
+                        EventDismissPlusEventLog.Outcome.OK,
+                        "lamp dialogue fallback, declined with '" + text + "'");
+                Rs2Dialogue.clickOption(text);
+                Global.sleep(Rs2Random.between(400, 900));
+                advanceDialogueClicks(4);
+                return;
+            }
+        }
+        Microbot.log("EventDismissPlus: " + npcName + " lamp dialogue exhausted and no decline option matched");
+        EventDismissPlusEventLog.append(npcName,
+                EventDismissPlusEventLog.Action.DECLINE,
+                EventDismissPlusEventLog.Outcome.ERROR,
+                "lamp dialogue stuck, no decline option matched");
     }
 
     private Skill pickLampSkill() {
