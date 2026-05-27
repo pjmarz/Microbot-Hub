@@ -4,6 +4,21 @@ Random event handling as a global companion plugin for any other Microbot Hub pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.2.2] — 2026-05-26
+
+Generic defensive fallback at the `execute()` level. Closes a Sandwich Lady loop bug Pete hit while smelting: she appeared, our handler routed her through the non-lamp `advanceDialogueClicks(10)` path, the Continue clicks ran out, but the actual Sandwich Lady engagement requires picking a food item from a TRAY WIDGET that opens at the end of the dialogue. We don't model widget-tray interactions. The NPC stayed on screen, `validate()` kept returning true, and `BlockingEventManager` re-fired the handler. Same shape as the v0.1.1 (Maze) and v0.2.1 (Bee keeper) bugs, but in a third code path.
+
+### Fixed
+
+- **Defensive fallback at `execute()` level.** After `engage()` runs, wait up to 3 seconds for the NPC to despawn naturally (`Global.sleepUntil(() -> !validate(), 3000)`). If it's still on screen, log + dismiss. Generalizes v0.2.1's lamp-dialogue fallback to ANY engagement path: lamp events, non-lamp events, Frog Prince Kiss path, and any future widget-tray or multi-step paths we haven't built yet.
+- **CSV log records fallback events** as `DISMISS / ERROR / "engagement fallback"`. The ERROR rows are the empirical signal showing which events have structurally incomplete engagement and need v0.3.0+ proper handling.
+
+### Notes
+
+- **One safety net, all paths.** The fallback at the dispatcher level (`execute()`) covers every engagement entry point. No per-event special-casing needed at this layer.
+- **Telemetry, not just safety.** Each fallback log entry adds a row to `~/.runelite/eventdismissplus-events.csv`. After a few soak sessions, the ERROR-row distribution shows which events need real engagement work. Likely candidates: Sandwich Lady (confirmed), Drunken Dwarf (suspected — yes/no option text uncertain), Bee keeper (v0.2.1 fallback may or may not have fully covered).
+- **Out of scope**: proper widget-tray engagement for Sandwich Lady (claim the free food), Drunken Dwarf option-dialog handling, OCR for Quiz Master / Mime. All v0.3.0+ per the existing CHANGELOG roadmap.
+
 ## [0.2.1] — 2026-05-26
 
 Defensive fallback for stuck lamp dialogues. Closes a real bug Pete hit while fighting Hill Giants in the Edgeville Dungeon: Bee keeper random event triggered, the handler tried to claim a lamp via the Genie-style flow (Continue → "Yes please" → skill picker) but Bee keeper's modern dialogue uses a help/decline question with different option text. The safety loop in `handleLampDialogue` exhausted without matching anything. The NPC stayed on screen, `validate()` kept returning true, and `BlockingEventManager` re-fired the handler every ~4 seconds, logging "handled Bee keeper (session total: N)" while the NPC just stood there. 5 iterations in 16 seconds before Pete intervened.

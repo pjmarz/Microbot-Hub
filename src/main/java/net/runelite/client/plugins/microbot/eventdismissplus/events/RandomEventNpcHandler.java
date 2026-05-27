@@ -96,6 +96,29 @@ public class RandomEventNpcHandler implements BlockingEvent {
                 engage(npc, name);
                 EventDismissPlusEventLog.append(name, EventDismissPlusEventLog.Action.ENGAGE,
                         EventDismissPlusEventLog.Outcome.OK, "");
+
+                // v0.2.2: defensive fallback at the execute() level, generalizing v0.2.1's
+                // lamp-only fallback to ANY engagement path. If engage() ran but the NPC
+                // is still on screen (e.g. Sandwich Lady's tray widget wasn't picked
+                // because we don't model widget interactions, Drunken Dwarf's yes/no
+                // option text didn't match, or any future event whose engagement is
+                // structurally incomplete), wait briefly for natural despawn then fall
+                // through to dismiss. Prevents BlockingEventManager re-fire loop.
+                //
+                // CSV log captures these as DISMISS/ERROR/"engagement fallback" so the
+                // empirical record shows WHICH events slip through. Telemetry drives
+                // v0.3.0+ priorities for proper engagement work.
+                Global.sleepUntil(() -> !validate(), 3000);
+                if (validate()) {
+                    Microbot.log("EventDismissPlus: " + name + " engagement didn't despawn NPC; falling back to dismiss");
+                    EventDismissPlusEventLog.append(name, EventDismissPlusEventLog.Action.DISMISS,
+                            EventDismissPlusEventLog.Outcome.ERROR, "engagement fallback");
+                    try {
+                        dismiss(npc);
+                    } catch (Exception ex) {
+                        Microbot.log("EventDismissPlus: fallback dismiss failed: " + ex.getMessage());
+                    }
+                }
             } else {
                 dismiss(npc);
                 EventDismissPlusEventLog.append(name, EventDismissPlusEventLog.Action.DISMISS,
