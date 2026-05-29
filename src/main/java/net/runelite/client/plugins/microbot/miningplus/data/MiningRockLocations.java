@@ -412,7 +412,7 @@ public class MiningRockLocations {
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
                 new WorldPoint(3028, 9737, 0),
-                "Mining Guild (Members)",
+                "Mining Guild",
                 false,
                 new HashMap<>(),
                 miningGuildSkills,
@@ -523,7 +523,7 @@ public class MiningRockLocations {
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
                 new WorldPoint(3045, 9741, 0),
-                "Mining Guild (Members)", false,
+                "Mining Guild", false,
                 new HashMap<>(),
                 miningGuildSkills,
                 new HashMap<>(),
@@ -678,7 +678,7 @@ public class MiningRockLocations {
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
                 new WorldPoint(3037, 9773, 0),
-                "Mining Guild (Members)", false,
+                "Mining Guild", false,
                 new HashMap<>(),
                 miningGuildSkills,
                 new HashMap<>(),
@@ -740,7 +740,7 @@ public class MiningRockLocations {
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
                 new WorldPoint(3042, 9772, 0),
-                "Mining Guild (Members)", false,
+                "Mining Guild", false,
                 new HashMap<>(),
                 miningGuildSkills,
                 new HashMap<>(),
@@ -804,7 +804,7 @@ public class MiningRockLocations {
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
                 new WorldPoint(3046, 9756, 0),
-                "Mining Guild (Members)", true,
+                "Mining Guild", true,
                 new HashMap<>(),
                 miningGuildSkills,
                 new HashMap<>(),

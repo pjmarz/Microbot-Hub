@@ -4,6 +4,14 @@ Auto-walking-and-mining "Plus" fork of upstream AutoMining. Part of the Skill Pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Semver-flavored (`0.x` = pre-stable, `1.0.0` = upstream-PR ready).
 
+## [0.5.9] — 2026-05-28
+
+Cosmetic follow-up to v0.5.8.
+
+### Fixed
+
+- **Overlay status showed "Mining Guild (Members)"** even though v0.5.8 made the location F2P-accessible. v0.5.8 fixed the user-facing dropdown name ("Mining Guild (P2P 60)" → "Mining Guild (60)") but left the internal `locationName` as "Mining Guild (Members)" to limit the edit scope. That internal string is what the overlay's "Mining X rocks @ <location>" status line renders, so it kept showing "(Members)". Renamed the internal `locationName` "Mining Guild (Members)" → "Mining Guild" across all 6 occurrences (1 in `MineLocationOption`, 5 in `MiningRockLocations`), preserving the name-match contract between the two files. Overlay now reads "Mining Guild". No functional change.
+
 ## [0.5.8] — 2026-05-28
 
 Mining Guild F2P correction. Closes the v0.4.0 deferred verification ("Live-verification deferred until a P2P account with 60 Mining is available") now that a 60-Mining account is available. Live-verified via RuneLite dev-tool tile hovers + the agent server `/state` endpoint.

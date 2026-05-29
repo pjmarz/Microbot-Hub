@@ -31,7 +31,7 @@ public enum MineLocationOption {
             new WorldPoint(3296, 3315, 0)),
     DWARVEN_MINE("Dwarven Mine", "Dwarven Mine",
             new WorldPoint(3034, 9822, 0)),
-    MINING_GUILD("Mining Guild (60)", "Mining Guild (Members)",
+    MINING_GUILD("Mining Guild (60)", "Mining Guild",
             new WorldPoint(3028, 9737, 0)),
     VARROCK_SOUTH_EAST_MINE("Varrock SE", "Varrock South East Mine",
             new WorldPoint(3285, 3363, 0)),
