@@ -56,6 +56,13 @@ import java.util.stream.Collectors;
  *       door; verify in a soak. The RUNITE Mining Guild entry is left at the old coord/members flag
  *       (runite is not in the F2P area and not in the members guild per wiki; likely a phantom entry,
  *       unverifiable without a members account -- flagged for a future members-side audit).</li>
+ *   <li><b>2026-05-28 (v0.5.11 -- mithril re-anchor):</b> The v0.5.8 MITHRIL anchor {@code (3037, 9773)}
+ *       (chamber 2, through the door) was the wrong call. Live verification found the full 5-rock F2P
+ *       mithril cluster is in CHAMBER 1, co-located with coal/iron, no door transit: tiles
+ *       {@code (3046,9733) (3047,9733) (3050,9738) (3052,9739) (3053,9737)}. Re-anchored to the cluster
+ *       center {@code (3050, 9738)}. Removes the door-transit dependency for mithril (iron/coal/mithril
+ *       are now all chamber 1). Adamant stays {@code (3042, 9772)} chamber 2 (only mithril was found in
+ *       chamber 1; adamant needs 70 Mining regardless).</li>
  *   <li>Re-audit before each minor version bump that touches this file.</li>
  * </ul>
  */
@@ -673,11 +680,14 @@ public class MiningRockLocations {
     private static List<LocationOption> getMithrilRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild F2P area - 5 mithril rocks, north chamber past the door at 3046,9756 (v0.5.8: live-verified F2P)
+        // Mining Guild F2P area - 5 mithril rocks, CHAMBER 1 cluster co-located with coal/iron, NO
+        // door transit (v0.5.11: re-anchored from the chamber-2 (3037,9773) guess to the verified
+        // chamber-1 cluster. Tiles: (3046,9733)(3047,9733)(3050,9738)(3052,9739)(3053,9737); anchor
+        // is the cluster center, all 5 within ~7 tiles).
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
-                new WorldPoint(3037, 9773, 0),
+                new WorldPoint(3050, 9738, 0),
                 "Mining Guild", false,
                 new HashMap<>(),
                 miningGuildSkills,

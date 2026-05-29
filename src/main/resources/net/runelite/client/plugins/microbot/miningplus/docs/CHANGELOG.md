@@ -4,6 +4,19 @@ Auto-walking-and-mining "Plus" fork of upstream AutoMining. Part of the Skill Pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Semver-flavored (`0.x` = pre-stable, `1.0.0` = upstream-PR ready).
 
+## [0.5.11] — 2026-05-28
+
+Mining Guild mithril re-anchor, surfaced during live use.
+
+### Fixed
+
+- **Mithril anchored to the wrong chamber.** The v0.5.8 Mining Guild fix put MITHRIL at `(3037, 9773)` — chamber 2, through the door — based on where mithril was first spotted. Live verification found the **full 5-rock F2P mithril cluster is actually in chamber 1**, co-located with the coal/iron, requiring **no door transit**: tiles `(3046,9733)`, `(3047,9733)`, `(3050,9738)`, `(3052,9739)`, `(3053,9737)`. Re-anchored MITHRIL to the cluster center `(3050, 9738)` (all 5 within ~7 tiles).
+- This removes the door-transit dependency for mithril — iron, coal, and mithril are now all chamber 1 (proven-reachable, no door). Only adamant remains chamber 2 `(3042, 9772)`, and it needs 70 Mining regardless, so it's untested-but-academic.
+
+### Notes
+
+- The chamber-2 mithril `(3037, 9773)` from v0.5.8 appears to have been a misread or a stray rock; the 5-rock complement is all in chamber 1 (matches the wiki's "5 mithril"). Audit log on `MiningRockLocations` updated with all five verified tiles.
+
 ## [0.5.10] — 2026-05-28
 
 Documentation of an AUTO_BEST limitation surfaced while testing the v0.5.8 Mining Guild fix. No logic change (deferred by choice).
