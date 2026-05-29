@@ -4,6 +4,20 @@ Auto-walking-and-mining "Plus" fork of upstream AutoMining. Part of the Skill Pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Semver-flavored (`0.x` = pre-stable, `1.0.0` = upstream-PR ready).
 
+## [0.5.10] — 2026-05-28
+
+Documentation of an AUTO_BEST limitation surfaced while testing the v0.5.8 Mining Guild fix. No logic change (deferred by choice).
+
+### Documented (known limitation)
+
+- **AUTO_BEST won't hold an underground mine after a surface bank.** `MiningRockLocations.getBestAccessibleLocation` ranks candidate mines by raw `WorldPoint.distanceTo` from the player. OSRS represents underground areas at plane 0 with a ~+6400 Y offset, so an underground mine (Mining Guild `(3028, 9737)`, Dwarven Mine, etc.) reads as ~6400 tiles away whenever the player is on the surface. After a bank trip to a surface bank, the distance check always favors the nearest *surface* iron mine (e.g. Rimmington) over the underground one the bot was just using, so AUTO_BEST abandons the underground mine and treks to the surface alternative. Reproduced: mining iron at the Mining Guild with AUTO_BEST, banked at Falador East, then walked off toward Rimmington Mine.
+- **Workaround (documented in the Mine location config description + the in-launcher guide):** for underground mines, select the mine explicitly instead of AUTO_BEST. Explicit selection pins the anchor and routes correctly (down the ladder), verified working for the Mining Guild in v0.5.8.
+- **Deferred fix:** a "sticky" AUTO_BEST (don't re-rank to a different mine after a bank trip while the current one is still accessible) would resolve this cleanly; a full path-distance ranking would too but is heavier. Deferred by choice -- explicit selection is good enough for now.
+
+### Also folds in (from v0.5.9, not separately deployed)
+
+- Overlay status no longer shows "Mining Guild (Members)"; internal `locationName` renamed "Mining Guild (Members)" -> "Mining Guild" across both data files.
+
 ## [0.5.9] — 2026-05-28
 
 Cosmetic follow-up to v0.5.8.

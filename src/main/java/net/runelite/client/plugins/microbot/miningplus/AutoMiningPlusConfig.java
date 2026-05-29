@@ -11,7 +11,7 @@ import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
         "<h3>Version: "+ AutoMiningPlusPlugin.version + "</h3>" +
         "<p>1. <strong>Ore Selection:</strong> Choose the type of ore you wish to mine. The default ore is <em>TIN</em>.</p>" +
         "<p></p>"+
-        "<p>2. <strong>Mine Location:</strong> Pick a named mine and the bot walks there before mining. <em>AUTO_BEST</em> picks the closest accessible mine for the chosen ore (matches upstream AutoMining behavior).</p>" +
+        "<p>2. <strong>Mine Location:</strong> Pick a named mine and the bot walks there before mining. <em>AUTO_BEST</em> picks the closest accessible mine by raw distance. It will NOT stay at an underground mine (Mining Guild, Dwarven Mine) after a surface bank trip -- pick those explicitly.</p>" +
         "<p></p>"+
         "<p>3. <strong>Distance to Stray:</strong> Set the maximum distance in tiles that the bot can travel from its initial position. The default distance is <em>20 tiles</em>.</p>" +
         "<p></p>"+
@@ -58,7 +58,7 @@ public interface AutoMiningPlusConfig extends Config {
     @ConfigItem(
             keyName = "mineLocation",
             name = "Mine location",
-            description = "Walk to and anchor at this mine before starting. AUTO_BEST picks the closest accessible mine for the chosen ore.",
+            description = "Walk to and anchor at this mine before starting. AUTO_BEST picks the closest accessible mine for the chosen ore by raw coordinate distance -- note it does NOT hold underground mines (Mining Guild, Dwarven Mine) once you bank on the surface (the underground coordinate reads as ~6400 tiles away, so a surface mine always wins the distance check). For underground mines, select the mine explicitly instead of AUTO_BEST.",
             position = 1,
             section = generalSection
     )
