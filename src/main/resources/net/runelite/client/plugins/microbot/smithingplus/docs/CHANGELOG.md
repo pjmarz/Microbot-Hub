@@ -4,6 +4,23 @@ Auto-walking-and-smithing-at-anvil "Plus" fork of upstream VarrockAnvil. Part of
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [0.5.8] — 2026-05-28
+
+Pre-soak hardening before a real smithing session. Two footguns closed.
+
+### Fixed
+
+- **`Rs2Walker.disableTeleports` lifecycle leak.** `run()` sets the global static flag to `true` (line 89) but `shutdown()` never reset it, so after the plugin stopped, any other plugin using Rs2Walker inherited `disableTeleports=true` and walked overland when it meant to teleport. Same leak fixed in AutoSmeltingPlus v0.5.9 (whose changelog flagged this one). Fix: reset to `false` in `shutdown()` before `super.shutdown()`.
+
+### Added
+
+- **Smith stall detection ("greyed item" guard).** If the configured item is above your Smithing level (e.g. Steel platebody at 40 — needs 48) or the wrong bar is selected for it, the anvil widget greys the item, the click is a no-op, and the bot would loop forever re-clicking it — looking frozen, gaining nothing. New guard in `smithAtAnvil`: it records Smithing XP before each smith click and, if 4 consecutive clicks produce no XP gain, logs a clear message ("'<item>' is likely above your Smithing level, or the wrong bar is selected") and shuts down cleanly. XP is sampled *before* the click, so a working cycle's gain registers by the next click and resets the counter — bank trips and antiban micro-breaks don't false-trip it. As a bonus this also catches a drifted anvil widget child id (another known gap).
+
+### Notes
+
+- This is the **reactive** version of the long-deferred "Smithing-level pre-flight." A **proactive** pre-flight (refuse before starting) needs the per-item `AnvilItemLevels` table (26 items x 6 bar tiers = 156 entries), which remains deferred — we won't ship fabricated level numbers from memory (same stale-data discipline as the coord audits). Stall detection covers the same "looks frozen" symptom and more failure causes, without that data.
+- **Still deferred / known gaps:** toolbelt hammer detection (keep a hammer in the bank), progressive smith, the AnvilItemLevels table, and the unverified Varrock Central/East anvil coords (use the verified Varrock West anvil for now).
+
 ## [0.5.7] — 2026-05-23
 
 ### Fixed

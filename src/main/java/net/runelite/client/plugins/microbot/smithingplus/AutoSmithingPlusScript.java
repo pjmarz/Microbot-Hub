@@ -68,6 +68,12 @@ public class AutoSmithingPlusScript extends Script {
     // v0.5.0: target-level cleanup flag. Intercepted after deposit in handleBankAndWithdraw.
     private boolean shutdownAfterCleanup = false;
 
+    // v0.5.8: smith stall detection. If smith clicks produce no Smithing XP across several
+    // attempts, the selected item is greyed (above our Smithing level, or wrong bar for it) and
+    // the bot would loop forever clicking it -- "looks frozen". Track XP between attempts and bail.
+    private int smithLastAttemptXp = -1;
+    private int smithNoProgressAttempts = 0;
+
     public long getStartTimeMillis() { return startTimeMillis; }
     public int getStartSkillXp() { return startSkillXp; }
     public int getStartSkillLevel() { return startSkillLevel; }
@@ -85,6 +91,8 @@ public class AutoSmithingPlusScript extends Script {
                 Microbot.getClient().getRealSkillLevel(Skill.SMITHING)).orElse(1);
         actionsCompleted = 0;
         shutdownAfterCleanup = false; // v0.5.0
+        smithLastAttemptXp = -1;      // v0.5.8: reset stall detection
+        smithNoProgressAttempts = 0;
 
         Rs2Walker.disableTeleports = true;
         Rs2Antiban.resetAntibanSettings();
@@ -211,6 +219,9 @@ public class AutoSmithingPlusScript extends Script {
 
     @Override
     public void shutdown() {
+        // v0.5.8: reset the disableTeleports flag set in run() so it doesn't leak to the next
+        // plugin that uses Rs2Walker. Parity with the AutoSmeltingPlus v0.5.9 lifecycle fix.
+        Rs2Walker.disableTeleports = false;
         super.shutdown();
         Rs2Antiban.resetAntibanSettings();
     }
@@ -301,6 +312,28 @@ public class AutoSmithingPlusScript extends Script {
         // Click "All" multiplier so the smith runs through the whole inventory of bars.
         Rs2Widget.clickWidget(ANVIL_WIDGET_CONTAINER, ANVIL_MAKE_QTY_CHILD);
         sleep(180, 480);
+
+        // v0.5.8: stall detection. Compare Smithing XP since the previous smith click. If 4
+        // consecutive clicks produce no XP, the item is greyed (above our Smithing level, or the
+        // wrong bar for it) and we'd loop forever on a no-op click. Bail with a clear message.
+        // Reactive guard in place of the per-item AnvilItemLevels table (still deferred); also
+        // catches a drifted widget child id. XP recorded BEFORE the smith, so a working cycle's
+        // gain registers by the next click and resets the counter (bank trips don't false-trip it).
+        int smithXpNow = Microbot.getClientThread().runOnClientThreadOptional(() ->
+                Microbot.getClient().getSkillExperience(Skill.SMITHING)).orElse(smithLastAttemptXp);
+        if (smithLastAttemptXp >= 0 && smithXpNow <= smithLastAttemptXp) {
+            if (++smithNoProgressAttempts >= 4) {
+                Microbot.log("AutoSmithingPlus: 4 smith attempts with no Smithing XP gained. '"
+                        + item.getName() + "' is likely above your Smithing level, or the wrong "
+                        + "bar (" + bar.getName() + ") is selected for it. Shutting down so you're "
+                        + "not stuck clicking a greyed item.");
+                super.shutdown();
+                return;
+            }
+        } else {
+            smithNoProgressAttempts = 0;
+        }
+        smithLastAttemptXp = smithXpNow;
 
         // Click the chosen item's child slot.
         Rs2Widget.clickWidget(ANVIL_WIDGET_CONTAINER, item.getChildId());
