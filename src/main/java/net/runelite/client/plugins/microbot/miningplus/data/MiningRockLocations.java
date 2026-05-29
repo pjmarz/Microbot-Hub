@@ -43,6 +43,19 @@ import java.util.stream.Collectors;
  *       flagged LOW UTILITY in inline comments). Coords are wiki-derived approximations -- needs
  *       in-game verification on next throwaway session. Trigger: Fadli's bank gap surfaced
  *       post-deploy in v0.3.3; this audit catches similar gaps proactively.</li>
+ *   <li><b>2026-05-28 (v0.5.8 -- Mining Guild F2P correction, closes the v0.4.0 deferred verification):</b>
+ *       The Mining Guild entries (iron/coal/mithril/adamant) were all coord {@code (3046, 9756)} and
+ *       flagged members-only. Live-verification on a 60-Mining F2P account (dev-tool tile hovers +
+ *       agent server {@code /state}) found {@code (3046, 9756)} is the chamber-divider DOOR, ~16 tiles
+ *       north of the iron/coal field -- the walker was routed to the door, never the rocks. Corrected to
+ *       verified per-ore tiles: IRON {@code (3028, 9737)}, COAL {@code (3045, 9741)} [chamber 1, south of
+ *       door], MITHRIL {@code (3037, 9773)}, ADAMANT {@code (3042, 9772)} [chamber 2, north of door].
+ *       Flipped membersOnly false (60 Mining is the only gate). Rock counts corrected to F2P-actual
+ *       (4 iron / 37 coal / 5 mithril / 2 adamant) from the inflated members-combined numbers.
+ *       NOTE: mithril/adamant are in chamber 2 behind the door -- depends on Rs2Walker handling that
+ *       door; verify in a soak. The RUNITE Mining Guild entry is left at the old coord/members flag
+ *       (runite is not in the F2P area and not in the members guild per wiki; likely a phantom entry,
+ *       unverifiable without a members account -- flagged for a future members-side audit).</li>
  *   <li>Re-audit before each minor version bump that touches this file.</li>
  * </ul>
  */
@@ -394,13 +407,13 @@ public class MiningRockLocations {
     private static List<LocationOption> getIronRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild - premier location for iron with many rocks (8 iron rocks)
+        // Mining Guild F2P area - 4 iron rocks (v0.5.8: live-verified F2P; old coord 3046,9756 was the chamber-divider door, not ore)
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
-                new WorldPoint(3046, 9756, 0),
+                new WorldPoint(3028, 9737, 0),
                 "Mining Guild (Members)",
-                true,
+                false,
                 new HashMap<>(),
                 miningGuildSkills,
                 new HashMap<>(),
@@ -505,12 +518,12 @@ public class MiningRockLocations {
     private static List<LocationOption> getCoalRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild - exceptional for coal with 57 coal rocks!
+        // Mining Guild F2P area - 37 coal rocks, the premier F2P coal spot (v0.5.8: live-verified F2P)
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
-                new WorldPoint(3046, 9756, 0),
-                "Mining Guild (Members)", true,
+                new WorldPoint(3045, 9741, 0),
+                "Mining Guild (Members)", false,
                 new HashMap<>(),
                 miningGuildSkills,
                 new HashMap<>(),
@@ -660,12 +673,12 @@ public class MiningRockLocations {
     private static List<LocationOption> getMithrilRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild - excellent for mithril with 15 rocks
+        // Mining Guild F2P area - 5 mithril rocks, north chamber past the door at 3046,9756 (v0.5.8: live-verified F2P)
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
-                new WorldPoint(3046, 9756, 0),
-                "Mining Guild (Members)", true,
+                new WorldPoint(3037, 9773, 0),
+                "Mining Guild (Members)", false,
                 new HashMap<>(),
                 miningGuildSkills,
                 new HashMap<>(),
@@ -722,12 +735,12 @@ public class MiningRockLocations {
     private static List<LocationOption> getAdamantiteRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild - excellent for adamantite with 10 rocks
+        // Mining Guild F2P area - 2 adamantite rocks, north chamber past the door at 3046,9756 (v0.5.8: live-verified F2P; needs 70 Mining to mine)
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
-                new WorldPoint(3046, 9756, 0),
-                "Mining Guild (Members)", true,
+                new WorldPoint(3042, 9772, 0),
+                "Mining Guild (Members)", false,
                 new HashMap<>(),
                 miningGuildSkills,
                 new HashMap<>(),

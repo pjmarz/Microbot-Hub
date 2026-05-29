@@ -4,6 +4,27 @@ Auto-walking-and-mining "Plus" fork of upstream AutoMining. Part of the Skill Pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Semver-flavored (`0.x` = pre-stable, `1.0.0` = upstream-PR ready).
 
+## [0.5.8] — 2026-05-28
+
+Mining Guild F2P correction. Closes the v0.4.0 deferred verification ("Live-verification deferred until a P2P account with 60 Mining is available") now that a 60-Mining account is available. Live-verified via RuneLite dev-tool tile hovers + the agent server `/state` endpoint.
+
+### Fixed
+
+- **Mining Guild anchor pointed at a door, not the rocks.** All Mining Guild entries used coord `(3046, 9756)` and were flagged members-only with display "Mining Guild (P2P 60)". Live verification found `(3046, 9756)` is the **chamber-divider door**, ~16 tiles north of the iron/coal field. Selecting Mining Guild routed the walker to the door and it never reached ore. Classic stale-seed coord (same shape as the v0.4.0 Mining Guild bank + Al Kharid Arena bugs).
+- **Per-ore anchors corrected to verified F2P tiles:**
+  - Iron → `(3028, 9737)` (chamber 1, south of door)
+  - Coal → `(3045, 9741)` (chamber 1) — the premier F2P coal spot, 37 rocks
+  - Mithril → `(3037, 9773)` (chamber 2, north of door)
+  - Adamantite → `(3042, 9772)` (chamber 2; needs 70 Mining to actually mine)
+- **`membersOnly` flipped to false** on the four F2P entries. The only gate is 60 Mining (the F2P Mining Guild exists and requires no membership). Display name "Mining Guild (P2P 60)" → "Mining Guild (60)".
+- **Rock counts corrected** to F2P-actual (4 iron / 37 coal / 5 mithril / 2 adamant) from the inflated members-combined numbers the entries carried (8 / 57 / 15 / 10).
+
+### Known limitations / test items
+
+- **Mithril and adamant are in chamber 2, behind the door at `(3046, 9756)`.** The web walker must open and path through that door from the chamber-1 entry ladder. Iron and coal don't have this dependency (same chamber as the ladder). Confirm Rs2Walker handles the door during the soak.
+- **F2P banking has no in-guild bank.** The walker climbs the ladder `(3020, 9740)→(3020, 3339)` and banks at Falador East `(3015, 3354)`. Use `AUTO_NEAREST`; confirm the multi-region route resolves.
+- **The runite Mining Guild entry is left untouched** (old coord, members flag). Runite isn't in the F2P area, and the members guild's runite presence is unverifiable without a members account. Flagged in `MiningRockLocations` audit log for a future members-side pass.
+
 ## [0.5.7] — 2026-05-23
 
 ### Fixed
