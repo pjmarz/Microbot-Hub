@@ -165,6 +165,17 @@ public interface AutoMiningPlusConfig extends Config {
         return 0;
     }
 
+    @ConfigItem(
+            keyName = "stopAfterOres",
+            name = "Stop after (ores mined)",
+            description = "Stop after mining this many ores, banking the inventory first (or dropping if UseBank is off). Counts actual ore obtained (one per XP drop), not mine attempts. 0 = disabled.",
+            position = 10,
+            section = generalSection
+    )
+    default int stopAfterOres() {
+        return 0;
+    }
+
     // v0.5.1: paused config item removed. Pause is now an overlay button (see
     // AutoMiningPlusOverlay) that toggles Microbot.pauseAllScripts (global AtomicBoolean).
     // Click pause on any Plus plugin's overlay and all scripts pause together.

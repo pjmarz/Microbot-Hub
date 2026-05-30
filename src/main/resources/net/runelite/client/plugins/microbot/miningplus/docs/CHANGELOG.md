@@ -4,6 +4,22 @@ Auto-walking-and-mining "Plus" fork of upstream AutoMining. Part of the Skill Pl
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Semver-flavored (`0.x` = pre-stable, `1.0.0` = upstream-PR ready).
 
+## [0.5.12] — 2026-05-28
+
+Adds an ore-count stop condition + makes the ore counter accurate.
+
+### Added
+
+- **"Stop after (ores mined)" config** (`stopAfterOres`, default 0 = disabled). Stops the bot once it has mined the configured number of ores, running one cleanup pass (bank, or drop if UseBank is off) before shutdown — so the ore ends up banked, not left in the pack. Same clean-shutdown flow as Target level. Fourth stop condition alongside stopAfterMinutes / stopAfterXp / targetLevel. Built for grinding a fixed haul (e.g. "mine 1000 iron ore then stop").
+
+### Changed
+
+- **Ore counter is now accurate.** The v0.3.0 counter incremented per rock-click ("approximate ores mined" — over-counted on missed/contested/depleted clicks). Replaced with a Mining-XP-drop detector: each XP increase = exactly one ore obtained (one ore per successful mine, any ore type). The 100ms tick is well below ore cadence (2.4s+), so counting is exact. This also makes the overlay's "Ores mined" stat accurate, and is what `stopAfterOres` counts against. The per-tick XP read is shared with the stopAfterXp check (no extra client-thread round-trip).
+
+### Notes
+
+- Cross-plugin rollout deferred: Woodcutting (logs) is straightforward, but Smelting and Smithing currently count inventory *cycles* rather than bars/items, so an equivalent "stop after N bars/items" needs their counters reworked first. Batched as a future v0.6.0.
+
 ## [0.5.11] — 2026-05-28
 
 Mining Guild mithril re-anchor, surfaced during live use.

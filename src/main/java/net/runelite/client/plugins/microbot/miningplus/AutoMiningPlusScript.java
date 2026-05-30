@@ -58,6 +58,9 @@ public class AutoMiningPlusScript extends Script {
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
     private int actionsCompleted = 0;
+    // v0.5.12: last-seen Mining XP, for the accurate per-ore counter (one ore per XP increase).
+    // Seeded to startSkillXp in run().
+    private int lastMiningXp = 0;
 
     // v0.5.0: set when targetLevel is reached; intercepted before state-flip-back in RESETTING
     // so we shutdown immediately after the cleanup pass (one bank or drop cycle).
@@ -81,6 +84,7 @@ public class AutoMiningPlusScript extends Script {
         startSkillLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getRealSkillLevel(Skill.MINING)).orElse(1);
         actionsCompleted = 0;
+        lastMiningXp = startSkillXp; // v0.5.12: seed accurate ore counter
         shutdownAfterCleanup = false; // v0.5.0: reset target-level cleanup flag on startup
 
         // Speed mode: flip Microbot's master antiban switch off. Every check inside
@@ -103,6 +107,18 @@ public class AutoMiningPlusScript extends Script {
                     return;
                 }
 
+                // v0.5.12: accurate ore counter. Read Mining XP once per tick; each increase is one
+                // ore obtained (one ore per successful mine, any ore type). The 100ms tick is well
+                // below ore cadence (2.4s+), so one increment per XP drop is exact. Replaces the
+                // v0.3.0 per-click "approximate" counter -- drives the overlay "Ores mined" stat AND
+                // the stopAfterOres target. Reused for the stopAfterXp check below.
+                int currentMiningXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
+                        Microbot.getClient().getSkillExperience(Skill.MINING)).orElse(lastMiningXp);
+                if (currentMiningXp > lastMiningXp) {
+                    actionsCompleted++;
+                    lastMiningXp = currentMiningXp;
+                }
+
                 // Polish-Cycle 2 v0.3.0: stopAfterMinutes / stopAfterXp threshold check.
                 if (config.stopAfterMinutes() > 0
                         && (System.currentTimeMillis() - startTimeMillis) / 60000 >= config.stopAfterMinutes()) {
@@ -111,15 +127,11 @@ public class AutoMiningPlusScript extends Script {
                     super.shutdown();
                     return;
                 }
-                if (config.stopAfterXp() > 0) {
-                    int currentXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
-                            Microbot.getClient().getSkillExperience(Skill.MINING)).orElse(startSkillXp);
-                    if (currentXp - startSkillXp >= config.stopAfterXp()) {
-                        Microbot.log("AutoMiningPlus: reached stopAfterXp (" + (currentXp - startSkillXp)
-                                + " XP). Shutting down.");
-                        super.shutdown();
-                        return;
-                    }
+                if (config.stopAfterXp() > 0 && currentMiningXp - startSkillXp >= config.stopAfterXp()) {
+                    Microbot.log("AutoMiningPlus: reached stopAfterXp (" + (currentMiningXp - startSkillXp)
+                            + " XP). Shutting down.");
+                    super.shutdown();
+                    return;
                 }
 
                 // v0.5.0: target-level check. When Mining hits the target, run one cleanup
@@ -138,6 +150,21 @@ public class AutoMiningPlusScript extends Script {
                         }
                         state = State.RESETTING;
                     }
+                }
+
+                // v0.5.12: stop-after-ores target. When the accurate ore counter hits the target,
+                // run one cleanup pass (bank, or drop if UseBank off) then shutdown -- same flow as
+                // targetLevel, so your ore ends up banked rather than left in the pack. 0 = disabled.
+                if (config.stopAfterOres() > 0 && !shutdownAfterCleanup
+                        && actionsCompleted >= config.stopAfterOres()) {
+                    Microbot.log("AutoMiningPlus: reached stopAfterOres (" + actionsCompleted + " >= "
+                            + config.stopAfterOres() + "). Banking/dropping inventory before shutdown.");
+                    shutdownAfterCleanup = true;
+                    if (Rs2Inventory.isEmpty()) {
+                        super.shutdown();
+                        return;
+                    }
+                    state = State.RESETTING;
                 }
 
                 if (config.leagueMode() && Rs2Player.checkIdleLogout(Rs2Random.between(500, 1500))) {
@@ -250,8 +277,8 @@ public class AutoMiningPlusScript extends Script {
                         }
 
                         if (rock.click("Mine")) {
-                            // Polish-Cycle 2 v0.3.0: approximate "ores mined" counter.
-                            actionsCompleted++;
+                            // v0.5.12: ore counting moved to the accurate XP-drop detector at the top
+                            // of the tick. The old per-click "approximate" actionsCompleted++ was here.
                             // Wait up to 1.2 sec for the swing to start. Don't wait for an
                             // XP drop — when the rock is depleted or another miner taps it
                             // first, Rs2Player.waitForXpDrop(skill, true) blocks for its full
