@@ -118,7 +118,19 @@ public enum AnvilItem {
     public static boolean isMembersOnly(AnvilItem item) {
         if (item == null) return false;
         switch (item) {
+            // Wiki-verified members-only anvil products (2026-05-31 audit): each confirmed via
+            // its item-page infobox "Members: Yes" and the Smithing#Anvil member icon. An F2P
+            // account cannot smith these (the widget slot is absent), so the Script's pre-flight
+            // refuses to start rather than stalling on a no-op click.
             case CLAWS:
+            case DART_TIPS:
+            case ARROWTIPS:
+            case KNIVES:
+            case NAILS:
+            case OIL_LAMP:
+            case BULLSEYE_LAMP:
+            case BRONZE_WIRE: // shared slot also covers Iron spit / Steel studs, both members
+            case BOLTS:
                 return true;
             default:
                 return false;
