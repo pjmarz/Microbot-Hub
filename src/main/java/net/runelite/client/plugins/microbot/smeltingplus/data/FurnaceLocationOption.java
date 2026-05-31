@@ -44,8 +44,8 @@ public enum FurnaceLocationOption {
             new WorldPoint(3271, 6101, 0), true),
     SHILO_VILLAGE_FURNACE("Shilo Village (P2P)", "Shilo Village Furnace",
             new WorldPoint(2853, 2954, 0), true),
-    MOR_UL_REK_FURNACE("Mor Ul Rek (Fight Caves)", "Mor Ul Rek Furnace",
-            new WorldPoint(2434, 5179, 0), false);
+    MOR_UL_REK_FURNACE("Mor Ul Rek (P2P)", "Mor Ul Rek Furnace",
+            new WorldPoint(2434, 5179, 0), true);
 
     private final String displayName;
     private final String locationName;
