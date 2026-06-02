@@ -58,6 +58,17 @@ public interface AutoSmithingPlusConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "progressiveSmith",
+            name = "Progressive mode",
+            description = "Ignore the Item pick and auto-smith the best item your Smithing level can make at the chosen bar tier (skips members items on F2P). Mirrors AutoSmeltingPlus's progressive mode.",
+            position = 2,
+            section = generalSection
+    )
+    default boolean progressiveSmith() {
+        return false;
+    }
+
+    @ConfigItem(
             keyName = "anvilLocation",
             name = "Anvil",
             description = "Walk to and anchor at this anvil. AUTO_NEAREST = require start-near-anvil. Lumbridge Rusted Anvil is bronze-only.",

@@ -49,7 +49,17 @@ public enum AnvilLocationOption {
     // 35 sq from E bank. Per OSRS Wiki Anvil page. Coord (3247, 3410, 0) is wiki-derived
     // approximation -- verify in-game.
     VARROCK_EAST("Varrock East (south of bank)",
-            "Varrock East Anvil", new WorldPoint(3247, 3410, 0), false, false);
+            "Varrock East Anvil", new WorldPoint(3247, 3410, 0), false, false),
+
+    // v0.6.0: P2P anvils. osrsmap-confirmed towns; anchors approximate (runtime 20-tile finder
+    // resolves the exact anvil tile; CONFIRM in-game). Keldagrim + Prifddinas deferred -- osrsmap
+    // cannot render those regions (Keldagrim underground clamps; Prifddinas y~6100 renders black).
+    YANILLE("Yanille (P2P)",
+            "Yanille Anvil", new WorldPoint(2614, 3084, 0), true, false),
+    SEERS_VILLAGE("Seers' Village (P2P)",
+            "Seers' Village Anvil", new WorldPoint(2701, 3482, 0), true, false),
+    BURTHORPE("Burthorpe (P2P)",
+            "Burthorpe Anvil", new WorldPoint(2899, 3542, 0), true, false);
 
     // v0.5.0+: Camdozaal (quest-gated F2P), Giants' Plateau (F2P, far from bank), Mudskipper Pt,
     // Draynor sewer, Doric's hut (Doric's Quest), Corsair Cove Dungeon (P2P quest);

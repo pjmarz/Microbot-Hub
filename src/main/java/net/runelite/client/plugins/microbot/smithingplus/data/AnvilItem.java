@@ -136,4 +136,80 @@ public enum AnvilItem {
                 return false;
         }
     }
+
+    /**
+     * Smithing level required to smith this item at the given bar tier, or -1 if not makeable at
+     * that tier. Wiki-verified table (2026-05-31 audit), indexed Bronze/Iron/Steel/Mithril/Adamant/
+     * Rune. Drives the Script's level pre-flight and progressive mode. The Script's stall-detection
+     * (v0.5.8) stays as a reactive backstop for any residual table error or a drifted widget id.
+     */
+    public int getRequiredLevel(Bars bar) {
+        if (bar == null) return -1;
+        int[] levels = levelsByBar(this);
+        int idx = bar.ordinal();
+        return (idx >= 0 && idx < levels.length) ? levels[idx] : -1;
+    }
+
+    /** True if this item is smithable at the given bar tier at all. */
+    public boolean isMakeableAt(Bars bar) {
+        return getRequiredLevel(bar) >= 0;
+    }
+
+    // Bronze, Iron, Steel, Mithril, Adamant, Rune. -1 = not makeable at that tier.
+    private static int[] levelsByBar(AnvilItem item) {
+        switch (item) {
+            case DAGGER:          return new int[]{ 1, 15, 30, 50, 70, 85};
+            case SWORD:           return new int[]{ 4, 19, 34, 54, 74, 89};
+            case SCIMITAR:        return new int[]{ 5, 20, 35, 55, 75, 90};
+            case LONG_SWORD:      return new int[]{ 6, 21, 36, 56, 76, 91};
+            case TWO_HAND_SWORD:  return new int[]{14, 29, 44, 64, 84, 99};
+            case AXE:             return new int[]{ 1, 16, 31, 51, 71, 86};
+            case MACE:            return new int[]{ 2, 17, 32, 52, 72, 87};
+            case WARHAMMER:       return new int[]{ 9, 24, 39, 59, 79, 94};
+            case BATTLE_AXE:      return new int[]{10, 25, 40, 60, 80, 95};
+            case CLAWS:           return new int[]{13, 28, 43, 63, 83, 98};
+            case CHAIN_BODY:      return new int[]{11, 26, 41, 61, 81, 96};
+            case PLATE_LEGS:      return new int[]{16, 31, 46, 66, 86, 99};
+            case PLATE_SKIRT:     return new int[]{16, 31, 46, 66, 86, 99};
+            case PLATE_BODY:      return new int[]{18, 33, 48, 68, 88, 99};
+            case NAILS:           return new int[]{ 4, 19, 34, 54, 74, 89};
+            case MEDIUM_HELM:     return new int[]{ 3, 18, 33, 53, 73, 88};
+            case FULL_HELM:       return new int[]{ 7, 22, 37, 57, 77, 92};
+            case SQUARE_SHIELD:   return new int[]{ 8, 23, 38, 58, 78, 93};
+            case KITE_SHIELD:     return new int[]{12, 27, 42, 62, 82, 97};
+            case DART_TIPS:       return new int[]{ 4, 19, 34, 54, 74, 89};
+            case ARROWTIPS:       return new int[]{ 5, 20, 35, 55, 75, 90};
+            case KNIVES:          return new int[]{ 7, 22, 37, 57, 77, 92};
+            case BOLTS:           return new int[]{ 3, 18, 33, 53, 73, 88};
+            // Tier-locked / shared-slot members items (see isMembersOnly). The -1 tiers fall
+            // through the level gate (treated as "unknown", not a hard refuse) and rely on
+            // stall-detection if a wrong bar is picked.
+            case OIL_LAMP:        return new int[]{-1, 26, -1, -1, -1, -1}; // oil lantern frame: iron, 26
+            case BRONZE_WIRE:     return new int[]{ 4, 17, 36, -1, -1, -1}; // wire(4)/iron spit(17)/steel studs(36)
+            case BULLSEYE_LAMP:   return new int[]{-1, -1, 49, -1, -1, -1}; // bullseye frame: steel, 49
+            default:              return new int[]{};
+        }
+    }
+
+    /**
+     * Progressive-mode picker: the best item to smith at the given bar tier for a player of the
+     * given Smithing level. "Best" = most bars per craft (most XP per craft, fewest interface
+     * clicks), tie-broken by highest level requirement. Skips members-only items unless isMember.
+     * Returns null if nothing is makeable (e.g. a bar tier too high for any item at this level).
+     */
+    public static AnvilItem bestForLevel(Bars bar, int smithingLevel, boolean isMember) {
+        AnvilItem best = null;
+        for (AnvilItem item : values()) {
+            if (!isMember && isMembersOnly(item)) continue;
+            int req = item.getRequiredLevel(bar);
+            if (req < 0 || req > smithingLevel) continue;
+            if (best == null
+                    || item.getRequiredBars() > best.getRequiredBars()
+                    || (item.getRequiredBars() == best.getRequiredBars()
+                        && req > best.getRequiredLevel(bar))) {
+                best = item;
+            }
+        }
+        return best;
+    }
 }
