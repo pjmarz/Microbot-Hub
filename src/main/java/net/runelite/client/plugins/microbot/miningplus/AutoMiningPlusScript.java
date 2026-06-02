@@ -26,13 +26,16 @@ import net.runelite.client.plugins.microbot.util.keyboard.Rs2Keyboard;
 import net.runelite.client.plugins.microbot.util.math.Rs2Random;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.security.Login;
+import net.runelite.client.plugins.microbot.util.tile.Rs2Tile;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 
 import java.util.ArrayList;
 import java.awt.event.KeyEvent;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -253,14 +256,26 @@ public class AutoMiningPlusScript extends Script {
                             return;
                         }
 
-                        // v0.3.1 fix: switch from Rs2GameObject.findReachableObject (slow,
-                        // reachability churn on crowded mines) to the v2.x Queryable cache,
-                        // matching what AutoWoodcuttingPlus uses. Faster, cache-aware, no
-                        // pathfinding work per tick.
+                        // v0.3.1 switched from Rs2GameObject.findReachableObject (slow,
+                        // reachability churn on crowded mines) to the v2.x Queryable cache for
+                        // speed, but that dropped the reachability check: the nearest rock by raw
+                        // distance can sit behind a P2P door we cannot path to (e.g. mithril at the
+                        // Mining Guild). v0.5.13 keeps the fast cache query but filters to rocks
+                        // with a reachable adjacent tile. We compute the reachable tiles once per
+                        // tick via a strict BFS flood-fill from the mining anchor (the same origin
+                        // the within() filter uses, so a strayed player can't shrink the set), with
+                        // ignoreCollision=false so closed doors and walls stop the fill. The radius
+                        // pads distanceToStray to allow path detours around obstacles. One BFS per
+                        // tick, not one per rock, so no churn on crowded mines.
+                        final Set<WorldPoint> reachable = (initialPlayerLocation == null)
+                                ? Collections.emptySet()
+                                : Rs2Tile.getReachableTilesFromTile(initialPlayerLocation, config.distanceToStray() + 12, false).keySet();
+
                         net.runelite.client.plugins.microbot.api.tileobject.models.Rs2TileObjectModel rock =
                                 Microbot.getRs2TileObjectCache().query()
                                         .within(initialPlayerLocation, config.distanceToStray())
                                         .withName(activeRock.getName())
+                                        .where(r -> hasReachableAdjacent(r.getWorldLocation(), reachable))
                                         .nearestOnClientThread();
 
                         if (rock == null) {
@@ -392,6 +407,23 @@ public class AutoMiningPlusScript extends Script {
     public void shutdown() {
         super.shutdown();
         Rs2Antiban.resetAntibanSettings();
+    }
+
+    /**
+     * True when at least one cardinally-adjacent tile of {@code rockTile} is in the reachable
+     * set. Ore rocks occupy a blocked tile, so we test the tiles a miner could stand on. Used to
+     * skip rocks behind doors or walls the player cannot path to (v0.5.13 mithril at the Mining
+     * Guild fix). {@code reachable} is the strict BFS flood-fill from the mining anchor, so an
+     * empty set (no anchor yet) filters everything out and the caller falls back to wait/walk-back.
+     */
+    private static boolean hasReachableAdjacent(WorldPoint rockTile, Set<WorldPoint> reachable) {
+        if (rockTile == null || reachable.isEmpty()) {
+            return false;
+        }
+        return reachable.contains(rockTile.dx(1))
+                || reachable.contains(rockTile.dx(-1))
+                || reachable.contains(rockTile.dy(1))
+                || reachable.contains(rockTile.dy(-1));
     }
 
     private static List<Rocks> buildProgressiveRocks() {
