@@ -25,7 +25,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoSmeltingPlusPlugin extends Plugin {
-    public static final String version = "0.5.9";
+    public static final String version = "0.5.10";
 
     @Inject
     private AutoSmeltingPlusConfig config;

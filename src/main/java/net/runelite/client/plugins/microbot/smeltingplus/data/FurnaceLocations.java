@@ -89,8 +89,8 @@ public final class FurnaceLocations {
                         "Members. Requires Song of the Elves. Best F2P-flavored layout but P2P."),
                 new Furnace("Shilo Village Furnace", new WorldPoint(2853, 2954, 0), true,
                         "Members. Requires Shilo Village. Furnace + bank in same building."),
-                new Furnace("Mor Ul Rek Furnace", new WorldPoint(2434, 5179, 0), false,
-                        "F2P with The Fight Caves access (Tzhaar city). Quest-gated but free.")
+                new Furnace("Mor Ul Rek Furnace", new WorldPoint(2434, 5179, 0), true,
+                        "Members. Inside Mor Ul Rek (TzHaar city) via the Karamja volcano / Fight Cave. P2P content (corrected from a wrong F2P flag in v0.5.9).")
         );
     }
 }

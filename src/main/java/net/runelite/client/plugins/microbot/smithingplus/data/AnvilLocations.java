@@ -114,7 +114,17 @@ public final class AnvilLocations {
                 new Anvil("Varrock East Anvil", new WorldPoint(3247, 3410, 0), false, false,
                         "F2P. 2 regular anvils south of Varrock East bank (west side). "
                                 + "35 squares from E bank per wiki Anvil page. Supports all bar tiers. "
-                                + "Pairs naturally with Varrock East bank.")
+                                + "Pairs naturally with Varrock East bank."),
+                // v0.6.0: P2P anvils. An anvil has no distinct osrsmap icon, so the anchor is the
+                // town area near the anvil; the runtime 20-tile name query resolves the exact tile.
+                // Anchors are approximate -- verify reachability on the first in-game run.
+                // Keldagrim + Prifddinas deferred: osrsmap cannot render those regions.
+                new Anvil("Yanille Anvil", new WorldPoint(2614, 3084, 0), true, false,
+                        "Members. Anvil in Yanille, near the bank. osrsmap-confirmed town; anchor approximate (CONFIRM in-game)."),
+                new Anvil("Seers' Village Anvil", new WorldPoint(2701, 3482, 0), true, false,
+                        "Members. Anvil near Seers' Village / Camelot bank. osrsmap-confirmed town; anchor approximate (CONFIRM in-game)."),
+                new Anvil("Burthorpe Anvil", new WorldPoint(2899, 3542, 0), true, false,
+                        "Members. Anvil by the Warriors' Guild in Burthorpe. osrsmap-confirmed town; anchor approximate (CONFIRM in-game).")
         );
     }
 }

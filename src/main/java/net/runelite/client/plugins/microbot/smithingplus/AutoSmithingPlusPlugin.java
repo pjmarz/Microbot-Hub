@@ -25,7 +25,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoSmithingPlusPlugin extends Plugin {
-    public static final String version = "0.5.8";
+    public static final String version = "0.6.0";
 
     @Inject
     private AutoSmithingPlusConfig config;

@@ -111,12 +111,33 @@ public class AutoSmithingPlusScript extends Script {
             super.shutdown();
             return false;
         }
-        if (AnvilItem.isMembersOnly(config.selectedItem()) && !Rs2Player.isMember()) {
-            Microbot.log("Pre-flight FAILED: item " + config.selectedItem().getName()
-                    + " is members-only (e.g. Cabin Fever quest gate) and you're on F2P. "
-                    + "Pick a different item. Shutting down.");
-            super.shutdown();
-            return false;
+        // v0.6.0: item/level pre-flight. Progressive mode validates that SOME item is makeable at
+        // the chosen bar for our level; manual mode validates the user's specific item + bar
+        // (members gate + Smithing-level gate). The v0.5.8 stall-detection stays as a backstop.
+        if (config.progressiveSmith()) {
+            AnvilItem progBest = AnvilItem.bestForLevel(config.selectedBar(), startSkillLevel, Rs2Player.isMember());
+            if (progBest == null) {
+                Microbot.log("Pre-flight FAILED: progressive mode found no smithable item for "
+                        + config.selectedBar().getName() + " at Smithing level " + startSkillLevel
+                        + " (members items excluded on F2P). Lower the bar tier. Shutting down.");
+                super.shutdown();
+                return false;
+            }
+        } else {
+            if (AnvilItem.isMembersOnly(config.selectedItem()) && !Rs2Player.isMember()) {
+                Microbot.log("Pre-flight FAILED: item " + config.selectedItem().getName()
+                        + " is members-only and you're on F2P. Pick a different item. Shutting down.");
+                super.shutdown();
+                return false;
+            }
+            int requiredSmithLevel = config.selectedItem().getRequiredLevel(config.selectedBar());
+            if (requiredSmithLevel > 0 && startSkillLevel < requiredSmithLevel) {
+                Microbot.log("Pre-flight FAILED: " + config.selectedItem().getName() + " ("
+                        + config.selectedBar().getName() + ") needs Smithing " + requiredSmithLevel
+                        + " but you are level " + startSkillLevel + ". Pick a lower item or bar tier. Shutting down.");
+                super.shutdown();
+                return false;
+            }
         }
 
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
@@ -297,7 +318,7 @@ public class AutoSmithingPlusScript extends Script {
         }
 
         Bars bar = config.selectedBar();
-        AnvilItem item = config.selectedItem();
+        AnvilItem item = activeItem(config);
         Microbot.status = "Smithing " + bar.getName() + " -> " + item.getName();
 
         anvil.click("Smith");
@@ -355,7 +376,8 @@ public class AutoSmithingPlusScript extends Script {
 
         // CSV-driven deposit (Cycle B v0.2.0). Inclusion list wins; exclusion list as fallback.
         depositByCsv(config);
-        sleepUntil(() -> !Rs2Inventory.hasItem(config.selectedItem().getName()), 3000);
+        AnvilItem item = activeItem(config);
+        sleepUntil(() -> !Rs2Inventory.hasItem(item.getName()), 3000);
 
         // v0.5.0: targetLevel cleanup done -- shutdown before re-withdrawing hammer/bars.
         if (shutdownAfterCleanup) {
@@ -380,9 +402,9 @@ public class AutoSmithingPlusScript extends Script {
 
         // Withdraw bars: all of them.
         String barName = config.selectedBar().getName();
-        if (Rs2Bank.count(barName) < config.selectedItem().getRequiredBars()) {
-            Microbot.log("Bank lacks " + config.selectedItem().getRequiredBars() + " " + barName
-                    + " for one " + config.selectedItem().getName() + ". Shutting down.");
+        if (Rs2Bank.count(barName) < item.getRequiredBars()) {
+            Microbot.log("Bank lacks " + item.getRequiredBars() + " " + barName
+                    + " for one " + item.getName() + ". Shutting down.");
             Rs2Bank.closeBank();
             shutdown();
             return;
@@ -453,10 +475,23 @@ public class AutoSmithingPlusScript extends Script {
 
     // --- Helpers ---
 
+    /**
+     * The item to smith this tick: in progressive mode, the best item our current Smithing level
+     * can make at the configured bar (recomputed as we level up); otherwise the configured item.
+     * Falls back to the configured item if progressive somehow finds nothing.
+     */
+    private AnvilItem activeItem(AutoSmithingPlusConfig config) {
+        if (!config.progressiveSmith()) return config.selectedItem();
+        int level = Microbot.getClientThread().runOnClientThreadOptional(() ->
+                Microbot.getClient().getRealSkillLevel(Skill.SMITHING)).orElse(startSkillLevel);
+        AnvilItem best = AnvilItem.bestForLevel(config.selectedBar(), level, Rs2Player.isMember());
+        return best != null ? best : config.selectedItem();
+    }
+
     private boolean inventoryHasMaterialsForOneCraft(AutoSmithingPlusConfig config) {
         if (!Rs2Inventory.hasItem(ItemID.HAMMER)) return false;
         String barName = config.selectedBar().getName();
-        int needed = config.selectedItem().getRequiredBars();
+        int needed = activeItem(config).getRequiredBars();
         return Rs2Inventory.hasItemAmount(barName, needed, false, true);
     }
 }
