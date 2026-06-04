@@ -1,8 +1,10 @@
 package net.runelite.client.plugins.microbot.autofishingplus;
 
 import net.runelite.api.Client;
+import net.runelite.api.Experience;
 import net.runelite.api.Skill;
 import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.OverlayPanel;
@@ -31,6 +33,9 @@ public class AutoFishingPlusOverlay extends OverlayPanel {
     private final AutoFishingPlusPlugin plugin;
     private final Client client;
     private final AutoFishingPlusConfig config;
+
+    // Cached GE price of the raw catch, refreshed while it is in the pack so GP/hr survives banking.
+    private int cachedFishPrice = 0;
 
     // public final so the parent Plugin can hook/unhook the mouse listener in startUp()/shutDown().
     public final ButtonComponent pauseButton;
@@ -118,6 +123,25 @@ public class AutoFishingPlusOverlay extends OverlayPanel {
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
+                // Profit estimate: cache the raw-fish GE price while it's in the pack so GP/hr
+                // survives after depositing. Approximate for mixed catches (uses whatever raw fish
+                // is currently held).
+                if (config.fishToCatch() != null) {
+                    for (String n : config.fishToCatch().getItemNames()) {
+                        if (n.startsWith("Raw") && Rs2Inventory.hasItem(n)) {
+                            int p = Microbot.getItemManager().getItemPrice(Rs2Inventory.get(n).getId());
+                            if (p > 0) { cachedFishPrice = p; break; }
+                        }
+                    }
+                }
+                long gpPerHour = (runtimeMillis > 1000 && cachedFishPrice > 0)
+                        ? ((long) script.getFishCaught() * cachedFishPrice * 3600000L / runtimeMillis) : 0;
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("GP/hr (est):")
+                        .right("~" + NumberFormat.getInstance().format(gpPerHour))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("Runtime:")
                         .right(formatDuration(Duration.ofMillis(runtimeMillis)))
@@ -131,6 +155,14 @@ public class AutoFishingPlusOverlay extends OverlayPanel {
                             .right(config.targetLevel() + (toGo > 0 ? " (" + toGo + " to go)" : " (reached)"))
                             .rightColor(HIGHLIGHT_COLOR)
                             .build());
+                    if (toGo > 0 && xpPerHour > 0) {
+                        long xpRemaining = Math.max(0, Experience.getXpForLevel(config.targetLevel()) - currentXp);
+                        panelComponent.getChildren().add(LineComponent.builder()
+                                .left("ETA:")
+                                .right(formatDuration(Duration.ofMillis(xpRemaining * 3600000L / xpPerHour)))
+                                .rightColor(HIGHLIGHT_COLOR)
+                                .build());
+                    }
                 }
             } else {
                 panelComponent.getChildren().add(LineComponent.builder()

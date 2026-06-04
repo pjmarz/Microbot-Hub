@@ -29,30 +29,30 @@ public enum FishingPlusLocation {
     // Corsair Cove Resource Area lobster pier (base enum MYTHS_GUILD_NORTH). Deposit box captured
     // in-game at (2569,2862). Requires The Corsair Curse + Dragon Slayer I for the free walk
     // (no fare, no NPC/object interaction). The flagship F2P loop -- long but free bank walk.
-    CORSAIR_COVE("Corsair Cove lobster (F2P)",
+    CORSAIR_COVE("Corsair Cove (F2P)",
             new WorldPoint(2456, 2893, 0), new WorldPoint(2569, 2862, 0),
             BankingStrategy.DEPOSIT_BOX, false),
-    MUSA_POINT("Musa Point lobster (F2P)",
+    MUSA_POINT("Musa Point (F2P)",
             new WorldPoint(2925, 3179, 0), null,
             BankingStrategy.DROP, false),
-    DRAYNOR_VILLAGE("Draynor Village net (F2P)",
+    DRAYNOR_VILLAGE("Draynor Village (F2P)",
             new WorldPoint(3084, 3228, 0), null,
             BankingStrategy.FULL_BANK, false),
-    AL_KHARID("Al Kharid net (F2P)",
+    AL_KHARID("Al Kharid (F2P)",
             new WorldPoint(3274, 3140, 0), null,
             BankingStrategy.DROP, false),
 
     // ---- P2P ----
-    FISHING_GUILD("Fishing Guild shark/lobster (P2P 68)",
+    FISHING_GUILD("Fishing Guild (P2P 68)",
             new WorldPoint(2604, 3423, 0), null,
             BankingStrategy.FULL_BANK, true),
-    CATHERBY("Catherby shark/lobster (P2P)",
+    CATHERBY("Catherby (P2P)",
             new WorldPoint(2836, 3431, 0), null,
             BankingStrategy.FULL_BANK, true),
-    PISCATORIS("Piscatoris monkfish (P2P 62)",
+    PISCATORIS("Piscatoris (P2P 62)",
             new WorldPoint(2308, 3700, 0), null,
             BankingStrategy.FULL_BANK, true),
-    OTTOS_GROTTO("Otto's Grotto barbarian (P2P 48)",
+    OTTOS_GROTTO("Otto's Grotto (P2P 48)",
             new WorldPoint(2500, 3509, 0), null,
             BankingStrategy.DROP, true);
 
