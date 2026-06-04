@@ -52,7 +52,7 @@ public enum BankLocationOption {
     // Our coord (3383, 3269, 0) sits 1-2 tiles east of both chests; Rs2Bank.openBank() nearest-
     // entity search biases toward a bank chest, so withdraw-required cycles (smelting,
     // smithing) work at Fadli too, not just mining.
-    AL_KHARID_ARENA("Al Kharid Arena (Fadli)", new WorldPoint(3383, 3269, 0), false),
+    AL_KHARID_ARENA("Al Kharid Arena", new WorldPoint(3383, 3269, 0), false),
     VARROCK_WEST("Varrock West", new WorldPoint(3185, 3437, 0), false),
     VARROCK_EAST("Varrock East", new WorldPoint(3253, 3420, 0), false),
     GRAND_EXCHANGE("Grand Exchange", new WorldPoint(3164, 3489, 0), false),
@@ -65,7 +65,7 @@ public enum BankLocationOption {
     // Coord (3128, 3637, 0) is wiki-derived approximation -- western end of enclave town.
     // WARNING: Rs2Walker may path through lvl 1-2 Wilderness on approach. Safe inside enclave.
     // Needs in-game verification on xitzpjmarz.
-    FEROX_ENCLAVE("Ferox Enclave (wild gate)", new WorldPoint(3128, 3637, 0), false),
+    FEROX_ENCLAVE("Ferox Enclave", new WorldPoint(3128, 3637, 0), false),
 
     // Members banks
     SEERS_VILLAGE("Seers' Village (P2P)", new WorldPoint(2722, 3493, 0), true),
@@ -80,7 +80,7 @@ public enum BankLocationOption {
     // New coord targets the underground chest vicinity near the mining floor
     // ((3046, 9756, 0) in MineLocationOption.MINING_GUILD). Nudged +4 Y toward the chest.
     // Still needs in-game verification on the next P2P session.
-    MINING_GUILD_FALADOR("Mining Guild ent. (P2P)", new WorldPoint(3046, 9760, 0), true);
+    MINING_GUILD_FALADOR("Mining Guild (P2P)", new WorldPoint(3046, 9760, 0), true);
 
     private final String displayName;
     private final WorldPoint worldPoint;

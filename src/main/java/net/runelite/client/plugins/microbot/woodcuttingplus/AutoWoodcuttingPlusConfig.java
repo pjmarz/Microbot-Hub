@@ -9,12 +9,25 @@ import net.runelite.client.plugins.microbot.woodcuttingplus.enums.WoodcuttingTre
 import net.runelite.client.plugins.microbot.woodcuttingplus.enums.WoodcuttingWalkBack;
 
 @ConfigGroup(AutoWoodcuttingPlusConfig.configGroup)
-@ConfigInformation(
-        "<html>" +
-                "<p>This script automatically cuts trees and handles the logs based on your settings.</p>" +
-                "<p>Forestry support implemented by Yuof and TaF</p>" +
-                "<p>If forestry is enabled, remember to use one of the forestry worlds for best results</p>" +
-                "</html>")
+@ConfigInformation("<h2>Auto Woodcutting Plus</h2>" +
+        "<h3>Version: " + AutoWoodcuttingPlusPlugin.version + "</h3>" +
+        "<p>1. <strong>Enable auto woodcutting:</strong> turn off to keep the Forestry helpers running without cutting trees yourself.</p>" +
+        "<p></p>" +
+        "<p>2. <strong>Tree / Progressive mode:</strong> pick a tree to cut, or let Progressive auto select the best tree for your Woodcutting level.</p>" +
+        "<p></p>" +
+        "<p>3. <strong>Distance to Stray:</strong> how far in tiles the bot may wander from its start tile before returning.</p>" +
+        "<p></p>" +
+        "<p>4. <strong>Autohop when player detected:</strong> hop worlds when another player comes near.</p>" +
+        "<p></p>" +
+        "<p>5. <strong>Inventory management:</strong> choose how a full inventory is handled (drop or bank) in the Inventory section.</p>" +
+        "<p></p>" +
+        "<p>6. <strong>Forestry:</strong> handles Forestry events automatically. Use a Forestry world for best results. Loot bird nests and seeds are toggles here.</p>" +
+        "<p></p>" +
+        "<p>7. <strong>Firemake only:</strong> burns logs where you stand instead of cutting. Start at your firemaking spot (tested at the Grand Exchange north east).</p>" +
+        "<p></p>" +
+        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban. Throwaway accounts only.</p>" +
+        "<p></p>" +
+        "<p>Forestry support by Yuof and TaF.</p>")
 public interface AutoWoodcuttingPlusConfig extends Config {
     // Pilot #4 v0.1.0: renamed from upstream's "AutoWoodcutting" to avoid settings cross-pollination.
     String configGroup = "WoodcuttingPlus";

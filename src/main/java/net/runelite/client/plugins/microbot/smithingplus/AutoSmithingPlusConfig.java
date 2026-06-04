@@ -11,17 +11,20 @@ import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
 @ConfigInformation("<h2>Auto Smithing Plus</h2>" +
         "<h3>Version: " + AutoSmithingPlusPlugin.version + "</h3>" +
         "<p>1. <strong>Bar:</strong> the bar tier to smith. Must already be in your bank.</p>" +
-        "<p>2. <strong>Item:</strong> what to make at the anvil. Each item consumes a fixed " +
-        "number of bars. Higher-bar items = higher XP/hr.</p>" +
-        "<p>3. <strong>Anvil:</strong> the anvil to walk to. AUTO_NEAREST mirrors upstream. " +
-        "Lumbridge Rusted Anvil is BRONZE BARS ONLY (object ID 39620).</p>" +
-        "<p>4. <strong>Max players in area:</strong> hop worlds if more players than this are " +
-        "within Distance to Stray. 0 = disabled.</p>" +
-        "<p>5. <strong>League mode:</strong> arrow-key press resets the idle-logout timer.</p>" +
-        "<p>6. <strong>Preferred bank:</strong> override nearest-by-raw-distance.</p>" +
-        "<p>7. <strong>Items to bank / Items to keep:</strong> comma-separated lists; substring " +
-        "match on item name. itemsToBank wins; if empty, falls back to deposit-all-except-keep.</p>" +
-        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban. Throwaway only.</p>")
+        "<p></p>" +
+        "<p>2. <strong>Item:</strong> what to make at the anvil. Each item uses a fixed number of bars. Bigger items give more XP per hour.</p>" +
+        "<p></p>" +
+        "<p>3. <strong>Anvil:</strong> the anvil to walk to. AUTO_NEAREST picks the closest. The Lumbridge rusted anvil is bronze bars only (object 39620).</p>" +
+        "<p></p>" +
+        "<p>4. <strong>Max players in area:</strong> hop worlds if more players than this are within Distance to Stray. 0 disables hopping.</p>" +
+        "<p></p>" +
+        "<p>5. <strong>League mode:</strong> presses an arrow key to reset the idle logout timer.</p>" +
+        "<p></p>" +
+        "<p>6. <strong>Preferred bank:</strong> override the nearest by distance choice.</p>" +
+        "<p></p>" +
+        "<p>7. <strong>Items to bank / keep:</strong> comma separated lists matched on item name. Items to bank wins; if empty it deposits all except your keep list.</p>" +
+        "<p></p>" +
+        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban. Throwaway accounts only.</p>")
 public interface AutoSmithingPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)

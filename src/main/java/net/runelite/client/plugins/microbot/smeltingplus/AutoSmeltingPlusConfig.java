@@ -9,24 +9,21 @@ import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
 @ConfigGroup("SmeltingPlus")
 @ConfigInformation("<h2>Auto Smelting Plus</h2>" +
         "<h3>Version: " + AutoSmeltingPlusPlugin.version + "</h3>" +
-        "<p>1. <strong>Bar:</strong> the bar to smelt. Sets the required ore composition " +
-        "automatically. Lower bars take 1 ore; higher bars take ore + coal " +
-        "(e.g. Steel = 1 iron + 2 coal).</p>" +
-        "<p>2. <strong>Progressive smelt:</strong> ignores the Bar pick and auto-selects the " +
-        "highest bar your Smithing level + bank stock can support, re-evaluated each banking " +
-        "trip.</p>" +
-        "<p>3. <strong>Furnace:</strong> the furnace to walk to. AUTO_NEAREST mirrors upstream " +
-        "behavior (stand near a furnace at toggle, restart to switch).</p>" +
-        "<p>4. <strong>Max players in area:</strong> hop worlds if more than this many other " +
-        "players are within Distance to Stray. 0 = disabled.</p>" +
-        "<p>5. <strong>League mode:</strong> periodically presses an arrow key to reset the " +
-        "idle-logout timer.</p>" +
-        "<p>6. <strong>Preferred bank:</strong> override the nearest-by-raw-distance heuristic.</p>" +
-        "<p>7. <strong>Items to bank / Items to keep:</strong> comma-separated lists. " +
-        "Substring match on item name. Items to bank wins; if empty, falls back to " +
-        "deposit-all-except-Items-to-keep.</p>" +
-        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban for faster pace. " +
-        "Throwaway only.</p>")
+        "<p>1. <strong>Bar:</strong> the bar to smelt. Sets the required ore mix automatically. Lower bars take 1 ore; higher bars take ore plus coal (e.g. steel is 1 iron and 2 coal).</p>" +
+        "<p></p>" +
+        "<p>2. <strong>Progressive smelt:</strong> ignores the Bar pick and auto selects the highest bar your Smithing level and bank stock can support, re-checked each banking trip.</p>" +
+        "<p></p>" +
+        "<p>3. <strong>Furnace:</strong> the furnace to walk to. AUTO_NEAREST uses the closest (stand near a furnace at start, restart to switch).</p>" +
+        "<p></p>" +
+        "<p>4. <strong>Max players in area:</strong> hop worlds if more than this many other players are within Distance to Stray. 0 disables hopping.</p>" +
+        "<p></p>" +
+        "<p>5. <strong>League mode:</strong> presses an arrow key to reset the idle logout timer.</p>" +
+        "<p></p>" +
+        "<p>6. <strong>Preferred bank:</strong> override the nearest by distance choice.</p>" +
+        "<p></p>" +
+        "<p>7. <strong>Items to bank / keep:</strong> comma separated lists matched on item name. Items to bank wins; if empty it deposits all except your keep list.</p>" +
+        "<p></p>" +
+        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban for a faster pace. Throwaway accounts only.</p>")
 public interface AutoSmeltingPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)

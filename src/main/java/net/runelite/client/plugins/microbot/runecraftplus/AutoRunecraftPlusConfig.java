@@ -9,16 +9,17 @@ import net.runelite.client.config.ConfigSection;
 @ConfigGroup("RunecraftPlus")
 @ConfigInformation("<h2>Auto Runecraft Plus</h2>" +
         "<h3>Version: " + AutoRunecraftPlusPlugin.version + "</h3>" +
-        "<p>1. <strong>Altar:</strong> the altar to craft at. The bot banks, walks there, enters, crafts, and " +
-        "returns. Air/Earth/Water/Fire/Body are F2P-runnable; Nature is members.</p>" +
-        "<p>2. <strong>Essence:</strong> Rune, Pure, or Daeyalt. Pure and rune give identical XP (pick by " +
-        "cost); daeyalt is +50% XP (members, self-mined). Keep your talisman or tiara and essence in the bank.</p>" +
-        "<p>3. <strong>Use pouches:</strong> fills/empties essence pouches each trip, and repairs degraded " +
-        "ones via NPC Contact if you are on the Lunar spellbook. Pouches are members-only.</p>" +
-        "<p>4. <strong>Stop after / Target level:</strong> auto-shutdown thresholds. Target level banks first.</p>" +
-        "<p>5. <strong>League mode:</strong> periodically presses an arrow key to defeat the idle-logout.</p>" +
-        "<p>6. <strong>Speed mode:</strong> disables Microbot antiban for a faster, more detectable pace. " +
-        "Throwaway accounts only.</p>")
+        "<p>1. <strong>Altar:</strong> the altar to craft at. The bot banks, walks there, enters, crafts, and returns. Air, Earth, Water, Fire and Body run in F2P; Nature is members.</p>" +
+        "<p></p>" +
+        "<p>2. <strong>Essence:</strong> Rune, Pure, or Daeyalt. Pure and rune give identical XP (pick by cost); daeyalt is 50% more XP (members, self mined). Keep your talisman or tiara and essence in the bank.</p>" +
+        "<p></p>" +
+        "<p>3. <strong>Use pouches:</strong> fills and empties essence pouches each trip, and repairs degraded ones via NPC Contact if you are on the Lunar spellbook. Pouches are members only.</p>" +
+        "<p></p>" +
+        "<p>4. <strong>Stop after / Target level:</strong> auto shutdown thresholds. Target level banks first.</p>" +
+        "<p></p>" +
+        "<p>5. <strong>League mode:</strong> presses an arrow key to defeat the idle logout.</p>" +
+        "<p></p>" +
+        "<p>6. <strong>Speed mode:</strong> disables Microbot antiban for a faster, more detectable pace. Throwaway accounts only.</p>")
 public interface AutoRunecraftPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)

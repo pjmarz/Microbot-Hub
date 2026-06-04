@@ -35,20 +35,20 @@ public enum AnvilLocationOption {
     //   v0.2.1: (3227, 3258, 0) -- same X as the proven-walkable furnace tile, +1 Y north. Should
     //                              land inside the building one tile north of the furnace.
     // If still off, ask the user to right-click the anvil tile in-game and report the X,Y,plane.
-    LUMBRIDGE_RUSTED("Lumbridge Rusted (BRONZE only)",
+    LUMBRIDGE_RUSTED("Lumbridge (bronze)",
             "Lumbridge Rusted Anvil", new WorldPoint(3227, 3258, 0), false, true),
-    VARROCK_WEST("Varrock West (all bars)",
+    VARROCK_WEST("Varrock West",
             "Varrock West Anvil", new WorldPoint(3188, 3426, 0), false, false),
 
     // v0.4.0: Varrock Central -- 2 anvils in Horvik's armour shop, F2P, all-bar, 31 sq from W bank.
     // Per OSRS Wiki Anvil page. Coord (3225, 3424, 0) is wiki-derived approximation -- verify in-game.
-    VARROCK_CENTRAL("Varrock Central (Horvik's)",
+    VARROCK_CENTRAL("Varrock Central",
             "Varrock Central Anvil", new WorldPoint(3225, 3424, 0), false, false),
 
     // v0.4.0: Varrock East -- 2 anvils just south of the east bank on the west side, F2P, all-bar,
     // 35 sq from E bank. Per OSRS Wiki Anvil page. Coord (3247, 3410, 0) is wiki-derived
     // approximation -- verify in-game.
-    VARROCK_EAST("Varrock East (south of bank)",
+    VARROCK_EAST("Varrock East",
             "Varrock East Anvil", new WorldPoint(3247, 3410, 0), false, false),
 
     // v0.6.0: P2P anvils. osrsmap-confirmed towns; anchors approximate (runtime 20-tile finder

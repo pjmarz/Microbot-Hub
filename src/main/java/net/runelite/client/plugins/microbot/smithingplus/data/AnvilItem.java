@@ -90,8 +90,8 @@ public enum AnvilItem {
     DART_TIPS("Dart tips", 29, 1),
     ARROWTIPS("Arrowtips", 30, 1),
     KNIVES("Knives", 31, 1),
-    BRONZE_WIRE("Bronze wire (bronze only) / Iron spit (iron) / Studs (steel)", 32, 1),
-    BULLSEYE_LAMP("Bullseye lamp (steel only)", 28, 1),
+    BRONZE_WIRE("Wire / spit / studs", 32, 1),
+    BULLSEYE_LAMP("Bullseye lamp (steel)", 28, 1),
     BOLTS("Bolts (unf)", 34, 1);
 
     private final String itemName;
