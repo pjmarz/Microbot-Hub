@@ -1,0 +1,144 @@
+package net.runelite.client.plugins.microbot.craftingplus;
+
+import net.runelite.api.Client;
+import net.runelite.api.Skill;
+import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
+import net.runelite.client.ui.FontManager;
+import net.runelite.client.ui.overlay.OverlayPanel;
+import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.components.ButtonComponent;
+import net.runelite.client.ui.overlay.components.LineComponent;
+import net.runelite.client.ui.overlay.components.TitleComponent;
+
+import javax.inject.Inject;
+import java.awt.*;
+import java.text.NumberFormat;
+import java.time.Duration;
+
+public class AutoCraftingPlusOverlay extends OverlayPanel {
+    private static final Color TITLE_COLOR = new Color(0, 170, 0);
+    private static final Color HEADER_COLOR = new Color(140, 220, 140);
+    private static final Color NORMAL_TEXT_COLOR = Color.WHITE;
+    private static final Color HIGHLIGHT_COLOR = new Color(255, 235, 145);
+
+    private final AutoCraftingPlusPlugin plugin;
+    private final Client client;
+    private final AutoCraftingPlusConfig config;
+
+    public final ButtonComponent pauseButton;
+
+    @Inject
+    AutoCraftingPlusOverlay(AutoCraftingPlusPlugin plugin, Client client, AutoCraftingPlusConfig config) {
+        super(plugin);
+        this.plugin = plugin;
+        this.client = client;
+        this.config = config;
+        setPosition(OverlayPosition.TOP_LEFT);
+        setNaughty();
+
+        pauseButton = new ButtonComponent("Pause");
+        pauseButton.setPreferredSize(new Dimension(100, 25));
+        pauseButton.setParentOverlay(this);
+        pauseButton.setFont(FontManager.getRunescapeBoldFont());
+        pauseButton.setOnClick(() -> {
+            Microbot.log("AutoCraftingPlus: pause button click received -- toggling pauseAllScripts");
+            Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
+            if (Microbot.pauseAllScripts.get()) {
+                Rs2Walker.setTarget(null);
+            }
+        });
+    }
+
+    @Override
+    public Dimension render(Graphics2D graphics) {
+        try {
+            panelComponent.setPreferredSize(new Dimension(240, 300));
+
+            panelComponent.getChildren().add(TitleComponent.builder()
+                    .text("AutoCraftingPlus v" + AutoCraftingPlusPlugin.version)
+                    .color(TITLE_COLOR)
+                    .build());
+
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Status:")
+                    .right(Microbot.status == null ? "Idle" : Microbot.status)
+                    .rightColor(HIGHLIGHT_COLOR)
+                    .build());
+
+            panelComponent.getChildren().add(LineComponent.builder().left("").build());
+
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Statistics")
+                    .leftColor(HEADER_COLOR)
+                    .build());
+
+            AutoCraftingPlusScript script = plugin.getScript();
+            if (script != null && script.getStartTimeMillis() > 0) {
+                int currentLevel = client.getRealSkillLevel(Skill.CRAFTING);
+                int currentXp = client.getSkillExperience(Skill.CRAFTING);
+                int xpGained = currentXp - script.getStartSkillXp();
+                long runtimeMillis = System.currentTimeMillis() - script.getStartTimeMillis();
+                long xpPerHour = (runtimeMillis > 1000) ? (xpGained * 3600000L / runtimeMillis) : 0;
+
+                int levelDelta = currentLevel - script.getStartSkillLevel();
+                String levelStr = currentLevel + (levelDelta > 0 ? " (+" + levelDelta + ")" : "");
+
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("Crafting level:")
+                        .right(levelStr)
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("XP gained:")
+                        .right(NumberFormat.getInstance().format(xpGained))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("XP/hr:")
+                        .right(NumberFormat.getInstance().format(xpPerHour))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("Cut cycles:")
+                        .right(String.valueOf(script.getActionsCompleted()))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("Runtime:")
+                        .right(formatDuration(Duration.ofMillis(runtimeMillis)))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
+                if (config.targetLevel() > 0) {
+                    int toGo = Math.max(0, config.targetLevel() - currentLevel);
+                    panelComponent.getChildren().add(LineComponent.builder()
+                            .left("Target:")
+                            .right(config.targetLevel() + (toGo > 0 ? " (" + toGo + " to go)" : " (reached)"))
+                            .rightColor(HIGHLIGHT_COLOR)
+                            .build());
+                }
+            } else {
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("(not running)")
+                        .leftColor(NORMAL_TEXT_COLOR)
+                        .build());
+            }
+
+            pauseButton.setText(Microbot.pauseAllScripts.get() ? "Resume" : "Pause");
+            panelComponent.getChildren().add(pauseButton);
+
+        } catch (Exception ex) {
+            Microbot.logStackTrace(this.getClass().getSimpleName(), ex);
+        }
+        return super.render(graphics);
+    }
+
+    private String formatDuration(Duration duration) {
+        return String.format("%02d:%02d:%02d", duration.toHours(), duration.toMinutesPart(), duration.toSecondsPart());
+    }
+}
