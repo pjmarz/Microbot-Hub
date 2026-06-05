@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  *
  * <h2>Audit log</h2>
  * <ul>
- *   <li><b>2026-05-14 (Pilot #4 v0.1.0):</b> Forked verbatim from upstream. No coord-level
+ *   <li><b>Origin:</b> Forked verbatim from upstream. No coord-level
  *       audit performed at v0.1.0; this file is treated as authoritative on the assumption
  *       that v1.8.3 has been live in production. Coord audit deferred to v0.2.0 (when we
  *       expose the named-location dropdown via {@code TreeLocationOption}).</li>
@@ -281,13 +281,29 @@ public class WoodcuttingTreeLocations {
     
     private static List<ResourceLocationOption> getMapleTreeLocations() {
         List<ResourceLocationOption> locations = new ArrayList<>();
-        
-        // Seers' Village - very popular location
+
+        // Corsair Cove Resource Area - the only F2P maple spot. Quest-gated (The Corsair Curse +
+        // Dragon Slayer I, both F2P). Maple trees (object 10832) captured live via the agent server
+        // at (2477-2481, 2895-2899); anchor sits in the cluster.
+        Map<Quest, QuestState> corsairQuests = new HashMap<>();
+        corsairQuests.put(Quest.THE_CORSAIR_CURSE, QuestState.FINISHED);
+        corsairQuests.put(Quest.DRAGON_SLAYER_I, QuestState.FINISHED);
         locations.add(new ResourceLocationOption(
-                new WorldPoint(2720, 3465, 0), 
+                new WorldPoint(2479, 2896, 0),
+                "Corsair Cove Maple Trees", false, 3,
+                corsairQuests,
+                new HashMap<>(),
+                new HashMap<>(),
+                new HashMap<>(),
+                new HashMap<>()
+        ));
+
+        // Seers' Village - very popular location (members)
+        locations.add(new ResourceLocationOption(
+                new WorldPoint(2720, 3465, 0),
                 "Seers' Village Maple Trees" ,true,1
         ));
-              
+
         return locations;
     }
     
@@ -361,10 +377,25 @@ public class WoodcuttingTreeLocations {
                 new WorldPoint(2711, 3463, 0),
                 "Seers' Village Yew Trees",true,1
         ));
-        
+
+        // Corsair Cove Resource Area - F2P (quest-gated: The Corsair Curse + Dragon Slayer I).
+        // Yew trees (object 10822) captured live via the agent server at (2471-2477, 2886-2891).
+        Map<Quest, QuestState> corsairQuests = new HashMap<>();
+        corsairQuests.put(Quest.THE_CORSAIR_CURSE, QuestState.FINISHED);
+        corsairQuests.put(Quest.DRAGON_SLAYER_I, QuestState.FINISHED);
+        locations.add(new ResourceLocationOption(
+                new WorldPoint(2473, 2888, 0),
+                "Corsair Cove Yew Trees", false, 3,
+                corsairQuests,
+                new HashMap<>(),
+                new HashMap<>(),
+                new HashMap<>(),
+                new HashMap<>()
+        ));
+
         return locations;
     }
-    
+
     private static List<ResourceLocationOption> getBlisterwoodTreeLocations() {
         List<ResourceLocationOption> locations = new ArrayList<>();
         

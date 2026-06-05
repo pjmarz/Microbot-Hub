@@ -38,19 +38,19 @@ import static net.runelite.client.plugins.microbot.util.Global.sleepUntil;
 
 @PluginDescriptor(
         name = PluginDescriptor.Mocrosoft + "Auto Woodcutting Plus",
-        description = "Pilot #4 Plus fork of AutoWoodcutting. v0.1.0 = bare clone + speed mode + audit citation. Future versions add bank + tree-location dropdowns.",
+        description = "Chops trees and banks logs with a tree-location picker, Forestry event handling, optional fletching, stop conditions and live stats. Part of the Plus suite.",
         tags = {"Woodcutting", "microbot", "skilling", "plus"},
-        authors = {"Mocrosoft", "Pete (Plus fork)"},
+        authors = {"Mocrosoft", "Yuof", "TaF", "pjmarz"},
         version = AutoWoodcuttingPlusPlugin.version,
-        minClientVersion = "2.1.32",
-        cardUrl = "",
-        iconUrl = "",
+        minClientVersion = "2.0.13",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AutoWoodcuttingPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AutoWoodcuttingPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class AutoWoodcuttingPlusPlugin extends Plugin {
-    public static final String version = "0.5.8";
+    public static final String version = "0.6.1";
     @Inject
     @Getter(AccessLevel.MODULE)
     public AutoWoodcuttingPlusScript AutoWoodcuttingPlusScript;

@@ -63,7 +63,7 @@ public class RitualEvent implements BlockingEvent {
             if (Rs2Player.getWorldLocation().equals(targetCircle.getWorldLocation())) {
                 //Microbot.log("RitualEvent: Already at the target circle, performing the ritual.", Level.INFO);
                 sleepGaussian(600, 150);
-                continue; // TODO find some condition to wait for here
+                continue; // already on the target circle; pace one tick and re-check (validate() drives completion)
             }
 
             // Move to the target circle

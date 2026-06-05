@@ -79,7 +79,7 @@ public class AutoWoodcuttingPlusScript extends Script {
     private WoodcuttingTree activeTree = WoodcuttingTree.TREE;
     private ResourceLocationOption activeLocation;
 
-    // Polish-Cycle 2 v0.3.0: runtime stats for threshold-based auto-shutdown. Overlay still
+    // runtime stats for threshold-based auto-shutdown. Overlay still
     // maintains its own independent tracking; these are script-side fields used only by the
     // stopAfterMinutes / stopAfterXp check in the main loop.
     private long startTimeMillis = 0;
@@ -110,7 +110,7 @@ public class AutoWoodcuttingPlusScript extends Script {
             sleepUntil(Rs2Bank::isOpen, 20000);
             Rs2Bank.withdrawAll(treeType.getLog());
             Rs2Bank.closeBank();
-            sleep(500, 1200);
+            sleepUntil(() -> !Rs2Bank.isOpen(), 2000);
         }
     }
 
@@ -127,13 +127,14 @@ public class AutoWoodcuttingPlusScript extends Script {
         Rs2Antiban.antibanSetupTemplates.applyWoodcuttingSetup();
         Rs2AntibanSettings.dynamicActivity = true;
         Rs2AntibanSettings.dynamicIntensity = true;
-        // Pilot #4 v0.1.0: speed mode single-flag flip. Throwaway-only.
+        // speed mode single-flag flip. Throwaway-only.
         if (config.speedMode()) {
             Rs2AntibanSettings.antibanEnabled = false;
         }
         activeTree = config.TREE();
         activeLocation = null;
-        // Polish-Cycle 2 v0.3.0: seed stats trackers from client thread.
+        returnPoint = null; // reset cross-restart static state (also cleared in shutdown())
+        // seed stats trackers from client thread.
         startTimeMillis = System.currentTimeMillis();
         startSkillXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getSkillExperience(Skill.WOODCUTTING)).orElse(0);
@@ -150,7 +151,7 @@ public class AutoWoodcuttingPlusScript extends Script {
                     return;
                 }
 
-                // Polish-Cycle 2 v0.3.0: stopAfterMinutes / stopAfterXp threshold check.
+                // stopAfterMinutes / stopAfterXp threshold check.
                 if (config.stopAfterMinutes() > 0
                         && (System.currentTimeMillis() - startTimeMillis) / 60000 >= config.stopAfterMinutes()) {
                     Microbot.log("AutoWoodcuttingPlus: reached stopAfterMinutes ("
@@ -613,7 +614,7 @@ public class AutoWoodcuttingPlusScript extends Script {
         WoodcuttingTree treeType = getActiveTree();
         int logCount = Rs2Inventory.count(treeType.getLogID());
         if (logCount > 0) {
-            //TODO: should we really stop script if fletching failed?
+            // fletch the logs; on failure we return false below so the inventory step retries next tick
             boolean startFletchingSucces = Rs2Fletching.fletchItems(treeType.getLogID(), config.fletchingType().getContainsInventoryName(), "All");
             int fletchedItems = Rs2Inventory.getList(itemBounds -> itemBounds.getName().contains(config.fletchingType().getContainsInventoryName())).size();
             log.info("We fletched {} {} into {} of {} , success: {}", logCount, treeType, fletchedItems, config.fletchingType().getContainsInventoryName(), startFletchingSucces);

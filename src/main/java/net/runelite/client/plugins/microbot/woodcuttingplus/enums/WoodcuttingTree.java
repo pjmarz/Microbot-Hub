@@ -21,7 +21,7 @@ import net.runelite.client.plugins.microbot.util.player.Rs2Player;
  *
  * <h2>Audit log</h2>
  * <ul>
- *   <li><b>2026-05-14 (Pilot #4 v0.1.0):</b> Forked verbatim from upstream. Audit script
+ *   <li><b>Origin:</b> Forked verbatim from upstream. Audit script
  *       {@code tools/wiki-audit-trees.ps1} hits the OSRS Wiki Woodcutting + Tree pages (combined).
  *       16 of 16 common-name entries confirmed (TREE, OAK, WILLOW, TEAK, MAPLE, MAHOGANY, YEW,
  *       MAGIC, REDWOOD, ACHEY, HOLLOW, SULLIUSCEP, ARCTIC_PINE, BLISTERWOOD, MATURE_JUNIPER,

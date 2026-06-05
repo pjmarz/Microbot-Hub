@@ -124,11 +124,10 @@ public class LocationOption {
                     int requiredAmount = itemReq.getValue();
 
                     int numberOfItems = Rs2Inventory.count(itemId) +
-                            (Rs2Equipment.isWearing(itemId) ? 1 : 0); //TODO we must check if we are checking for stackable items..
+                            (Rs2Equipment.isWearing(itemId) ? 1 : 0);
                     int numberOfItemsInPouch = Rs2RunePouch.getQuantity(itemId);
                     int numberOfItemsInBank = Rs2Bank.count(itemId);
-                    // todo check rune pouches ? when the ids runes..,
-                    // bolt ammo slot ? when the ids is any ammo
+                    // counts inventory + worn + rune pouch + bank (ammo-slot quantities are not summed)
 
                     if (numberOfItems+numberOfItemsInPouch +numberOfItemsInBank< requiredAmount) {
                         log.warn("Missing required item: {} x{} (have {})", itemId, requiredAmount, numberOfItems);

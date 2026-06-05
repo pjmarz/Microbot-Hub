@@ -11,25 +11,53 @@ import net.runelite.client.plugins.microbot.woodcuttingplus.enums.WoodcuttingWal
 @ConfigGroup(AutoWoodcuttingPlusConfig.configGroup)
 @ConfigInformation("<h2>Auto Woodcutting Plus</h2>" +
         "<h3>Version: " + AutoWoodcuttingPlusPlugin.version + "</h3>" +
+        "<h3>General</h3>" +
         "<p>1. <strong>Enable auto woodcutting:</strong> turn off to keep the Forestry helpers running without cutting trees yourself.</p>" +
         "<p></p>" +
-        "<p>2. <strong>Tree / Progressive mode:</strong> pick a tree to cut, or let Progressive auto select the best tree for your Woodcutting level.</p>" +
+        "<p>2. <strong>Progressive mode:</strong> auto switch to the best tree for your Woodcutting level. Overrides the Tree choice below.</p>" +
         "<p></p>" +
-        "<p>3. <strong>Distance to Stray:</strong> how far in tiles the bot may wander from its start tile before returning.</p>" +
+        "<p>3. <strong>Tree:</strong> pick which tree to cut. Ignored while Progressive mode is on.</p>" +
         "<p></p>" +
-        "<p>4. <strong>Autohop when player detected:</strong> hop worlds when another player comes near.</p>" +
+        "<p>4. <strong>Distance to Stray:</strong> how far in tiles you may wander from your start tile before walking back.</p>" +
         "<p></p>" +
-        "<p>5. <strong>Inventory management:</strong> choose how a full inventory is handled (drop or bank) in the Inventory section.</p>" +
+        "<p>5. <strong>Autohop when player detected:</strong> hop worlds when another player comes near.</p>" +
         "<p></p>" +
-        "<p>6. <strong>Forestry:</strong> handles Forestry events automatically. Use a Forestry world for best results. Loot bird nests and seeds are toggles here.</p>" +
+        "<p>6. <strong>Firemake only:</strong> burn logs where you stand instead of cutting. Start the plugin on your firemaking spot.</p>" +
         "<p></p>" +
-        "<p>7. <strong>Firemake only:</strong> burns logs where you stand instead of cutting. Start at your firemaking spot (tested at the Grand Exchange north east).</p>" +
+        "<p>7. <strong>Woodcut at Hardwood Tree Patch:</strong> cut the hardwood patch trees instead of normal trees.</p>" +
         "<p></p>" +
-        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban. Throwaway accounts only.</p>" +
+        "<p>8. <strong>Loot Bird Nests:</strong> pick up bird nests dropped from trees and events.</p>" +
         "<p></p>" +
-        "<p>Forestry support by Yuof and TaF.</p>")
+        "<p>9. <strong>Loot Seeds:</strong> pick up seeds dropped from events.</p>" +
+        "<p></p>" +
+        "<p>10. <strong>Loot my items only:</strong> only grab loot tagged to you. Use this on an Ironman.</p>" +
+        "<p></p>" +
+        "<p>11. <strong>Speed mode:</strong> turns off Microbot antiban for a faster but more detectable bot. Throwaway accounts only.</p>" +
+        "<p></p>" +
+        "<p>12. <strong>Stop conditions:</strong> set Stop after minutes, Stop after XP gained, or a Target level to shut the plugin down automatically. Leave any at 0 to ignore it. For Bank and Drop primaries the Target level banks or drops your inventory first.</p>" +
+        "<p></p>" +
+        "<h3>Inventory management</h3>" +
+        "<p>13. <strong>Primary action:</strong> what to do when your inventory fills. Bank logs, Drop logs, Burn logs on the spot, Burn logs at a campfire, or Fletch logs.</p>" +
+        "<p></p>" +
+        "<p>14. <strong>Fletching type:</strong> which item to fletch. Only used when the primary action is Fletch.</p>" +
+        "<p></p>" +
+        "<p>15. <strong>Secondary action:</strong> what to do with fletched items. None, Bank, Drop, String and Drop, or String and Bank. Only used after fletching.</p>" +
+        "<p></p>" +
+        "<p>16. <strong>Drop order:</strong> the order items are dropped when dropping.</p>" +
+        "<p></p>" +
+        "<p>17. <strong>Additional items to bank:</strong> extra item names to bank, comma separated.</p>" +
+        "<p></p>" +
+        "<p>18. <strong>Items to keep when dropping:</strong> item names to never drop, comma separated.</p>" +
+        "<p></p>" +
+        "<p>19. <strong>Walk back:</strong> return to your initial spot or to the last tree you cut.</p>" +
+        "<p></p>" +
+        "<p>20. <strong>String bows:</strong> string unstrung bows when a bowstring is in your inventory.</p>" +
+        "<p></p>" +
+        "<h3>Forestry</h3>" +
+        "<p>21. <strong>Enable forestry:</strong> master switch for the Forestry helpers. Use a Forestry world for best results.</p>" +
+        "<p></p>" +
+        "<p>22. <strong>Event toggles:</strong> turn each Forestry event on or off on its own. Egg, Entlings, Flowers, Fox, Hives, Leprechaun, Ritual, Root, and Struggling Sapling.</p>")
 public interface AutoWoodcuttingPlusConfig extends Config {
-    // Pilot #4 v0.1.0: renamed from upstream's "AutoWoodcutting" to avoid settings cross-pollination.
     String configGroup = "WoodcuttingPlus";
     @ConfigSection(
             name = "General",
@@ -156,10 +184,6 @@ public interface AutoWoodcuttingPlusConfig extends Config {
     )
     default boolean lootMyItemsOnly() { return false;}
 
-    /**
-     * Pilot #4 v0.1.0 borrow from the Plus pattern. Single flag flip disables Microbot's
-     * antiban. Throwaway-only.
-     */
     @ConfigItem(
             keyName = "speedMode",
             name = "Speed mode (less antiban)",
@@ -169,9 +193,6 @@ public interface AutoWoodcuttingPlusConfig extends Config {
     )
     default boolean speedMode() { return false; }
 
-    /**
-     * Polish-Cycle 2 v0.3.0: runtime/XP threshold for auto-shutdown.
-     */
     @ConfigItem(
             keyName = "stopAfterMinutes",
             name = "Stop after (minutes)",
@@ -194,12 +215,6 @@ public interface AutoWoodcuttingPlusConfig extends Config {
         return 0;
     }
 
-    /**
-     * v0.5.0: target-level threshold. When Woodcutting level reaches this value, the script
-     * runs one cleanup cycle (BANK or DROP per primaryAction) then shuts down. 0 = disabled.
-     * BURN/FLETCH primary actions don't trip cleanup cleanly -- they just let the current
-     * tick complete and shut down on the next iteration.
-     */
     @ConfigItem(
             keyName = "targetLevel",
             name = "Target level",
@@ -210,9 +225,6 @@ public interface AutoWoodcuttingPlusConfig extends Config {
     default int targetLevel() {
         return 0;
     }
-
-    // v0.5.1: paused config item removed. Pause is now an overlay button toggling
-    // Microbot.pauseAllScripts (shared global flag). See AutoWoodcuttingPlusOverlay.
 
     @ConfigItem(
             keyName = "PrimaryAction",
@@ -343,7 +355,7 @@ public interface AutoWoodcuttingPlusConfig extends Config {
              description = "Enable the Flowers forestry event",
              position = 3,
              section = forestrySection,
-             hidden = false //TODO: Remove this when the event is implemented
+             hidden = false
      )
      default boolean flowersEvent() {
          return false;

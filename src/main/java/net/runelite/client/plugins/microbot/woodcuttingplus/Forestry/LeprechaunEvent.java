@@ -62,7 +62,7 @@ public class LeprechaunEvent implements BlockingEvent {
         plugin.incrementForestryEventCompleted();
         return true;
 
-        //TODO: Implement interaction with the leprechaun for banking
+        // Note: leprechaun banking is not automated -- this event walks to the rainbow end and completes.
     }
 
     @Override
