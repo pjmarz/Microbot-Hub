@@ -8,15 +8,19 @@ import net.runelite.client.plugins.microbot.autofishingplus.enums.HarpoonType;
 @ConfigGroup("AutoFishingPlus")
 @ConfigInformation("<h2>Auto Fishing Plus</h2>" +
         "<h3>Version: " + AutoFishingPlusPlugin.version + "</h3>" +
-        "<p>1. <strong>Fish to catch:</strong> what to fish. Make sure your chosen <em>Location</em> actually offers it.</p>" +
+        "<h3>General</h3>" +
+        "<p>1. <strong>Fish to catch:</strong> pick the fish type to fish. Make sure your chosen Location actually offers it.</p>" +
         "<p></p>" +
-        "<p>2. <strong>Location:</strong> walk to and fish a named spot. <em>AUTO</em> fishes the nearest spot of your chosen fish to where you are standing.</p>" +
+        "<p>2. <strong>Location:</strong> walk to and fish a named spot. AUTO fishes the nearest spot of your chosen fish to where you stand. One of the named spots is Corsair Cove, a free lobster spot.</p>" +
         "<p></p>" +
-        "<p>3. <strong>Banking:</strong> each named location has a built-in strategy (deposit box / bank / drop). For <em>AUTO</em>, the <em>Use Bank</em> toggle picks bank vs drop.</p>" +
+        "<p>3. <strong>Use bank (AUTO only):</strong> on the AUTO location, turn this on to bank the catch instead of dropping it. Named spots ignore it and use their own deposit box, bank, or drop strategy.</p>" +
         "<p></p>" +
-        "<p>4. <strong>Stop conditions:</strong> auto-shutdown after minutes / XP / target level / fish caught. The bot deposits or drops its catch once before stopping.</p>" +
+        "<p>4. <strong>Cook fish:</strong> after fishing, cook the raw fish on a nearby fire or range. Leave it off to keep raw fish. Only useful where a fire or range is in reach.</p>" +
         "<p></p>" +
-        "<p>5. <strong>F2P lobster flagship:</strong> Corsair Cove (requires <em>The Corsair Curse</em> + <em>Dragon Slayer I</em>) uses the deposit box. It is a long but free walk with no fare or NPC interaction. The first run is the soak test.</p>")
+        "<p>5. <strong>Harpoon spec:</strong> pick the harpoon whose special attack you want fired while fishing, for faster catches. Choose Crystal, Dragon, or Infernal harpoon, or None to never spec.</p>" +
+        "<p></p>" +
+        "<h3>Stop conditions</h3>" +
+        "<p>6. <strong>Stop after:</strong> auto shutdown by minutes of runtime, Fishing XP gained, target Fishing level, or fish caught. Set any to 0 to disable that limit. The bot deposits or drops its catch once before stopping.</p>")
 public interface AutoFishingPlusConfig extends Config {
 
     @ConfigSection(

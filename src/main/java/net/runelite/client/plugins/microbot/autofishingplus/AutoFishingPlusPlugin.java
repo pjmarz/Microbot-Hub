@@ -17,7 +17,7 @@ import java.awt.*;
         name = PluginDescriptor.Mocrosoft + "Auto Fishing Plus",
         description = "Fishes, banks/deposit-boxes/drops, with a location picker, stop conditions and stats. Part of the Plus suite.",
         tags = {"fishing", "microbot", "skilling", "plus"},
-        authors = {"Mocrosoft"},
+        authors = {"AI Agent", "pjmarz"},
         version = AutoFishingPlusPlugin.version,
         minClientVersion = "2.0.13",
         iconUrl = "https://chsami.github.io/Microbot-Hub/AutoFishingPlusPlugin/assets/icon.png",
@@ -27,7 +27,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoFishingPlusPlugin extends Plugin {
-    public static final String version = "0.2.0";
+    public static final String version = "0.2.1";
 
     @Inject
     private AutoFishingPlusConfig config;
