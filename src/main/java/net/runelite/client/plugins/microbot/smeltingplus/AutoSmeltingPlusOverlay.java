@@ -3,6 +3,8 @@ package net.runelite.client.plugins.microbot.smeltingplus;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
 import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.smeltingplus.data.Bars;
+import net.runelite.client.plugins.microbot.smeltingplus.data.Ores;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.OverlayPanel;
@@ -15,6 +17,7 @@ import javax.inject.Inject;
 import java.awt.*;
 import java.text.NumberFormat;
 import java.time.Duration;
+import java.util.Map;
 
 /**
  * rebuilt overlay matching AutoWoodcuttingPlus standard.
@@ -115,6 +118,33 @@ public class AutoSmeltingPlusOverlay extends OverlayPanel {
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("Smelt cycles:")
                         .right(String.valueOf(script.getActionsCompleted()))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
+                // GP/hr: NET profit per bar = bar GE price minus the cost of its input ores. The
+                // counter is smelt cycles, so multiply by bars per full inventory to estimate bars
+                // smelted. Can be negative when ore costs more than the bar. Guards runtime 0 and
+                // price 0. The "~" marks it an estimate (cycle->bar conversion, coal bag ignored).
+                long gpPerHour = 0;
+                Bars activeBar = script.getActiveBar();
+                if (activeBar != null && runtimeMillis > 1000) {
+                    int barPrice = Microbot.getItemManager().getItemPrice(activeBar.getId());
+                    int inputOreCost = 0;
+                    for (Map.Entry<Ores, Integer> req : activeBar.getRequiredMaterials().entrySet()) {
+                        int oreId = req.getKey().getItemId();
+                        if (oreId > 0) {
+                            inputOreCost += Microbot.getItemManager().getItemPrice(oreId) * req.getValue();
+                        }
+                    }
+                    if (barPrice > 0) {
+                        long netPerBar = (long) barPrice - inputOreCost;
+                        long barsSmelted = (long) script.getActionsCompleted() * activeBar.maxBarsForFullInventory();
+                        gpPerHour = netPerBar * barsSmelted * 3600000L / runtimeMillis;
+                    }
+                }
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("GP/hr:")
+                        .right("~" + NumberFormat.getInstance().format(gpPerHour))
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 

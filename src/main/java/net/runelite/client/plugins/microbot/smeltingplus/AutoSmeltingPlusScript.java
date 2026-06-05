@@ -70,6 +70,8 @@ public class AutoSmeltingPlusScript extends Script {
     public int getStartSkillXp() { return startSkillXp; }
     public int getStartSkillLevel() { return startSkillLevel; }
     public int getActionsCompleted() { return actionsCompleted; }
+    /** The bar currently being smelted (resolves progressive mode), for the overlay GP/hr line. */
+    public Bars getActiveBar() { return activeBar; }
 
     public boolean run(AutoSmeltingPlusConfig config) {
         initialPlayerLocation = null;
