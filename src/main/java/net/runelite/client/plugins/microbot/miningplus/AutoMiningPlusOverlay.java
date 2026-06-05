@@ -17,7 +17,7 @@ import java.text.NumberFormat;
 import java.time.Duration;
 
 /**
- * Polish-Cycle 2 (v0.3.0): runtime + XP + ores-mined overlay.
+ * runtime + XP + ores-mined overlay.
  * v0.5.0: target-level progress + paused config + overlay updates.
  * v0.5.1: Pause overlay button (mirrors AIO Fighter) toggling Microbot.pauseAllScripts.
  * v0.5.2: removed panelComponent.getChildren().clear() — was wiping click registry.

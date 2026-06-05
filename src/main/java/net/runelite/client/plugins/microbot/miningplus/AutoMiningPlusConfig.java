@@ -9,17 +9,36 @@ import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
 @ConfigGroup("MiningPlus")
 @ConfigInformation("<h2>Auto Mining Plus</h2>" +
         "<h3>Version: "+ AutoMiningPlusPlugin.version + "</h3>" +
-        "<p>1. <strong>Ore Selection:</strong> Choose the type of ore you wish to mine. The default ore is <em>TIN</em>.</p>" +
-        "<p></p>"+
-        "<p>2. <strong>Mine Location:</strong> Pick a named mine and the bot walks there before mining. <em>AUTO_BEST</em> picks the closest accessible mine by raw distance. It will NOT stay at an underground mine (Mining Guild, Dwarven Mine) after a surface bank trip -- pick those explicitly.</p>" +
-        "<p></p>"+
-        "<p>3. <strong>Distance to Stray:</strong> Set the maximum distance in tiles that the bot can travel from its initial position. The default distance is <em>20 tiles</em>.</p>" +
-        "<p></p>"+
-        "<p>4. <strong>Banking Option:</strong> Enable or disable the use of a bank. If enabled, the bot will walk back to the original location after banking. The default setting is <em>disabled</em>.</p>" +
-        "<p></p>"+
-        "<p>5. <strong>Items to Bank:</strong> Specify the items to be banked, separated by commas. The default value is <em>'ore'</em>.</p>"+
-        "<p></p>"+
-        "<p>6. <strong>Basalt:</strong> If mining basalt, ensure UseBank is checked and it will automatically note at Snowflake</em>.</p>")
+        "<h3>General</h3>" +
+        "<p>1. <strong>Ore:</strong> Pick the ore you want to mine. Default is Tin.</p>" +
+        "<p></p>" +
+        "<p>2. <strong>Mine location:</strong> Walk to and stay at this mine before mining. AUTO BEST picks the closest reachable mine for your ore. AUTO BEST does not hold underground mines such as Mining Guild or Dwarven Mine once you bank on the surface, so pick those by name.</p>" +
+        "<p></p>" +
+        "<p>3. <strong>Progressive mode:</strong> Let the bot choose the best ore for your current Mining level instead of the fixed Ore choice.</p>" +
+        "<p></p>" +
+        "<p>4. <strong>Distance to stray:</strong> How far in tiles the bot may roam from where it started. Default is 20 tiles.</p>" +
+        "<p></p>" +
+        "<p>5. <strong>Max players in area:</strong> Hop worlds when more players than this are nearby. Set 0 to never hop.</p>" +
+        "<p></p>" +
+        "<p>6. <strong>League mode:</strong> Taps a key now and then to reset the idle timer so you are not logged out for inactivity.</p>" +
+        "<p></p>" +
+        "<p>7. <strong>Speed mode:</strong> Turns off cooldowns, micro breaks, and curved mouse paths for faster mining. It looks more bot like, so use it only on throwaway accounts.</p>" +
+        "<p></p>" +
+        "<p>8. <strong>Stop conditions:</strong> Four optional limits that shut the bot down once met: Stop after minutes, Stop after XP gained, Target level, and Stop after ores mined. Set any to 0 to disable it. When a limit is reached the bot banks the inventory first, or drops it if Use bank is off.</p>" +
+        "<p></p>" +
+        "<h3>Banking</h3>" +
+        "<p>9. <strong>Use bank:</strong> Bank when the inventory fills, then walk back to where you started. Default is off.</p>" +
+        "<p></p>" +
+        "<p>10. <strong>Preferred bank:</strong> Which bank to use. AUTO NEAREST picks the closest bank by raw distance, which can favor Al Kharid over Lumbridge for the East Lumbridge mine because the toll gate is not counted.</p>" +
+        "<p></p>" +
+        "<p>11. <strong>Items to bank:</strong> Comma separated list of items to deposit. The default covers common mined items, and the bot also adds the current ore name at deposit time.</p>" +
+        "<p></p>" +
+        "<p>12. <strong>Use clay bracelet:</strong> Withdraw and wear a bracelet of clay. Start the script with one already on.</p>" +
+        "<p></p>" +
+        "<h3>Dropping</h3>" +
+        "<p>13. <strong>Drop order:</strong> The order the bot uses when dropping items.</p>" +
+        "<p></p>" +
+        "<p>14. <strong>Items to keep:</strong> Comma separated list of items never to drop. Default keeps your pickaxe.</p>")
 
 public interface AutoMiningPlusConfig extends Config {
     @ConfigSection(
@@ -58,7 +77,7 @@ public interface AutoMiningPlusConfig extends Config {
     @ConfigItem(
             keyName = "mineLocation",
             name = "Mine location",
-            description = "Walk to and anchor at this mine before starting. AUTO_BEST picks the closest accessible mine for the chosen ore by raw coordinate distance -- note it does NOT hold underground mines (Mining Guild, Dwarven Mine) once you bank on the surface (the underground coordinate reads as ~6400 tiles away, so a surface mine always wins the distance check). For underground mines, select the mine explicitly instead of AUTO_BEST.",
+            description = "Walk to and anchor at this mine before starting. AUTO_BEST picks the closest accessible mine for the chosen ore by raw coordinate distance. Note it does NOT hold underground mines (Mining Guild, Dwarven Mine) once you bank on the surface (the underground coordinate reads as ~6400 tiles away, so a surface mine always wins the distance check). For underground mines, select the mine explicitly instead of AUTO_BEST.",
             position = 1,
             section = generalSection
     )
@@ -123,10 +142,6 @@ public interface AutoMiningPlusConfig extends Config {
         return false;
     }
 
-    /**
-     * Polish-Cycle 2 (v0.3.0): runtime/XP threshold for auto-shutdown. Disrupts the uniform-
-     * session-length signal that Jagex's bot detection model loves.
-     */
     @ConfigItem(
             keyName = "stopAfterMinutes",
             name = "Stop after (minutes)",
@@ -149,11 +164,6 @@ public interface AutoMiningPlusConfig extends Config {
         return 0;
     }
 
-    /**
-     * v0.5.0: target-level threshold. When Mining level reaches this value, the script flips
-     * to RESETTING for one cleanup cycle (bank or drop, per useBank), then shuts down.
-     * 0 = disabled. AIO Fighter-style.
-     */
     @ConfigItem(
             keyName = "targetLevel",
             name = "Target level",
@@ -175,11 +185,6 @@ public interface AutoMiningPlusConfig extends Config {
     default int stopAfterOres() {
         return 0;
     }
-
-    // v0.5.1: paused config item removed. Pause is now an overlay button (see
-    // AutoMiningPlusOverlay) that toggles Microbot.pauseAllScripts (global AtomicBoolean).
-    // Click pause on any Plus plugin's overlay and all scripts pause together.
-    // Mirrors AIO Fighter's UX.
 
     @ConfigItem(
             keyName = "UseBank",
@@ -212,22 +217,10 @@ public interface AutoMiningPlusConfig extends Config {
             section = bankingSection
     )
     default String itemsToBank() {
-        // v0.4.1: expanded from "ore" alone to cover the OSRS-mineables that DON'T have an
-        // "ore" suffix in their item name -- Coal, Clay, Basalt, and gem variants. Without
-        // this, mining coal/clay/basalt with default settings caused a bank<->mine oscillation
-        // because the deposit predicate matched zero items.
-        // v0.4.2: wiki-driven sweep of the full Mining/Mineable_items table -- list now also
-        // catches:
-        //   essence    -> Rune essence, Pure essence, Dense essence block, Ancient essence
-        //   ash        -> Volcanic ash
-        //   shard      -> Barronite shards, Daeyalt shard
-        //   geode      -> Rubium geode
-        //   salt       -> Urt/Efh/Te salts
-        //   limestone, granite, sandstone, amethyst, pay-dirt -> single-item rocks
-        // Script also auto-augments this filter with the active rock's first word at deposit
-        // time, so once a Rock is in the enum the bot deposits correctly even if the user
-        // overrode this default. This list is belt-and-suspenders for users on custom filters
-        // AND a forward-compat safety net for rock types not yet wired into the Rocks enum.
+        // Covers mineables whose item name has no "ore" suffix (coal, clay, basalt, gems, essence,
+        // ash, shards, geodes, salts, and single-item rocks like granite or amethyst). The script
+        // also adds the active rock's first word to this filter at deposit time, so a user override
+        // still deposits correctly.
         return "ore, uncut, coal, clay, basalt, essence, ash, shard, geode, salt, limestone, granite, sandstone, amethyst, pay-dirt";
     }
 

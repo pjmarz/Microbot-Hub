@@ -56,7 +56,7 @@ public class AutoMiningPlusScript extends Script {
     // We still walk there per the user's pick, but updateStatus surfaces a clear warning.
     private boolean wrongOreLocation = false;
 
-    // Polish-Cycle 2 v0.3.0: runtime stats tracking (read by AutoMiningPlusOverlay).
+    // runtime stats tracking (read by AutoMiningPlusOverlay).
     private long startTimeMillis = 0;
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
@@ -80,7 +80,7 @@ public class AutoMiningPlusScript extends Script {
         Rs2Antiban.antibanSetupTemplates.applyMiningSetup();
         Rs2AntibanSettings.actionCooldownChance = 0.1;
 
-        // Polish-Cycle 2 v0.3.0: seed stats trackers from client thread.
+        // seed stats trackers from client thread.
         startTimeMillis = System.currentTimeMillis();
         startSkillXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getSkillExperience(Skill.MINING)).orElse(0);
@@ -122,7 +122,7 @@ public class AutoMiningPlusScript extends Script {
                     lastMiningXp = currentMiningXp;
                 }
 
-                // Polish-Cycle 2 v0.3.0: stopAfterMinutes / stopAfterXp threshold check.
+                // stopAfterMinutes / stopAfterXp threshold check.
                 if (config.stopAfterMinutes() > 0
                         && (System.currentTimeMillis() - startTimeMillis) / 60000 >= config.stopAfterMinutes()) {
                     Microbot.log("AutoMiningPlus: reached stopAfterMinutes (" + config.stopAfterMinutes()

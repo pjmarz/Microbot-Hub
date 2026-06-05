@@ -16,16 +16,17 @@ import java.awt.*;
         name = PluginDescriptor.Mocrosoft + "Auto Mining Plus",
         description = "Mines and banks ores. Pick a mine location and the bot walks there before mining.",
         tags = {"mining", "microbot", "skilling", "plus"},
+        authors = {"Mocrosoft", "pjmarz"},
         version = AutoMiningPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AutoMiningPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AutoMiningPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class AutoMiningPlusPlugin extends Plugin {
-    public static final String version = "0.5.14";
+    public static final String version = "0.5.15";
     @Inject
     private AutoMiningPlusConfig config;
     @Provides
@@ -67,7 +68,7 @@ public class AutoMiningPlusPlugin extends Plugin {
         overlayManager.remove(autoMiningOverlay);
     }
 
-    /** Polish-Cycle 2 v0.3.0: overlay reads script stats via this getter. */
+    /** overlay reads script stats via this getter. */
     public AutoMiningPlusScript getScript() {
         return autoMiningScript;
     }
