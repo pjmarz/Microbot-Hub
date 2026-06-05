@@ -47,7 +47,9 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li>Smithing-level pre-flight (e.g. refuse Rune Plate Body at Smithing 1). Needs the
  *       AnvilItemLevels table (26 items x 6 bars = 156 entries).</li>
- *   <li>Toolbelt hammer detection. Current Rs2Inventory.hasItem(HAMMER) misses toolbelt hammers.</li>
+ *   <li>Toolbelt hammer: handled in v0.6.5 via the "Hammer on tool belt" config toggle. The OSRS
+ *       tool belt has no varbit/Rs2 helper in this client, so it cannot be auto-detected; the
+ *       toggle lets the user declare it and the bot then stops requiring a loose hammer.</li>
  *   <li>Progressive smith. Picks highest-XP item for current level + bar.</li>
  * </ul>
  */
@@ -395,10 +397,12 @@ public class AutoSmithingPlusScript extends Script {
             return;
         }
 
-        // Withdraw hammer if missing.
-        if (!Rs2Inventory.hasItem(ItemID.HAMMER)) {
+        // Withdraw hammer if missing. v0.6.5: skipped entirely when the hammer is on the tool belt
+        // (config toggle) -- no loose hammer is needed in that case.
+        if (!config.hammerOnToolBelt() && !Rs2Inventory.hasItem(ItemID.HAMMER)) {
             if (!Rs2Bank.hasItem(ItemID.HAMMER)) {
-                Microbot.log("No hammer in inventory or bank. Shutting down.");
+                Microbot.log("No hammer in inventory or bank. Tick 'Hammer on tool belt' in config "
+                        + "if yours is stored there. Shutting down.");
                 Rs2Bank.closeBank();
                 shutdown();
                 return;
@@ -497,9 +501,20 @@ public class AutoSmithingPlusScript extends Script {
     }
 
     private boolean inventoryHasMaterialsForOneCraft(AutoSmithingPlusConfig config) {
-        if (!Rs2Inventory.hasItem(ItemID.HAMMER)) return false;
+        if (!hasHammer(config)) return false;
         String barName = config.selectedBar().getName();
         int needed = activeItem(config).getRequiredBars();
         return Rs2Inventory.hasItemAmount(barName, needed, false, true);
+    }
+
+    /**
+     * v0.6.5: hammer present for smithing? A hammer in the inventory satisfies it (the original
+     * path), and so does the new "Hammer on tool belt" config opt-in. The OSRS tool belt is not
+     * exposed by any varbit or Rs2 helper in this client/API version, so it cannot be auto-detected
+     * from code; the toggle is how the user declares it. With the toggle on we never require or
+     * withdraw a loose hammer, since the tool belt one is always available at the anvil.
+     */
+    private boolean hasHammer(AutoSmithingPlusConfig config) {
+        return config.hammerOnToolBelt() || Rs2Inventory.hasItem(ItemID.HAMMER);
     }
 }

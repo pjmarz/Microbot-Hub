@@ -85,6 +85,17 @@ public interface AutoSmithingPlusConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "hammerOnToolBelt",
+            name = "Hammer on tool belt",
+            description = "Tick this if your hammer lives on the tool belt instead of the inventory. The bot then stops requiring (and withdrawing) a loose hammer. Leave unticked to use a normal inventory hammer.",
+            position = 3,
+            section = generalSection
+    )
+    default boolean hammerOnToolBelt() {
+        return false;
+    }
+
+    @ConfigItem(
             keyName = "anvilLocation",
             name = "Anvil",
             description = "Walk to and anchor at this anvil. AUTO_NEAREST = require start-near-anvil. Lumbridge Rusted Anvil is bronze-only.",
