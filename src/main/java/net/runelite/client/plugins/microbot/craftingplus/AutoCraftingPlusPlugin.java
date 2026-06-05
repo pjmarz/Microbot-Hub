@@ -16,16 +16,17 @@ import java.awt.*;
         name = PluginDescriptor.Mocrosoft + "Auto Crafting Plus",
         description = "Leather, gem cutting, and furnace jewellery on a bank-and-do loop, with stop conditions, target level, and overlay/pause.",
         tags = {"crafting", "leather", "gems", "jewellery", "microbot", "plus"},
+        authors = {"Mocrosoft", "pjmarz"},
         version = AutoCraftingPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AutoCraftingPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AutoCraftingPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class AutoCraftingPlusPlugin extends Plugin {
-    public static final String version = "0.2.0";
+    public static final String version = "0.2.1";
 
     @Inject
     private AutoCraftingPlusConfig config;
