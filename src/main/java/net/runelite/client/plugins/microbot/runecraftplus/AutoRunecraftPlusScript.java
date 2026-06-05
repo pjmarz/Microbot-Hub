@@ -32,10 +32,22 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class AutoRunecraftPlusScript extends Script {
 
+    // Binding necklace (the enchanted emerald necklace used to guarantee a combo-rune bind). Item id
+    // 5521; in the in-client gameval table it is named MAGIC_EMERALD_NECKLACE, so the literal id and
+    // the display name are kept here to avoid that confusing constant name. A worn necklace lasts 16
+    // altar clicks then crumbles to dust (OSRS Wiki); a worn necklace makes every bind succeed.
+    private static final int BINDING_NECKLACE_ID = 5521;
+    private static final String BINDING_NECKLACE_NAME = "Binding necklace";
+
     // Essence + pouch settings, resolved from config in run() (v0.2.0).
     private int essenceId;
     private String essenceName;
     private boolean usePouches;
+
+    // Combo-rune settings, resolved from config in run() (v0.3.0). comboRune == NONE keeps the normal
+    // single-rune path entirely unchanged.
+    private ComboRune comboRune = ComboRune.NONE;
+    private int spareBindingNecklaces;
 
     private State state = State.BANKING;
     private Altars altar;
@@ -55,12 +67,31 @@ public class AutoRunecraftPlusScript extends Script {
     public int getStartSkillXp() { return startSkillXp; }
     public int getStartSkillLevel() { return startSkillLevel; }
     public int getActionsCompleted() { return actionsCompleted; }
+    public Altars getAltar() { return altar; }
+    public int getEssenceId() { return essenceId; }
 
     public boolean run(AutoRunecraftPlusConfig config) {
-        altar = config.altar();
-        essenceId = config.essenceType().getItemId();
-        essenceName = config.essenceType().getItemName();
-        usePouches = config.usePouches();
+        comboRune = config.comboRune();
+        spareBindingNecklaces = Math.max(0, config.spareBindingNecklaces());
+        // Combo crafting binds at the combo's element altar and ignores the General altar choice. The
+        // secondary runes are bound onto pure essence, so combo mode forces pure essence regardless of
+        // the essence picker (rune essence cannot be used at non-rune-essence altars and the combo
+        // recipe always wants pure essence).
+        if (comboRune.isCombo()) {
+            altar = comboRune.getAltar();
+            essenceId = EssenceType.PURE.getItemId();
+            essenceName = EssenceType.PURE.getItemName();
+        } else {
+            altar = config.altar();
+            essenceId = config.essenceType().getItemId();
+            essenceName = config.essenceType().getItemName();
+        }
+        // Pouches are deliberately disabled in combo mode. Combo crafting must keep pure essence and
+        // the secondary runes at an exact 1:1 count, and each altar click also burns one secondary
+        // talisman plus one binding-necklace charge. Mixing that with the fill/empty pouch dance is
+        // the most error-prone, least testable path, so combo trips do a single full-inventory bind
+        // (one click) per trip: essence count == secondary rune count, one talisman, one charge.
+        usePouches = config.usePouches() && !comboRune.isCombo();
         initialise = true;
         state = State.BANKING;
 
@@ -71,6 +102,14 @@ public class AutoRunecraftPlusScript extends Script {
                 Microbot.getClient().getRealSkillLevel(Skill.RUNECRAFT)).orElse(1);
         actionsCompleted = 0;
         shutdownAfterCleanup = false;
+
+        // Combo runes have a hard level requirement; below it the altar simply will not bind, so refuse
+        // to start rather than walk loops banking essence that never converts.
+        if (comboRune.isCombo() && startSkillLevel < comboRune.getLevelRequired()) {
+            Microbot.showMessage(comboRune.getDisplayName() + " needs Runecraft level "
+                    + comboRune.getLevelRequired() + " (you are " + startSkillLevel + ").");
+            return false;
+        }
 
         Microbot.enableAutoRunOn = true;
         // v0.1.1: keep the running loop on foot. Without this the walker's nearest-bank fallback
@@ -138,7 +177,11 @@ public class AutoRunecraftPlusScript extends Script {
                             || Rs2Equipment.isWearing(altar.getTiaraName());
                     boolean haveEssence = Rs2Inventory.hasItem(essenceName, false)
                             || (usePouches && Rs2Inventory.hasAnyPouch() && !Rs2Inventory.allPouchesEmpty());
-                    state = (haveTalismanOrTiara && haveEssence) ? State.WALKING_TO_ALTAR : State.BANKING;
+                    boolean comboReady = !comboRune.isCombo()
+                            || (Rs2Inventory.hasItem(comboRune.getSecondaryRuneId())
+                                && (Rs2Equipment.isWearing(BINDING_NECKLACE_NAME, false)
+                                    || Rs2Inventory.hasItem(BINDING_NECKLACE_ID)));
+                    state = (haveTalismanOrTiara && haveEssence && comboReady) ? State.WALKING_TO_ALTAR : State.BANKING;
                 }
 
                 if (Rs2Player.isMoving() || Rs2Player.isAnimating()) return;
@@ -186,7 +229,23 @@ public class AutoRunecraftPlusScript extends Script {
                             state = State.EXITING_ALTAR;
                             break;
                         }
-                        Microbot.status = "Crafting runes";
+                        // Combo: bind only while a necklace guarantees success. The worn necklace
+                        // crumbles after 16 altar clicks (no warning, it just vanishes from the neck
+                        // slot), so before every bind re-equip a spare. Bind with no necklace would
+                        // be a 50% loss of essence + runes, so bail to the bank if none are left.
+                        if (comboRune.isCombo()) {
+                            if (!Rs2Inventory.hasItem(comboRune.getSecondaryRuneId())) {
+                                // Ran out of secondary runes (e.g. failed binds before a necklace was
+                                // on, or a mismatched stack). Nothing more to bind this trip.
+                                state = State.EXITING_ALTAR;
+                                break;
+                            }
+                            if (!ensureBindingNecklaceWorn()) {
+                                state = State.EXITING_ALTAR;
+                                break;
+                            }
+                        }
+                        Microbot.status = comboRune.isCombo() ? "Crafting combo runes" : "Crafting runes";
                         Rs2Inventory.useItemOnObject(essenceId, altar.getAltarID());
                         Rs2Random.wait(600, 1200);
                         sleepUntil(() -> Rs2Player.waitForXpDrop(Skill.RUNECRAFT));
@@ -211,15 +270,40 @@ public class AutoRunecraftPlusScript extends Script {
         return true;
     }
 
+    /**
+     * Make sure a binding necklace is worn before a combo bind. Returns true if one is already worn
+     * or a spare was equipped from the inventory; false if none are left (caller should leave the
+     * altar and re-bank). A worn necklace crumbles silently after 16 altar clicks, so this is checked
+     * before every single bind rather than once per trip.
+     */
+    private boolean ensureBindingNecklaceWorn() {
+        if (Rs2Equipment.isWearing(BINDING_NECKLACE_NAME, false)) {
+            return true;
+        }
+        if (!Rs2Inventory.hasItem(BINDING_NECKLACE_ID)) {
+            Microbot.status = "Out of binding necklaces";
+            return false;
+        }
+        Microbot.status = "Equipping binding necklace";
+        Rs2Inventory.equip(BINDING_NECKLACE_ID);
+        // Wait for the necklace to actually move to the neck slot before binding, otherwise the next
+        // craft could fire while unworn and burn essence at the 50% failure rate.
+        sleepUntil(() -> Rs2Equipment.isWearing(BINDING_NECKLACE_NAME, false), 2000);
+        return Rs2Equipment.isWearing(BINDING_NECKLACE_NAME, false);
+    }
+
     private void handleBanking() {
         Microbot.status = "Walking to bank";
         boolean isBankOpen = Rs2Bank.walkToBankAndUseBank();
         if (!isBankOpen || !Rs2Bank.isOpen()) return;
 
-        // Deposit crafted runes.
-        if (Rs2Inventory.hasItem(altar.getRuneName(), false)) {
+        // Deposit crafted runes. In combo mode the product is the combo rune, not the altar's own
+        // single rune; the secondary runes carried for binding are deliberately kept (they re-balance
+        // 1:1 against essence in the combo withdrawal below).
+        String craftedRuneName = comboRune.isCombo() ? comboRune.getDisplayName() : altar.getRuneName();
+        if (Rs2Inventory.hasItem(craftedRuneName, false)) {
             Microbot.status = "Depositing runes";
-            Rs2Bank.depositAll(altar.getRuneName(), false);
+            Rs2Bank.depositAll(craftedRuneName, false);
             Rs2Random.wait(600, 1200);
         }
 
@@ -246,6 +330,14 @@ public class AutoRunecraftPlusScript extends Script {
                 super.shutdown();
                 return;
             }
+        }
+
+        // Combo mode owns the rest of the banking (necklaces + secondary runes + secondary talisman
+        // + matching pure essence). It returns or shuts down internally and never falls through to
+        // the single-rune essence path below.
+        if (comboRune.isCombo()) {
+            handleComboWithdraw();
+            return;
         }
 
         // Repair degraded pouches via NPC Contact (Lunar spellbook only). No-op for F2P / non-Lunar.
@@ -275,6 +367,103 @@ public class AutoRunecraftPlusScript extends Script {
         }
         Rs2Bank.withdrawAll(essenceName, true);
         Rs2Random.wait(600, 1200);
+        Rs2Bank.closeBank();
+        state = State.WALKING_TO_ALTAR;
+    }
+
+    /**
+     * Combo-mode withdrawal (bank already open, crafted runes already deposited, entry talisman/tiara
+     * already secured by {@link #handleBanking()}). Builds a single full-inventory bind: one binding
+     * necklace worn plus spares, one secondary talisman (consumed once per altar click, and a combo
+     * trip is a single click), then equal counts of pure essence and secondary runes. Shuts the bot
+     * down with a message if any required bank stock is missing.
+     */
+    private void handleComboWithdraw() {
+        // Reset the secondary runes so they re-balance exactly 1:1 with essence below. Without this,
+        // leftover runes from a prior trip would drift the essence:rune ratio and waste essence.
+        if (Rs2Inventory.hasItem(comboRune.getSecondaryRuneId())) {
+            Rs2Bank.depositAll(comboRune.getSecondaryRuneId());
+            Rs2Random.wait(300, 700);
+        }
+
+        // Stock checks up front so we fail fast with a clear message rather than half-equipping.
+        if (!Rs2Bank.hasBankItem(BINDING_NECKLACE_NAME, false)
+                && !Rs2Equipment.isWearing(BINDING_NECKLACE_NAME, false)
+                && !Rs2Inventory.hasItem(BINDING_NECKLACE_ID)) {
+            Microbot.showMessage("No " + BINDING_NECKLACE_NAME + " in bank!");
+            super.shutdown();
+            return;
+        }
+        if (!Rs2Bank.hasBankItem(comboRune.getSecondaryRuneName(), false)) {
+            Microbot.showMessage("No " + comboRune.getSecondaryRuneName() + " in bank!");
+            super.shutdown();
+            return;
+        }
+        if (!Rs2Bank.hasBankItem(comboRune.getSecondaryTalismanName(), false)
+                && !Rs2Inventory.hasItem(comboRune.getSecondaryTalismanId())) {
+            Microbot.showMessage("No " + comboRune.getSecondaryTalismanName() + " in bank!");
+            super.shutdown();
+            return;
+        }
+        if (!Rs2Bank.hasBankItem(essenceName, false)) {
+            Microbot.showMessage("No " + essenceName + " in bank!");
+            super.shutdown();
+            return;
+        }
+
+        // Equip a binding necklace now if none is worn, then top up spares in the inventory. The worn
+        // one carries the bind; spares are swapped in mid-trip by ensureBindingNecklaceWorn() when it
+        // crumbles.
+        if (!Rs2Equipment.isWearing(BINDING_NECKLACE_NAME, false)) {
+            Microbot.status = "Equipping binding necklace";
+            if (Rs2Inventory.hasItem(BINDING_NECKLACE_ID)) {
+                Rs2Inventory.equip(BINDING_NECKLACE_ID);
+            } else {
+                Rs2Bank.withdrawAndEquip(BINDING_NECKLACE_NAME);
+            }
+            sleepUntil(() -> Rs2Equipment.isWearing(BINDING_NECKLACE_NAME, false), 2000);
+        }
+        if (spareBindingNecklaces > 0) {
+            int spareShort = spareBindingNecklaces - Rs2Inventory.count(BINDING_NECKLACE_ID);
+            if (spareShort > 0 && Rs2Bank.hasBankItem(BINDING_NECKLACE_NAME, false)) {
+                Microbot.status = "Withdrawing spare necklaces";
+                Rs2Bank.withdrawX(BINDING_NECKLACE_ID, spareShort);
+                Rs2Random.wait(300, 700);
+            }
+        }
+
+        // One secondary talisman per altar click; a combo trip is one click, so one talisman is
+        // enough. Withdraw only if we are not already holding one (talismans do not stack).
+        if (!Rs2Inventory.hasItem(comboRune.getSecondaryTalismanId())) {
+            Microbot.status = "Withdrawing " + comboRune.getSecondaryTalismanName();
+            Rs2Bank.withdrawOne(comboRune.getSecondaryTalismanId());
+            Rs2Random.wait(300, 700);
+        }
+
+        // Size the essence/secondary-rune batch from the free slots that remain after gear, spares,
+        // the secondary talisman and one slot reserved for the (stackable) secondary rune. Withdraw
+        // an equal count of each so every essence has a rune to bind with (1:1) and none is wasted.
+        int essenceBatch = Rs2Inventory.emptySlotCount() - 1; // reserve one slot for the rune stack
+        if (essenceBatch < 1) {
+            Microbot.showMessage("Not enough inventory space for combo crafting. Reduce spare necklaces.");
+            super.shutdown();
+            return;
+        }
+        Microbot.status = "Withdrawing essence";
+        Rs2Bank.withdrawX(essenceId, essenceBatch);
+        Rs2Inventory.waitForInventoryChanges(1800);
+
+        int essenceHeld = Rs2Inventory.count(essenceId);
+        if (essenceHeld < 1) {
+            Microbot.showMessage("No " + essenceName + " withdrawn for combo crafting.");
+            super.shutdown();
+            return;
+        }
+        Microbot.status = "Withdrawing " + comboRune.getSecondaryRuneName();
+        Rs2Bank.withdrawX(comboRune.getSecondaryRuneId(), essenceHeld);
+        Rs2Inventory.waitForInventoryChanges(1800);
+
+        Rs2Random.wait(300, 700);
         Rs2Bank.closeBank();
         state = State.WALKING_TO_ALTAR;
     }

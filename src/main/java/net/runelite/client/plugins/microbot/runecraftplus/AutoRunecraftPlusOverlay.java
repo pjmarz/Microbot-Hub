@@ -10,11 +10,13 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.ButtonComponent;
 import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
+import net.runelite.http.api.item.ItemPrice;
 
 import javax.inject.Inject;
 import java.awt.*;
 import java.text.NumberFormat;
 import java.time.Duration;
+import java.util.List;
 
 public class AutoRunecraftPlusOverlay extends OverlayPanel {
     private static final Color TITLE_COLOR = new Color(0, 170, 0);
@@ -108,6 +110,30 @@ public class AutoRunecraftPlusOverlay extends OverlayPanel {
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
+                // GP/hr: NET = runePrice * runesCrafted - essencePrice * essenceUsed, over runtime.
+                // The script counts craft actions, not runes, so we derive both from Runecraft XP:
+                // essenceUsed = xpGained / altar.xpPerEssence (exact -- bonus runes give no extra XP),
+                // and runesCrafted is estimated as 1 rune per essence (lower bound; the multiple-runes
+                // -per-essence bonus at higher levels is not counted, so this under-states profit at
+                // high levels). The "~" marks this estimate. runePrice is name-resolved + cached (the
+                // altar enum carries only the rune name, not its item id); essencePrice is a direct id
+                // lookup. Guards runtime 0 and price 0. NET can be negative (essence dearer than rune).
+                long gpPerHour = 0;
+                Altars activeAltar = script.getAltar();
+                if (activeAltar != null && runtimeMillis > 1000 && activeAltar.getXpPerEssence() > 0) {
+                    long essenceUsed = Math.round(xpGained / activeAltar.getXpPerEssence());
+                    long runesCrafted = essenceUsed; // lower bound: 1 rune per essence
+                    int runePrice = runePrice(activeAltar);
+                    int essencePrice = Microbot.getItemManager().getItemPrice(script.getEssenceId());
+                    long net = runePrice * runesCrafted - (long) essencePrice * essenceUsed;
+                    gpPerHour = net * 3600000L / runtimeMillis;
+                }
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("GP/hr:")
+                        .right("~" + NumberFormat.getInstance().format(gpPerHour))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("Runtime:")
                         .right(formatDuration(Duration.ofMillis(runtimeMillis)))
@@ -140,5 +166,41 @@ public class AutoRunecraftPlusOverlay extends OverlayPanel {
 
     private String formatDuration(Duration duration) {
         return String.format("%02d:%02d:%02d", duration.toHours(), duration.toMinutesPart(), duration.toSecondsPart());
+    }
+
+    // Cache the resolved rune item id so the name search runs only when the active altar changes,
+    // not every render frame. search() scans the whole item database; getItemPrice by id is cheap.
+    private Altars cachedRuneAltar;
+    private int cachedRuneId = 0;
+
+    /**
+     * GE price of the rune crafted at {@code altar}. The altar enum carries the rune's display name
+     * (e.g. "Fire Rune") but not its item id, so we resolve the id once via the item manager's name
+     * search (exact match) and cache it. Returns 0 when no item matches, so the overlay shows GP/hr 0
+     * rather than mispricing.
+     */
+    private int runePrice(Altars altar) {
+        if (altar != cachedRuneAltar) {
+            cachedRuneAltar = altar;
+            cachedRuneId = resolveRuneId(altar);
+        }
+        return cachedRuneId > 0 ? Microbot.getItemManager().getItemPrice(cachedRuneId) : 0;
+    }
+
+    private int resolveRuneId(Altars altar) {
+        String runeName = altar.getRuneName();
+        if (runeName == null) {
+            return 0;
+        }
+        List<ItemPrice> matches = Microbot.getItemManager().search(runeName);
+        if (matches == null || matches.isEmpty()) {
+            return 0;
+        }
+        for (ItemPrice match : matches) {
+            if (match.getName() != null && match.getName().equalsIgnoreCase(runeName)) {
+                return match.getId();
+            }
+        }
+        return 0;
     }
 }

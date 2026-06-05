@@ -19,11 +19,16 @@ import net.runelite.client.config.ConfigSection;
         "<p></p>" +
         "<p>5. <strong>League mode:</strong> presses an arrow key to defeat the idle logout.</p>" +
         "<p></p>" +
-        "<p>6. <strong>Speed mode:</strong> disables Microbot antiban for a faster, more detectable pace. Throwaway accounts only.</p>")
+        "<p>6. <strong>Speed mode:</strong> disables Microbot antiban for a faster, more detectable pace. Throwaway accounts only.</p>" +
+        "<p></p>" +
+        "<p>7. <strong>Combo rune:</strong> members only. Leave on None for normal single-rune crafting. When set to a combination rune the bot ignores the Altar choice above, walks to the correct element altar, wears a binding necklace for a guaranteed bind, crafts, and re-equips a fresh necklace whenever the worn one crumbles. Keep these in your bank: pure essence, the secondary element's runes, the secondary element's talisman, and a stack of binding necklaces. Mist needs level 6 (Air altar, Water), Dust 10 (Earth altar, Air), Mud 13 (Earth altar, Water), Smoke 15 (Fire altar, Air), Steam 19 (Fire altar, Water), Lava 23 (Fire altar, Earth). Pouches are turned off in combo mode. Magic Imbue is not used yet.</p>")
 public interface AutoRunecraftPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)
     String generalSection = "general";
+
+    @ConfigSection(name = "Combo runes", description = "Combination-rune crafting (members)", position = 1, closedByDefault = true)
+    String comboSection = "combo";
 
     @ConfigItem(
             keyName = "altar",
@@ -111,5 +116,30 @@ public interface AutoRunecraftPlusConfig extends Config {
     )
     default boolean speedMode() {
         return false;
+    }
+
+    @ConfigItem(
+            keyName = "comboRune",
+            name = "Combo rune",
+            description = "Combination rune to craft. None keeps normal single-rune crafting (uses the Altar above). "
+                    + "Any other choice overrides the Altar, carries the secondary runes plus binding necklaces, and binds "
+                    + "at the correct altar. Members only.",
+            position = 0,
+            section = comboSection
+    )
+    default ComboRune comboRune() {
+        return ComboRune.NONE;
+    }
+
+    @ConfigItem(
+            keyName = "spareBindingNecklaces",
+            name = "Spare necklaces",
+            description = "How many binding necklaces to keep in the inventory as spares in addition to the one worn. "
+                    + "A worn necklace lasts 16 altar clicks, so a small buffer covers a long trip. Ignored when Combo rune is None.",
+            position = 1,
+            section = comboSection
+    )
+    default int spareBindingNecklaces() {
+        return 3;
     }
 }

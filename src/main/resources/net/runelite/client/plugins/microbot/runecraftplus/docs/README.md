@@ -14,6 +14,7 @@ Auto Runecraft Plus runs essence to a runecrafting altar and crafts runes on a c
 | **Essence type** | Craft with Rune, Pure, or Daeyalt essence. Pure and Rune give identical XP; pick by cost. Daeyalt gives +50% XP but is members-only. |
 | **Pouch support** | Fills and empties essence pouches each trip to carry more essence per run. Members-only. |
 | **Pouch repair** | Repairs degraded pouches via NPC Contact if you are on the Lunar spellbook. Members-only. |
+| **Combination runes** | Crafts mist, dust, mud, smoke, steam, or lava runes using the binding-necklace method. The bot carries pure essence plus the secondary element's runes and talisman, wears a binding necklace for a guaranteed bind, and swaps in a fresh necklace when the worn one crumbles. Members-only. |
 | **Stop after (minutes)** | Auto-shuts down after the set number of runtime minutes. 0 disables the limit. |
 | **Stop after (XP gained)** | Auto-shuts down after gaining the set amount of Runecraft XP. 0 disables the limit. |
 | **Target level** | Stops when your Runecraft level reaches the target, banking the inventory first for a clean exit. 0 disables. |
@@ -29,7 +30,7 @@ Auto Runecraft Plus runs essence to a runecrafting altar and crafts runes on a c
 - A talisman or tiara for your chosen altar in the bank
 - Essence of the chosen type in the bank
 - F2P friendly for Air, Earth, Water, Fire, and Body altars
-- Members account required for: Nature altar, pouch use, pouch repair (Lunar spellbook + NPC Contact), and Daeyalt essence (Sins of the Father quest + access to the Darkmeyer daeyalt mine)
+- Members account required for: Nature altar, pouch use, pouch repair (Lunar spellbook + NPC Contact), Daeyalt essence (Sins of the Father quest + access to the Darkmeyer daeyalt mine), and combination runes (binding necklaces + secondary runes and talismans in the bank)
 
 ---
 
@@ -54,12 +55,35 @@ Enable **Use pouches** if you have essence pouches banked and want to carry more
 
 Use the three **stop conditions** - Stop after (minutes), Stop after (XP gained), and Target level - to schedule unattended sessions with a defined endpoint. Setting all three to 0 runs indefinitely.
 
+### Combination runes
+
+Open the **Combo runes** section and set **Combo rune** to the combination rune you want. Leave it on None for normal single-rune crafting. When set, the bot ignores the Altar picker, walks to the correct element altar, and binds the combo rune. Keep these in your bank:
+
+- Pure essence
+- The secondary element's runes (one per essence)
+- The secondary element's talisman (one is consumed per altar trip)
+- A stack of binding necklaces
+
+Recipes and level requirements (members):
+
+| Combo rune | Level | Altar | Carry |
+|------------|-------|-------|-------|
+| Mist | 6 | Air | Water runes + Water talisman |
+| Dust | 10 | Earth | Air runes + Air talisman |
+| Mud | 13 | Earth | Water runes + Water talisman |
+| Smoke | 15 | Fire | Air runes + Air talisman |
+| Steam | 19 | Fire | Water runes + Water talisman |
+| Lava | 23 | Fire | Earth runes + Earth talisman |
+
+The worn binding necklace guarantees every bind succeeds and lasts 16 altar trips before it crumbles. Set **Spare necklaces** to how many extras to keep in the inventory so the bot can swap in a fresh one without a bank trip. Pouches are turned off automatically in combo mode so essence and the secondary runes stay matched one to one.
+
 ---
 
 ## Limitations
 
 - Supported altars are Air, Earth, Water, Fire, Body, and Nature only. Cosmic, Chaos, Law, Death, and others are not implemented.
+- Combination runes cover mist, dust, mud, smoke, steam, and lava (the combos craftable at the Air, Earth, Water, and Fire altars). They are members-only and need the level shown in the table above.
 - GOTR, Ourania/ZMI, Abyss, Astral, and Arceuus blood/soul runecrafting are separate Hub plugins and are not covered here.
 - Pouch filling and repair require a members account. Repair additionally requires the Lunar spellbook and completion of the Lunar Diplomacy quest chain.
 - Daeyalt essence requires a members account and completion of Sins of the Father.
-- Lava runes and combination runes are not supported.
+- The Magic Imbue method (binding combos without a talisman) is not implemented yet; the bot uses the binding-necklace method only.

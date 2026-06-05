@@ -14,8 +14,8 @@ import java.awt.*;
 
 @PluginDescriptor(
         name = PluginDescriptor.Mocrosoft + "Auto Runecraft Plus",
-        description = "Runs essence to an altar and crafts runes, with pouches (fill/empty/repair) and rune/pure/daeyalt essence. Stop conditions, target level, overlay/pause.",
-        tags = {"runecraft", "runecrafting", "rc", "microbot", "plus"},
+        description = "Runs essence to an altar and crafts runes, with pouches (fill/empty/repair), rune/pure/daeyalt essence, and binding-necklace combination runes (mist, dust, mud, smoke, steam, lava). Stop conditions, target level, overlay/pause.",
+        tags = {"runecraft", "runecrafting", "rc", "microbot", "plus", "combination", "combo"},
         authors = {"ChillX", "pjmarz"},
         version = AutoRunecraftPlusPlugin.version,
         minClientVersion = "2.0.13",
@@ -26,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoRunecraftPlusPlugin extends Plugin {
-    public static final String version = "0.2.2";
+    public static final String version = "0.3.0";
 
     @Inject
     private AutoRunecraftPlusConfig config;
