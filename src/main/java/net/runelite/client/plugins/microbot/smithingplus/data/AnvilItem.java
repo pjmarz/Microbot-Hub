@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
  *
  * <h2>Audit log</h2>
  * <ul>
- *   <li><b>2026-05-14 (Pilot #3 v0.1.0):</b> Forked from {@code varrockanvil/enums/AnvilItem.java}
+ *   <li><b>Origin:</b> Forked from {@code varrockanvil/enums/AnvilItem.java}
  *       v1.0.3. 26 items, child IDs and bar counts copied verbatim (dropped MOLTEN_GLASS-style
  *       carryover; trimmed to anvil-only items). Levels NOT included (deferred to v0.2.0; bot
  *       trusts user's Bar+Item combo for v0.1.0).</li>

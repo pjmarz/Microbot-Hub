@@ -14,18 +14,19 @@ import java.awt.*;
 
 @PluginDescriptor(
         name = PluginDescriptor.Mocrosoft + "Auto Smithing Plus",
-        description = "Smiths bars into items at a configured anvil. Pick a Bar + Item + Anvil; bot walks there, banks bars, smiths, repeats. Pilot #3 of the SPT.",
+        description = "Smiths bars into items at a configured anvil. Pick a Bar, Item and Anvil; the bot walks there, banks bars, smiths, and repeats. Part of the Plus suite.",
         tags = {"smithing", "anvil", "microbot", "plus"},
+        authors = {"StickToTheScript", "pjmarz"},
         version = AutoSmithingPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AutoSmithingPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AutoSmithingPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class AutoSmithingPlusPlugin extends Plugin {
-    public static final String version = "0.6.2";
+    public static final String version = "0.6.3";
 
     @Inject
     private AutoSmithingPlusConfig config;
@@ -68,7 +69,7 @@ public class AutoSmithingPlusPlugin extends Plugin {
         overlayManager.remove(overlay);
     }
 
-    /** Polish-Cycle 2 v0.3.0: overlay reads script stats via this getter. */
+    /** overlay reads script stats via this getter. */
     public AutoSmithingPlusScript getScript() {
         return script;
     }

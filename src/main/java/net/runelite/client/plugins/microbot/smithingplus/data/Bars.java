@@ -18,12 +18,12 @@ import java.util.Map;
  *   <li>Bar names + IDs: <a href="https://oldschool.runescape.wiki/w/Smithing/Smelting_bars">OSRS Wiki — Smelting bars</a></li>
  *   <li>Smithing level requirements (to smelt): same wiki page</li>
  *   <li>Item IDs: RuneLite client constants ({@code net.runelite.api.gameval.ItemID})</li>
- *   <li>Copied from {@code smeltingplus/data/Bars.java} (Pilot #2 v0.1.1)</li>
+ *   <li>Copied from {@code smeltingplus/data/Bars.java}</li>
  * </ul>
  *
  * <h2>Audit log</h2>
  * <ul>
- *   <li><b>2026-05-14 (Pilot #3 v0.1.0):</b> Copied from smeltingplus/data/Bars.java with package
+ *   <li><b>Origin:</b> Copied from smeltingplus/data/Bars.java with package
  *       rename. smeltingplus's copy was audited at v0.1.1 (no corrections). Dropped MOLTEN_GLASS
  *       entry (only smelted, not smithed at an anvil). Re-audit if upstream smelting bumps the
  *       smelting table or if OSRS publishes a smithing rework.</li>

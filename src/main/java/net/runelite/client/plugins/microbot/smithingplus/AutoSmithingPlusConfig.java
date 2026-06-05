@@ -10,21 +10,34 @@ import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
 @ConfigGroup("SmithingPlus")
 @ConfigInformation("<h2>Auto Smithing Plus</h2>" +
         "<h3>Version: " + AutoSmithingPlusPlugin.version + "</h3>" +
-        "<p>1. <strong>Bar:</strong> the bar tier to smith. Must already be in your bank.</p>" +
+        "<h3>General</h3>" +
+        "<p>1. <strong>Bar:</strong> the bar tier to smith. The bars must already be in your bank.</p>" +
         "<p></p>" +
-        "<p>2. <strong>Item:</strong> what to make at the anvil. Each item uses a fixed number of bars. Bigger items give more XP per hour.</p>" +
+        "<p>2. <strong>Item:</strong> what to make at the anvil. Each item uses a fixed number of bars, and bigger items give more XP per hour. Some picks are members only and will refuse to start on free worlds.</p>" +
         "<p></p>" +
-        "<p>3. <strong>Anvil:</strong> the anvil to walk to. AUTO_NEAREST picks the closest. The Lumbridge rusted anvil is bronze bars only (object 39620).</p>" +
+        "<p>3. <strong>Progressive mode:</strong> ignore the Item pick and smith the best item your Smithing level can make at the chosen bar tier. It skips members items on free worlds.</p>" +
         "<p></p>" +
-        "<p>4. <strong>Max players in area:</strong> hop worlds if more players than this are within Distance to Stray. 0 disables hopping.</p>" +
+        "<p>4. <strong>Anvil:</strong> the anvil to walk to and anchor at. Auto nearest picks the closest. The Lumbridge rusted anvil takes bronze bars only.</p>" +
         "<p></p>" +
-        "<p>5. <strong>League mode:</strong> presses an arrow key to reset the idle logout timer.</p>" +
+        "<p>5. <strong>Distance to stray:</strong> how far the bot may wander from the anvil tile. This is also the radius used to count nearby players for world hopping.</p>" +
         "<p></p>" +
-        "<p>6. <strong>Preferred bank:</strong> override the nearest by distance choice.</p>" +
+        "<p>6. <strong>Max players in area:</strong> hop worlds when more players than this are within Distance to stray. Set 0 to never hop.</p>" +
         "<p></p>" +
-        "<p>7. <strong>Items to bank / keep:</strong> comma separated lists matched on item name. Items to bank wins; if empty it deposits all except your keep list.</p>" +
+        "<p>7. <strong>League mode:</strong> presses an arrow key now and then to reset the idle logout timer.</p>" +
         "<p></p>" +
-        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban. Throwaway accounts only.</p>")
+        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban for a faster but more detectable bot. Use throwaway accounts only.</p>" +
+        "<p></p>" +
+        "<p>9. <strong>Stop conditions:</strong> the bot shuts down when any limit you set is reached. Stop after minutes caps runtime, Stop after XP caps Smithing XP gained, and Target level stops once your Smithing level reaches it. Each value of 0 means no limit. The bot deposits its inventory before stopping.</p>" +
+        "<p></p>" +
+        "<h3>Banking</h3>" +
+        "<p>10. <strong>Use bank:</strong> run the full loop of bank, withdraw bars and hammer, walk to the anvil, smith, then deposit the finished items.</p>" +
+        "<p></p>" +
+        "<p>11. <strong>Preferred bank:</strong> override the closest by distance choice with a specific bank.</p>" +
+        "<p></p>" +
+        "<p>12. <strong>Items to bank and keep:</strong> two comma separated lists matched against item names. Items to bank wins. Leave it empty to deposit everything except your keep list. Keep defaults hold the hammer and any bar you are smithing.</p>" +
+        "<p></p>" +
+        "<h3>Dropping</h3>" +
+        "<p>13. <strong>Drop order:</strong> not used. Smithing always banks the finished items.</p>")
 public interface AutoSmithingPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)
@@ -93,9 +106,6 @@ public interface AutoSmithingPlusConfig extends Config {
         return 20;
     }
 
-    /**
-     * Cycle B v0.2.0 borrow from MiningPlus / WC. Anti-PK / busy-anvil safety.
-     */
     @ConfigItem(
             keyName = "maxPlayersInArea",
             name = "Max players in area",
@@ -107,9 +117,6 @@ public interface AutoSmithingPlusConfig extends Config {
         return 0;
     }
 
-    /**
-     * Cycle B v0.2.0 borrow from MiningPlus. Defends against the game's idle-logout.
-     */
     @ConfigItem(
             keyName = "leagueMode",
             name = "League mode (anti-AFK)",
@@ -132,9 +139,6 @@ public interface AutoSmithingPlusConfig extends Config {
         return false;
     }
 
-    /**
-     * Polish-Cycle 2 v0.3.0: runtime/XP threshold for auto-shutdown.
-     */
     @ConfigItem(
             keyName = "stopAfterMinutes",
             name = "Stop after (minutes)",
@@ -158,8 +162,8 @@ public interface AutoSmithingPlusConfig extends Config {
     }
 
     /**
-     * v0.5.0: target-level threshold. When Smithing level reaches this value, the script
-     * runs one final deposit pass then shuts down. 0 = disabled.
+     * When Smithing level reaches this value, the script runs one final deposit pass
+     * then shuts down. 0 disables the check.
      */
     @ConfigItem(
             keyName = "targetLevel",
@@ -172,8 +176,8 @@ public interface AutoSmithingPlusConfig extends Config {
         return 0;
     }
 
-    // v0.5.1: paused config item removed. Pause is now an overlay button toggling
-    // Microbot.pauseAllScripts (shared global flag). See AutoSmithingPlusOverlay.
+    // Pause is an overlay button that toggles the shared Microbot.pauseAllScripts flag.
+    // See AutoSmithingPlusOverlay.
 
     // --- Banking section ---
 
@@ -200,8 +204,8 @@ public interface AutoSmithingPlusConfig extends Config {
     }
 
     /**
-     * Cycle B v0.2.0 borrow. CSV inclusion list (substring match) replaces the v0.1.0
-     * hardcoded depositAllExcept(HAMMER, barId) call. Default empty = use itemsToKeep instead.
+     * Comma separated inclusion list matched as substrings against item names.
+     * Leave empty to fall back to the keep list instead.
      */
     @ConfigItem(
             keyName = "itemsToBank",
@@ -215,8 +219,8 @@ public interface AutoSmithingPlusConfig extends Config {
     }
 
     /**
-     * Cycle B v0.2.0 borrow. Defaults preserve the smithing setup (hammer + selected bar) so the
-     * bot never deposits the tools it needs to keep working.
+     * Defaults preserve the smithing setup (hammer plus selected bar) so the bot never
+     * deposits the tools it needs to keep working.
      */
     @ConfigItem(
             keyName = "itemsToKeep",
@@ -234,7 +238,7 @@ public interface AutoSmithingPlusConfig extends Config {
     @ConfigItem(
             keyName = "dropOrder",
             name = "Drop order",
-            description = "Reserved for parity with MiningPlus. Smithing always banks; unused at v0.2.0.",
+            description = "Not used. Smithing always banks the finished items.",
             position = 0,
             section = droppingSection
     )

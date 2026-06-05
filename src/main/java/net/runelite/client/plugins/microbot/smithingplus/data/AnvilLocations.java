@@ -26,7 +26,7 @@ import java.util.List;
  *
  * <h2>Audit log</h2>
  * <ul>
- *   <li><b>2026-05-14 (Pilot #3 v0.1.0):</b> Initial entries from {@code tools/wiki-audit-anvils.ps1}
+ *   <li><b>Origin:</b> Initial entries from {@code tools/wiki-audit-anvils.ps1}
  *       run against the wiki. Two F2P anvils included: Varrock West (regular anvil, coord verified
  *       from upstream VarrockAnvil's {@code (3188, 3426, 0)}) and Lumbridge (Rusted anvil at object
  *       ID 39620, bronze-only). Walk-to coord for Lumbridge uses the adjacent Smiths' building

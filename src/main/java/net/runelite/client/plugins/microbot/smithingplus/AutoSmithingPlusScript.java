@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * AutoSmithingPlus v0.2.0 (Cycle B of the polish cycle).
+ * AutoSmithingPlus v0.2.0.
  *
  * <p>v0.1.0 shipped the auto-travel MVP + bank cycle + speed mode. v0.2.0 adds:
  * <ul>
@@ -59,7 +59,7 @@ public class AutoSmithingPlusScript extends Script {
 
     State state = State.SMITHING;
 
-    // Polish-Cycle 2 v0.3.0: runtime stats tracking (read by AutoSmithingPlusOverlay).
+    // runtime stats tracking (read by AutoSmithingPlusOverlay).
     private long startTimeMillis = 0;
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
@@ -83,7 +83,7 @@ public class AutoSmithingPlusScript extends Script {
         initialPlayerLocation = null;
         state = State.SMITHING;
 
-        // Polish-Cycle 2 v0.3.0: seed stats trackers from client thread.
+        // seed stats trackers from client thread.
         startTimeMillis = System.currentTimeMillis();
         startSkillXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getSkillExperience(Skill.SMITHING)).orElse(0);
@@ -152,7 +152,7 @@ public class AutoSmithingPlusScript extends Script {
                     return;
                 }
 
-                // Polish-Cycle 2 v0.3.0: stopAfterMinutes / stopAfterXp threshold check.
+                // stopAfterMinutes / stopAfterXp threshold check.
                 if (config.stopAfterMinutes() > 0
                         && (System.currentTimeMillis() - startTimeMillis) / 60000 >= config.stopAfterMinutes()) {
                     Microbot.log("AutoSmithingPlus: reached stopAfterMinutes (" + config.stopAfterMinutes()
@@ -241,13 +241,13 @@ public class AutoSmithingPlusScript extends Script {
     @Override
     public void shutdown() {
         // v0.5.8: reset the disableTeleports flag set in run() so it doesn't leak to the next
-        // plugin that uses Rs2Walker. Parity with the AutoSmeltingPlus v0.5.9 lifecycle fix.
+        // plugin that uses Rs2Walker. Matches the AutoSmeltingPlus lifecycle fix.
         Rs2Walker.disableTeleports = false;
         super.shutdown();
         Rs2Antiban.resetAntibanSettings();
     }
 
-    // --- Autohop (Cycle B v0.2.0) ---
+    // --- Autohop ---
 
     private boolean hopIfCrowded(AutoSmithingPlusConfig config) {
         int maxPlayers = config.maxPlayersInArea();
@@ -359,7 +359,7 @@ public class AutoSmithingPlusScript extends Script {
         // Click the chosen item's child slot.
         Rs2Widget.clickWidget(ANVIL_WIDGET_CONTAINER, item.getChildId());
         sleep(600, 1200);
-        actionsCompleted++; // Polish-Cycle 2 v0.3.0: count completed smith cycles
+        actionsCompleted++; // count completed smith cycles
     }
 
     // --- RESETTING state ---
@@ -374,7 +374,7 @@ public class AutoSmithingPlusScript extends Script {
         Rs2Player.waitForWalking();
         sleep(600, 1200);
 
-        // CSV-driven deposit (Cycle B v0.2.0). Inclusion list wins; exclusion list as fallback.
+        // CSV-driven deposit. Inclusion list wins; exclusion list as fallback.
         depositByCsv(config);
         AnvilItem item = activeItem(config);
         sleepUntil(() -> !Rs2Inventory.hasItem(item.getName()), 3000);
