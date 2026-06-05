@@ -15,7 +15,7 @@ import javax.inject.Inject;
 import java.awt.*;
 
 /**
- * EventDismissPlus -- Pilot #5 of the Skill Plus Template (SPT) lineage.
+ * EventDismissPlus is part of the Microbot Plus suite.
  *
  * <p>Random event handling as a companion plugin. Registers two {@link
  * net.runelite.client.plugins.microbot.BlockingEvent}s with Microbot's global event manager:
@@ -36,17 +36,17 @@ import java.awt.*;
         name = PluginDescriptor.Mocrosoft + "Event Dismiss Plus",
         description = "Plus fork of EventDismiss. Random event handling with variable delays, Genie lamp auto-skill detection, and engagement with 10 high-value events. Companion plugin: enable alongside any other plugin.",
         tags = {"random", "events", "antiban", "plus"},
-        authors = {"Mocrosoft", "Pete (Plus fork)"},
+        authors = {"pjmarz"},
         version = EventDismissPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/EventDismissPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/EventDismissPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class EventDismissPlusPlugin extends Plugin {
-    public static final String version = "0.2.2";
+    public static final String version = "0.2.4";
 
     @Inject
     private EventDismissPlusConfig config;

@@ -15,10 +15,10 @@ import net.runelite.client.config.Range;
 @ConfigGroup("EventDismissPlus")
 @ConfigInformation("<h2>Event Dismiss Plus</h2>" +
         "<h3>Version: " + EventDismissPlusPlugin.version + "</h3>" +
-        "<p>Companion plugin -- enable alongside any skill plugin (Mining/Smelting/Smithing/WC, AIO Fighter, etc.) to handle random events automatically.</p>" +
+        "<p>Companion plugin: enable alongside any skill plugin (Mining/Smelting/Smithing/WC, AIO Fighter, etc.) to handle random events automatically.</p>" +
         "<p><strong>Default behavior:</strong> dismiss everything with a 2-5 second human-like delay. Engage with high-value events (Genie lamps, food drops, Frog Token, etc.) per the toggles below.</p>" +
         "<p><strong>Genie lamps</strong> auto-detect the skill you're currently training (via XP delta tracking over a 30-second rolling window) and apply there. Falls back to the configured skill if auto-detect finds nothing.</p>" +
-        "<p>Uses Microbot's global BlockingEvent framework -- interrupts any running script when an event fires, then resumes.</p>")
+        "<p>Uses Microbot's global BlockingEvent framework: it interrupts any running script when an event fires, then resumes.</p>")
 public interface EventDismissPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "Response delay + general settings", position = 0)
@@ -35,7 +35,7 @@ public interface EventDismissPlusConfig extends Config {
     @ConfigItem(
             keyName = "responseDelayMin",
             name = "Response delay min (ms)",
-            description = "Minimum delay before dismissing or engaging a random event. Anti-detection -- instant dismiss is a bot signal.",
+            description = "Minimum delay before dismissing or engaging a random event. Anti-detection: instant dismiss is a bot signal.",
             position = 0,
             section = generalSection
     )
@@ -59,7 +59,7 @@ public interface EventDismissPlusConfig extends Config {
     @ConfigItem(
             keyName = "globalSkipChance",
             name = "Random Skip Chance %",
-            description = "v0.2.0: probability (0-100) of skipping engagement and just dismissing, even when the per-event toggle is ON. Adds variability for antiban -- humans don't engage every random event. 0 = never skip (always engage when configured), 100 = always skip.",
+            description = "Probability (0-100) of skipping engagement and just dismissing, even when the per-event toggle is ON. Adds variability for antiban: humans don't engage every random event. 0 = never skip (always engage when configured), 100 = always skip.",
             position = 2,
             section = generalSection
     )

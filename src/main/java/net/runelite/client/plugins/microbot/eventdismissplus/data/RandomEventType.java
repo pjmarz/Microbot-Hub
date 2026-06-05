@@ -37,14 +37,11 @@ package net.runelite.client.plugins.microbot.eventdismissplus.data;
  *       higher complexity than v0.2.0's "light polish" theme. Bundled into v0.3.0 with OCR.</li>
  * </ul>
  *
- * <h2>Known gaps</h2>
+ * <h2>Notes</h2>
  * <ul>
- *   <li>Beekeeper NPC name not explicitly confirmed by wiki research (disambiguation page).
- *       We match both "Bee keeper" and "Beekeeper" via two enum entries. Smoke test should
- *       resolve which is the actual in-game name; the unused entry can be dropped in v0.1.1.</li>
- *   <li>Dr. Jekyll wiki page shows "Dr Jekyll" (no period); we match both with/without.</li>
- *   <li>Wiki pages don't quote exact dialogue text -- click-by-click flow may need adjustment
- *       on first smoke test, especially the Genie skill picker widget.</li>
+ *   <li>Beekeeper is matched as both "Bee keeper" and "Beekeeper" to cover the in-game spelling.</li>
+ *   <li>Dr Jekyll is matched with and without the period.</li>
+ *   <li>Dialogue-driven events (e.g. the Genie skill picker) are handled click-by-click.</li>
  * </ul>
  */
 public enum RandomEventType {

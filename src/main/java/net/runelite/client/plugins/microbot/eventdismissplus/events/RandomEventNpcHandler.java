@@ -125,7 +125,7 @@ public class RandomEventNpcHandler implements BlockingEvent {
                         EventDismissPlusEventLog.Outcome.OK, skipNote == null ? "" : skipNote);
             }
         } catch (Exception ex) {
-            Microbot.log("RandomEventNpcHandler error handling " + name + ": " + ex.getMessage());
+            Microbot.logStackTrace("RandomEventNpcHandler (" + name + ")", ex);
             EventDismissPlusEventLog.append(name,
                     engage ? EventDismissPlusEventLog.Action.ENGAGE : EventDismissPlusEventLog.Action.DISMISS,
                     EventDismissPlusEventLog.Outcome.ERROR,
