@@ -15,6 +15,7 @@ import net.runelite.client.plugins.microbot.util.antiban.Rs2AntibanSettings;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
 import net.runelite.client.plugins.microbot.util.bank.enums.BankLocation;
 import net.runelite.client.plugins.microbot.util.combat.Rs2Combat;
+import net.runelite.client.plugins.microbot.util.depositbox.Rs2DepositBox;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
 import net.runelite.client.plugins.microbot.util.grounditem.LootingParameters;
 import net.runelite.client.plugins.microbot.util.grounditem.Rs2GroundItem;
@@ -59,6 +60,10 @@ public class AutoWoodcuttingPlusScript extends Script {
     );
 
     public static final int FORESTRY_DISTANCE = 15;
+    // Corsair Cove Resource Area deposit box. Captured in-game via the agent server; same point
+    // the fishing Plus plugin uses for this spot. F2P maple/yew trains here, so banking deposits
+    // logs at this box instead of the long walk to a full bank.
+    private static final WorldPoint CORSAIR_COVE_DEPOSIT_BOX = new WorldPoint(2569, 2862, 0);
     private static final List<WoodcuttingTree> PROGRESSIVE_TREE_ORDER = List.of(
             WoodcuttingTree.TREE,
             WoodcuttingTree.OAK,
@@ -425,6 +430,11 @@ public class AutoWoodcuttingPlusScript extends Script {
     }
 
     private boolean handleBanking(AutoWoodcuttingPlusConfig config) {
+        // Corsair Cove (F2P maple/yew) banks at the nearby deposit box instead of a far full bank.
+        if (shouldUseDepositBox()) {
+            return handleDepositBoxBanking(config);
+        }
+
         BankLocation nearestBank = Rs2Bank.getNearestBank();
         boolean isBankOpen = Rs2Bank.isNearBank(nearestBank, 8) ? Rs2Bank.openBank() : Rs2Bank.walkToBankAndUseBank(nearestBank);
         if (!isBankOpen || !Rs2Bank.isOpen()) return false;
@@ -440,6 +450,57 @@ public class AutoWoodcuttingPlusScript extends Script {
 
         Rs2Bank.closeBank();
         sleepUntil(() -> !Rs2Bank.isOpen());
+
+        Rs2Walker.walkTo(getReturnPoint(config));
+        return true;
+    }
+
+    /**
+     * True when the current spot banks via a deposit box rather than a full bank. In progressive
+     * mode the resolved {@link #activeLocation} carries the flag. Outside progressive mode the
+     * location data is not resolved, so we fall back to proximity to the Corsair Cove deposit box
+     * (the only deposit-box spot the picker offers).
+     */
+    private boolean shouldUseDepositBox() {
+        if (activeLocation != null && activeLocation.isUseDepositBox()) {
+            return true;
+        }
+        WorldPoint here = Rs2Player.getWorldLocation();
+        return here != null && here.distanceTo(CORSAIR_COVE_DEPOSIT_BOX) <= 30;
+    }
+
+    /**
+     * Deposit-box banking for Corsair Cove. Walks to the deposit box, deposits the same items the
+     * full-bank flow deposits (the itemsToBank list plus the fletching output), then walks back to
+     * the return point. Woodcutting only ever deposits, so a box is enough. There is no log-basket
+     * empty step here: deposit boxes cannot empty a log basket, and the basket is members-only
+     * while Corsair maple/yew is F2P, so F2P trainers have no basket.
+     */
+    private boolean handleDepositBoxBanking(AutoWoodcuttingPlusConfig config) {
+        WorldPoint here = Rs2Player.getWorldLocation();
+        if (here == null || here.distanceTo(CORSAIR_COVE_DEPOSIT_BOX) > 4) {
+            Microbot.status = "Walking to Corsair Cove deposit box...";
+            if (!Rs2Player.isMoving()) {
+                Rs2Walker.walkTo(CORSAIR_COVE_DEPOSIT_BOX, 4);
+            }
+            return false;
+        }
+
+        if (!Rs2DepositBox.openDepositBox()) {
+            return false;
+        }
+        sleepUntil(Rs2DepositBox::isOpen, 3000);
+        if (!Rs2DepositBox.isOpen()) {
+            return false;
+        }
+
+        List<String> itemNames = Arrays.stream(config.itemsToBank().split(",")).map(String::toLowerCase).collect(Collectors.toList());
+        itemNames.add(config.fletchingType().getContainsInventoryName().toLowerCase());
+        Rs2DepositBox.depositAll(i -> itemNames.stream().anyMatch(itemName -> i.getName().toLowerCase().contains(itemName)));
+        Rs2Inventory.waitForInventoryChanges(1800);
+
+        Rs2DepositBox.closeDepositBox();
+        sleepUntil(() -> !Rs2DepositBox.isOpen());
 
         Rs2Walker.walkTo(getReturnPoint(config));
         return true;
@@ -737,6 +798,7 @@ public class AutoWoodcuttingPlusScript extends Script {
     @Override
     public void shutdown() {
         super.shutdown();
+        if (Rs2DepositBox.isOpen()) Rs2DepositBox.closeDepositBox();
         currentLogBasketCount = -1;
         Rs2Fletching.stopFletchingWhileMoving();
         Rs2Walker.setTarget(null);

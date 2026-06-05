@@ -32,6 +32,14 @@ public class ResourceLocationOption extends LocationOption {
     private final int numberOfResources;
 
     /**
+     * When true, banking at this location uses the nearby deposit box instead of walking to a
+     * full bank. Set only for locations whose closest banking option is a deposit box (Corsair
+     * Cove). Defaults to false; flip it on with {@link #setUseDepositBox(boolean)}.
+     */
+    @lombok.Setter
+    private boolean useDepositBox = false;
+
+    /**
      * Constructor with resource count and members-only flag.
      *
      * @param worldPoint The world coordinates of this location

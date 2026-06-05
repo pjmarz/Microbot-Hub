@@ -181,6 +181,23 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
                     .rightColor(NORMAL_TEXT_COLOR)
                     .build());
 
+            // GP/hr: gross profit (chopped logs are free, like mined ore). logPrice = GE price of
+            // the active tree's log item, logsChopped = the log counter. Raw log value only -- this
+            // does not count any fletched-product value, which is fine for v1. Guards runtime 0 and
+            // price 0 (some trees yield bark/charcoal/mushrooms with no single priced log -> 0).
+            long gpPerHour = 0;
+            if (tree != null && tree.getLogID() > 0 && secondsElapsed > 0) {
+                int logPrice = Microbot.getItemManager().getItemPrice(tree.getLogID());
+                if (logPrice > 0) {
+                    gpPerHour = (long) logsChopped * logPrice * 3600 / secondsElapsed;
+                }
+            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("GP/Hour:")
+                    .right(NumberFormat.getInstance().format(gpPerHour))
+                    .rightColor(NORMAL_TEXT_COLOR)
+                    .build());
+
             // Time running
             panelComponent.getChildren().add(LineComponent.builder()
                     .left("Time Running:")
