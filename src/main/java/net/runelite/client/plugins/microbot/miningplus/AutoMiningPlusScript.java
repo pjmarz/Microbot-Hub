@@ -340,6 +340,14 @@ public class AutoMiningPlusScript extends Script {
                                     }
                                     Rs2DepositBox.closeDepositBox();
                                 }
+                                // v0.5.17: only flip back to MINING once the pack is actually clear.
+                                // A failed or partial deposit (box closed early, item still held)
+                                // would otherwise return to MINING with a full inventory and
+                                // immediately re-trip RESETTING, looping forever. Stay in RESETTING
+                                // and retry the deposit next tick instead.
+                                if (!Rs2Inventory.isEmpty()) {
+                                    return;
+                                }
                             } else if (Rocks.BASALT == activeRock) {
                                 if (Rs2Walker.walkTo(2872, 3935, 0)) {
                                     Rs2Inventory.useItemOnNpc(ItemID.BASALT, NpcID.MY2ARM_SNOWFLAKE);

@@ -26,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoMiningPlusPlugin extends Plugin {
-    public static final String version = "0.5.16";
+    public static final String version = "0.5.17";
     @Inject
     private AutoMiningPlusConfig config;
     @Provides
