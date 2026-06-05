@@ -41,12 +41,24 @@ import java.awt.image.BufferedImage;
  *     <li>Dashboard HTML/CSS/JS deleted from the JAR.</li>
  * </ul>
  *
- * <h2>v0.2.0 known limitations</h2>
+ * <h2>v1.1.0 additions</h2>
  * <ul>
- *     <li>XP-over-time chart not yet ported (deferred to v0.2.1; Java2D paint).</li>
+ *     <li>Watchdog panel reads the external restart-helper log again and shows
+ *         health, last-seen, and uptime. Shows Unavailable when no watchdog log
+ *         is present.</li>
+ *     <li>Skills panel shows an ETA to a target level (or the next level while
+ *         training) from the rolling XP per hour.</li>
+ *     <li>Antiban State panel tells a silent stall apart from an intentional
+ *         anti-AFK pause (micro break, action cooldown, global pause, blocking
+ *         event).</li>
+ * </ul>
+ *
+ * <h2>Known limitations</h2>
+ * <ul>
  *     <li>Active scripts list is heuristic (enumerates enabled plugins).</li>
- *     <li>Watchdog status reads as "unavailable" until v0.2.x reconnects the
- *         disk log reader.</li>
+ *     <li>The blocking-event "running" flag has no public getter on the client,
+ *         so the Antiban State panel reads it by reflection and omits it when
+ *         that is not available on the running client version.</li>
  * </ul>
  */
 @PluginDescriptor(
@@ -64,7 +76,7 @@ import java.awt.image.BufferedImage;
 @Slf4j
 public class MicrobotDashboardPlusPlugin extends Plugin {
 
-    public static final String version = "1.0.1";
+    public static final String version = "1.1.0";
 
     @Inject
     private MicrobotDashboardPlusConfig config;

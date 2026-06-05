@@ -15,6 +15,7 @@ import net.runelite.client.plugins.microbot.microbotdashboardplus.data.PollSnaps
 import net.runelite.client.plugins.microbot.microbotdashboardplus.data.XpHistory;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.notify.AlertManager;
 import net.runelite.client.plugins.microbot.microbotdashboardplus.notify.DiscordNotifier;
+import net.runelite.client.plugins.microbot.util.antiban.Rs2AntibanSettings;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
 
@@ -361,6 +362,7 @@ public class GameStatePoller {
             b.activeScripts(collectActiveScripts());
             b.plusPlugins(collectPlusPlugins());
             b.watchdog(logReaders.readWatchdog());
+            b.antibanState(collectAntibanState());
             b.eventDismissStats(logReaders.readEventDismissStats());
 
             return b.build();
@@ -544,5 +546,103 @@ public class GameStatePoller {
             log.debug("collectPlusPlugins failed: {}", t.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Antiban + pause state
+    // ---------------------------------------------------------------------
+
+    /**
+     * Reads the in-process antiban and pause flags so a user can tell a silent
+     * stall (everything idle, nothing intentional) from a deliberate anti-AFK
+     * pause (a micro break or action cooldown is holding the script).
+     *
+     * <p>Reads the static {@link Rs2AntibanSettings} flags, the global
+     * {@link Microbot#pauseAllScripts} switch, and the registered
+     * blocking-event handlers. The "blocking event running" flag has no public
+     * getter, so it is read by reflection and reported as unknown (null) when
+     * that fails on the running client version.
+     */
+    private PollSnapshot.AntibanState collectAntibanState() {
+        try {
+            boolean antibanEnabled = Rs2AntibanSettings.antibanEnabled;
+            boolean cooldown = Rs2AntibanSettings.actionCooldownActive;
+            boolean microBreak = Rs2AntibanSettings.microBreakActive;
+            boolean takeMicroBreaks = Rs2AntibanSettings.takeMicroBreaks;
+
+            boolean allPaused = false;
+            try { allPaused = Microbot.pauseAllScripts != null && Microbot.pauseAllScripts.get(); }
+            catch (Throwable t) { log.debug("read pauseAllScripts failed: {}", t.getMessage()); }
+
+            int blockingCount = 0;
+            Boolean blockingRunning = null;
+            try {
+                Object mgr = Microbot.getBlockingEventManager();
+                if (mgr != null) {
+                    try {
+                        java.util.List<?> events = Microbot.getBlockingEventManager().getEvents();
+                        blockingCount = events == null ? 0 : events.size();
+                    } catch (Throwable t) {
+                        log.debug("read blocking events failed: {}", t.getMessage());
+                    }
+                    blockingRunning = readBlockingEventRunning(mgr);
+                }
+            } catch (Throwable t) {
+                log.debug("read blocking event manager failed: {}", t.getMessage());
+            }
+
+            String summary = buildAntibanSummary(allPaused, microBreak, cooldown,
+                    Boolean.TRUE.equals(blockingRunning), antibanEnabled);
+
+            return PollSnapshot.AntibanState.builder()
+                    .antibanEnabled(antibanEnabled)
+                    .actionCooldownActive(cooldown)
+                    .microBreakActive(microBreak)
+                    .takeMicroBreaks(takeMicroBreaks)
+                    .allScriptsPaused(allPaused)
+                    .blockingEventCount(blockingCount)
+                    .blockingEventRunning(blockingRunning)
+                    .summary(summary)
+                    .build();
+        } catch (Throwable t) {
+            log.debug("collectAntibanState failed: {}", t.getMessage());
+            return PollSnapshot.AntibanState.builder()
+                    .antibanEnabled(false).summary("unavailable").build();
+        }
+    }
+
+    /**
+     * The BlockingEventManager keeps its "is an event executing right now" flag
+     * private with no public getter. Probe it by reflection so we can surface a
+     * running blocker, and return null (unknown) when the field is absent or
+     * unreadable on this client version.
+     */
+    private static Boolean readBlockingEventRunning(Object manager) {
+        try {
+            java.lang.reflect.Field f = manager.getClass().getDeclaredField("isRunning");
+            f.setAccessible(true);
+            Object v = f.get(manager);
+            if (v instanceof java.util.concurrent.atomic.AtomicBoolean) {
+                return ((java.util.concurrent.atomic.AtomicBoolean) v).get();
+            }
+            if (v instanceof Boolean) {
+                return (Boolean) v;
+            }
+            return null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Plain one-line reason for the current hold. Highest-priority cause wins. */
+    private static String buildAntibanSummary(boolean allPaused, boolean microBreak,
+                                              boolean cooldown, boolean blockingRunning,
+                                              boolean antibanEnabled) {
+        if (allPaused) return "All scripts paused";
+        if (microBreak) return "Micro break in progress";
+        if (cooldown) return "Action cooldown";
+        if (blockingRunning) return "Handling a blocking event";
+        if (!antibanEnabled) return "Running (antiban off)";
+        return "Running";
     }
 }

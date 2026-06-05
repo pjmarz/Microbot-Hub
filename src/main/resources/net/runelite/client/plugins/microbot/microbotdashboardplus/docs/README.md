@@ -2,7 +2,7 @@
 
 ![preview](assets/dashboard-top.png)
 
-Microbot Dashboard Plus is a passive monitoring plugin for the Microbot RuneLite client. It opens a floating Swing window outside the game canvas with ten live-updating panels covering your session state, plus a compact sidebar panel for quick access. No HTTP server, no port binding, and no Agent Server dependency - it reads game state in-process. Part of the Microbot "Plus" suite.
+Microbot Dashboard Plus is a passive monitoring plugin for the Microbot RuneLite client. It opens a floating Swing window outside the game canvas with twelve live-updating panels covering your session state, plus a compact sidebar panel for quick access. No HTTP server, no port binding, and no Agent Server dependency - it reads game state in-process. Part of the Microbot "Plus" suite.
 
 ---
 
@@ -16,15 +16,17 @@ Microbot Dashboard Plus is a passive monitoring plugin for the Microbot RuneLite
 | **Active Scripts section** | All enabled Microbot plugins with per-plugin runtime and a Stop button per row |
 | **Plus Plugins section** | Quick start/stop grid for every plugin whose name ends in "Plus" |
 | **Inventory section** | Slot grid showing item names and quantities; noted items styled distinctly |
-| **Skills section** | All 22 skills with current level, total XP, session gain, and rolling 5-minute XP/hr |
+| **Skills section** | All 22 skills with current level, total XP, session gain, rolling 5-minute XP/hr, and an ETA to your target level |
 | **Nearby NPCs section** | NPC list sorted by distance; random-event NPCs highlighted orange |
-| **Watchdog section** | Status from the Microbot watchdog log file |
+| **Watchdog section** | Health of the external restart helper from its log file: last seen, uptime, last event, last restart, total restarts |
+| **Antiban State section** | Tells a silent stall apart from an intentional anti-AFK pause (micro break, action cooldown, global pause, blocking event) |
 | **XP Over Time chart** | Java2D line chart with skill and time-window selectors (5m to 24h) |
 | **Event Dismiss Stats section** | Per-event-type counts from the EventDismissPlus CSV log |
 | **Event Log section** | Rolling 10-entry ring buffer of login, logout, and world-hop events |
 | **Discord notifications** | Optional webhook for level-ups, random events, alert threshold crossings, and session start/stop |
 | **Alert thresholds** | Comma-separated SKILL:LEVEL pairs that fire an in-dashboard banner and optional Discord ping when crossed |
-| **Per-section visibility** | Toggle any of the ten panels on or off; the window updates immediately |
+| **Skill targets (ETA)** | Comma-separated SKILL:LEVEL pairs that drive the ETA column in the Skills section |
+| **Per-section visibility** | Toggle any of the twelve panels on or off; the window updates immediately |
 | **Auto-open on enable** | Dashboard window launches automatically when the plugin enables (configurable) |
 | **Configurable poll rate** | Refresh interval from 1 to 60 seconds |
 
@@ -63,7 +65,7 @@ The plugin config has four sections.
 - Poll interval in seconds (default 5, range 1-60) - how often to refresh from game state
 - Nearby NPCs max distance in tiles (default 20, range 1-200) - filter for the NPC section
 
-**Layout** - ten boolean toggles, one per panel, all default ON. Untick any section to hide it; the window re-evaluates immediately.
+**Layout** - twelve boolean toggles, one per panel, all default ON. Untick any section to hide it; the window re-evaluates immediately.
 
 **Notifications** - requires a Discord webhook URL in the field (masked in the UI, treated as a secret):
 - Notify on level-up (default ON)
@@ -71,7 +73,11 @@ The plugin config has four sections.
 - Notify on alert threshold crossing (default ON)
 - Notify on session start/stop (default OFF)
 
-**Alerts** - comma-separated `SKILL:LEVEL` pairs, e.g. `MINING:60, WOODCUTTING:80`. Skill names follow the OSRS API enum (uppercase). Each threshold fires exactly once per session.
+**Alerts** - two comma-separated `SKILL:LEVEL` lists:
+- Alert thresholds, e.g. `MINING:60, WOODCUTTING:80`. Each threshold fires an in-dashboard banner and optional Discord ping exactly once per session.
+- Skill targets (ETA), e.g. `MINING:70, AGILITY:60`. The Skills section shows an ETA to each target from the current XP per hour. A skill with no target still shows an ETA to its next level while it is being trained.
+
+Skill names follow the OSRS API enum (uppercase).
 
 ---
 
@@ -82,7 +88,9 @@ The plugin config has four sections.
 - Not for vanilla RuneLite users - requires Microbot client APIs
 - The Active Scripts list is heuristic: it enumerates enabled plugins rather than reading a dedicated script registry
 - The Event Dismiss Stats section requires EventDismissPlus to be installed and have logged at least one event
-- Watchdog status depends on the Microbot watchdog CSV log being present on disk
+- The Watchdog section depends on the external watchdog CSV log being present on disk; it shows Unavailable when you do not run the watchdog
+- The Antiban State section reads the blocking-event running flag by reflection; on a client version where that flag is not accessible it shows the handler count without the live running marker
+- Skill ETAs need a non-zero XP per hour to estimate; a skill that is not currently gaining XP shows no ETA unless it has already reached its target
 
 ---
 

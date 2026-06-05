@@ -4,6 +4,26 @@ Native Swing monitoring dashboard, distributed as a Microbot Hub plugin. Pilot #
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Semver-flavored.
 
+## [1.1.0] - 2026-06-05
+
+Three monitoring enhancements. Restores the Watchdog reader the v0.2.0 rewrite left as a placeholder, adds a per-skill ETA, and adds an Antiban State panel so a silent stall can be told apart from an intentional anti-AFK pause.
+
+### Added
+
+- **Antiban State panel** (`panels/AntibanStatePanel.java`). Reads in-process state only: the static `Rs2AntibanSettings` flags (antiban enabled, action cooldown active, micro break active, take micro breaks), the global `Microbot.pauseAllScripts` switch, and the `BlockingEventManager` registered-handler count. Shows a one-line state ("Running", "Micro break in progress", "Action cooldown", "All scripts paused", "Handling a blocking event"). New `showAntibanState` Layout toggle (default ON). New `AntibanState` field on `PollSnapshot`, collected each tick by `GameStatePoller.collectAntibanState()`.
+- **Per-skill ETA column** in the Skills section. Computed from the rolling XP per hour the dashboard already tracks and `Experience.getXpForLevel`. The target is read from a new **Skill targets (ETA)** config field (comma-separated `SKILL:LEVEL` pairs, e.g. `MINING:70`). A skill with no target still shows an ETA to its next level while it is being trained. ETA renders as `L70 3h 25m`; reached targets render `done`.
+- **Watchdog last-seen and uptime**. `WatchdogStatus` gains `lastSeenText` ("12s ago") and `uptimeText` ("2h 05m"), recomputed on every poll so they keep ticking between watchdog writes. Health downgrades to "Stalled" when the watchdog has not written a line for over five minutes.
+
+### Changed
+
+- **Watchdog panel** now reads the disk log honestly and surfaces health, last seen, uptime, last event, last restart, and total restarts. Plain-language health labels (Healthy / Idle / Stalled / Unavailable) replace the raw ok/warn/bad strings. The v0.2.0 "unavailable until the disk reader reconnects" placeholder javadoc is removed; the reader was already present, the panel and docs now reflect that. When no watchdog log exists the panel shows Unavailable, the graceful fallback for users who do not run the watchdog.
+- Version constant bumped to `1.1.0`. The window footer and sidebar subtitle now read the version constant instead of a hardcoded string so they cannot drift again.
+- `ConfigInformation`, the in-dashboard Guide panel, and the README updated for the two new panels, the ETA column, and the skill-targets field.
+
+### Notes
+
+- The `BlockingEventManager` "is an event running right now" flag has no public getter, so it is read by reflection and omitted (handler count only) when it cannot be read on the running client version. There is no in-client Watchdog object: the watchdog is the external `watchdog.ps1` helper, so the panel reads its CSV log rather than a client API.
+
 ## [1.0.0] — 2026-05-25
 
 Version bump for upstream PR readiness. No functional changes since 0.3.4.

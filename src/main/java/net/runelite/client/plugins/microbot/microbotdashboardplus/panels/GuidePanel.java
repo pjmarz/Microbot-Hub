@@ -34,9 +34,10 @@ public class GuidePanel extends DashboardSection {
             "<li><b>Active Scripts</b>: user-facing Microbot plugins currently enabled, per-plugin runtime, Stop button per row.</li>" +
             "<li><b>Plus Plugins</b>: quick start/stop grid for plugins whose name ends in &quot;Plus&quot;.</li>" +
             "<li><b>Inventory</b>: slot grid with item names + quantities; noted items styled distinctly.</li>" +
-            "<li><b>Skills</b>: all 22 skills with current level, total XP, gain since session start, rolling 5-min XP/hr.</li>" +
+            "<li><b>Skills</b>: all 22 skills with current level, total XP, gain since session start, rolling 5-min XP/hr, and an ETA to your target level (or the next level while training).</li>" +
             "<li><b>Nearby NPCs</b>: NPC list sorted by distance, max-distance spinner, random-event NPCs highlighted orange.</li>" +
-            "<li><b>Watchdog</b>: real-time status from <code>~/.runelite/microbot-watchdog.csv</code>.</li>" +
+            "<li><b>Watchdog</b>: health of the external restart helper, read from <code>~/.runelite/microbot-watchdog.csv</code>: last seen, uptime, last event, last restart, total restarts. Shows Unavailable if you do not run the watchdog.</li>" +
+            "<li><b>Antiban State</b>: tells a silent stall apart from an intentional anti-AFK pause. Shows the current state, antiban on/off, action cooldown, micro break, global pause, and blocking-event handlers.</li>" +
             "<li><b>XP Over Time</b>: Java2D line chart with skill + window selectors (5m to 24h). Selection persists across launches.</li>" +
             "<li><b>Event Dismiss Stats</b>: per-event-type counts from EventDismissPlus's CSV log (if installed).</li>" +
             "<li><b>Event Log</b>: rolling 10-entry ring buffer of login / logout / world-hop events.</li>" +
@@ -46,10 +47,11 @@ public class GuidePanel extends DashboardSection {
             "<li><b>Auto-open dashboard on startup</b>: open the floating window when the plugin enables.</li>" +
             "<li><b>Poll interval (sec)</b>: refresh rate from game state (1-60, default 5).</li>" +
             "<li><b>Nearby NPCs max distance</b>: filter for the NPC panel (1-200 tiles, default 20).</li>" +
-            "<li><b>Layout toggles</b>: eleven on/off switches, one per panel (including this Guide).</li>" +
+            "<li><b>Layout toggles</b>: twelve on/off switches, one per panel (including this Guide).</li>" +
             "<li><b>Discord webhook URL</b>: paste your channel webhook (field is masked; blank disables Discord).</li>" +
             "<li><b>Notify on level-up / random event / session lifecycle / alert threshold</b>: four independent toggles.</li>" +
             "<li><b>Alert thresholds</b>: comma-separated <code>SKILL:LEVEL</code> pairs (e.g. <code>MINING:60, WOODCUTTING:80</code>). Crossings show an in-window banner and (if Discord is set) send a notification.</li>" +
+            "<li><b>Skill targets (ETA)</b>: comma-separated <code>SKILL:LEVEL</code> pairs (e.g. <code>MINING:70, AGILITY:60</code>) that drive the Skills ETA column.</li>" +
             "</ol>" +
             "<p style='margin-bottom:0'>Hide this section by unticking <b>Show Guide</b> in plugin config &rarr; Layout.</p>" +
             "</body></html>";

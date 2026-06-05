@@ -61,7 +61,17 @@ public final class LogReaders {
 
     private long watchdogMtime = -1L;
     private PollSnapshot.WatchdogStatus watchdogCache = PollSnapshot.WatchdogStatus.builder()
-            .status("unavailable").lastEventText("--").lastRestartText("--").totalRestarts(0).build();
+            .status("unavailable").lastEventText("--").lastRestartText("--").totalRestarts(0)
+            .lastSeenText("--").uptimeText("--").build();
+
+    /**
+     * Last-known watchdog instants, cached so that "last seen" and "uptime"
+     * keep counting up on every poll even when the file has not changed (the
+     * mtime cache short-circuits before re-parsing, so we recompute the human
+     * text from these on each call).
+     */
+    private Instant lastWatchdogLineInstant = null;
+    private Instant lastWatchdogStartInstant = null;
 
     // -----------------------------------------------------------------
     // EventDismiss
@@ -124,17 +134,29 @@ public final class LogReaders {
     public PollSnapshot.WatchdogStatus readWatchdog() {
         try {
             if (!Files.exists(WATCHDOG_PATH)) {
+                lastWatchdogLineInstant = null;
+                lastWatchdogStartInstant = null;
                 return PollSnapshot.WatchdogStatus.builder()
-                        .status("unavailable").lastEventText("no log file").lastRestartText("--").totalRestarts(0).build();
+                        .status("unavailable").lastEventText("no log file").lastRestartText("--")
+                        .totalRestarts(0).lastSeenText("--").uptimeText("--").build();
             }
             long mtime = Files.getLastModifiedTime(WATCHDOG_PATH).toMillis();
-            if (mtime == watchdogMtime) return watchdogCache;
+            // File unchanged since last parse: reuse the parsed fields but
+            // recompute the live "last seen" / "uptime" text so they keep
+            // ticking up between watchdog writes.
+            if (mtime == watchdogMtime) {
+                watchdogCache = withLiveText(watchdogCache);
+                return watchdogCache;
+            }
 
             List<String> lines = Files.readAllLines(WATCHDOG_PATH);
             if (lines.isEmpty()) {
                 watchdogMtime = mtime;
+                lastWatchdogLineInstant = null;
+                lastWatchdogStartInstant = null;
                 watchdogCache = PollSnapshot.WatchdogStatus.builder()
-                        .status("unavailable").lastEventText("empty log").lastRestartText("--").totalRestarts(0).build();
+                        .status("unavailable").lastEventText("empty log").lastRestartText("--")
+                        .totalRestarts(0).lastSeenText("--").uptimeText("--").build();
                 return watchdogCache;
             }
 
@@ -143,6 +165,7 @@ public final class LogReaders {
             String lastEventText = "--";
             String latestReason = null;
             Instant latestInstant = null;
+            Instant latestStartInstant = null;
 
             boolean firstLine = true;
             for (String line : lines) {
@@ -163,7 +186,9 @@ public final class LogReaders {
                     latestReason = reason;
                     lastEventText = HUMAN_TIME.format(parsed) + " - " + reason + (details.isEmpty() ? "" : " (" + details + ")");
                 }
-                if (!"WATCHDOG_START".equalsIgnoreCase(reason)) {
+                if ("WATCHDOG_START".equalsIgnoreCase(reason)) {
+                    if (parsed != null) latestStartInstant = parsed;
+                } else {
                     totalRestarts++;
                     if (parsed != null) {
                         lastRestart = HUMAN_TIME.format(parsed);
@@ -184,17 +209,81 @@ public final class LogReaders {
             }
 
             watchdogMtime = mtime;
-            watchdogCache = PollSnapshot.WatchdogStatus.builder()
+            lastWatchdogLineInstant = latestInstant;
+            lastWatchdogStartInstant = latestStartInstant;
+            watchdogCache = withLiveText(PollSnapshot.WatchdogStatus.builder()
                     .status(status)
                     .lastEventText(lastEventText)
                     .lastRestartText(lastRestart)
                     .totalRestarts(totalRestarts)
-                    .build();
+                    .lastSeenText("--")
+                    .uptimeText("--")
+                    .build());
             return watchdogCache;
         } catch (IOException ex) {
             log.debug("readWatchdog failed: {}", ex.getMessage());
             return watchdogCache;
         }
+    }
+
+    /**
+     * Recompute the live "last seen" and "uptime" text from the cached
+     * instants. Called on every poll so the values advance even when the log
+     * file has not been touched since the previous read.
+     *
+     * <p>If the latest line is older than the staleness window the status is
+     * downgraded to "bad": the watchdog process itself looks stopped.
+     */
+    private PollSnapshot.WatchdogStatus withLiveText(PollSnapshot.WatchdogStatus base) {
+        if (base == null) return null;
+        Instant now = Instant.now();
+
+        String lastSeen = "--";
+        String status = base.getStatus();
+        if (lastWatchdogLineInstant != null) {
+            Duration since = Duration.between(lastWatchdogLineInstant, now);
+            lastSeen = humanizeAgo(since);
+            // No fresh line for over 5 minutes: the watchdog looks dead.
+            if (since.toMinutes() >= 5 && !"unavailable".equals(status)) {
+                status = "bad";
+            }
+        }
+
+        String uptime = "--";
+        if (lastWatchdogStartInstant != null) {
+            uptime = humanizeSpan(Duration.between(lastWatchdogStartInstant, now));
+        }
+
+        return PollSnapshot.WatchdogStatus.builder()
+                .status(status)
+                .lastEventText(base.getLastEventText())
+                .lastRestartText(base.getLastRestartText())
+                .totalRestarts(base.getTotalRestarts())
+                .lastSeenText(lastSeen)
+                .uptimeText(uptime)
+                .build();
+    }
+
+    /** "12s ago", "3m ago", "2h ago". Never negative. */
+    private static String humanizeAgo(Duration d) {
+        if (d == null || d.isNegative()) return "just now";
+        long secs = d.getSeconds();
+        if (secs < 60) return secs + "s ago";
+        long mins = secs / 60;
+        if (mins < 60) return mins + "m ago";
+        long hours = mins / 60;
+        return hours + "h " + (mins % 60) + "m ago";
+    }
+
+    /** "2h 05m", "8m", "45s". Never negative. */
+    private static String humanizeSpan(Duration d) {
+        if (d == null || d.isNegative()) return "--";
+        long secs = d.getSeconds();
+        if (secs < 60) return secs + "s";
+        long mins = secs / 60;
+        if (mins < 60) return mins + "m";
+        long hours = mins / 60;
+        return String.format("%dh %02dm", hours, mins % 60);
     }
 
     // -----------------------------------------------------------------

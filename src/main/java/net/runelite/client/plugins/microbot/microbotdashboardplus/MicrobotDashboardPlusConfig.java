@@ -22,7 +22,7 @@ import net.runelite.client.config.Range;
 @ConfigInformation(
     "<h2>Microbot Dashboard Plus</h2>" +
     "<h3>Version: " + MicrobotDashboardPlusPlugin.version + "</h3>" +
-    "<p>Aggregate session dashboard. A floating window with eleven live-updating panels: Player, Active Scripts, Plus Plugins, Inventory, Skills, Nearby NPCs, Watchdog, XP Chart, Event Dismiss Stats, Event Log, and Guide. A green chart-line icon in the right sidebar (while the plugin is enabled) opens the dashboard.</p>" +
+    "<p>Aggregate session dashboard. A floating window with twelve live-updating panels: Player, Active Scripts, Plus Plugins, Inventory, Skills, Nearby NPCs, Watchdog, Antiban State, XP Chart, Event Dismiss Stats, Event Log, and Guide. A green chart-line icon in the right sidebar (while the plugin is enabled) opens the dashboard.</p>" +
     "<p></p>" +
     "<h3>Behavior</h3>" +
     "<p>1. <strong>Auto-open dashboard:</strong> opens the floating window automatically when the plugin enables. Untick to launch it manually from the sidebar.</p>" +
@@ -32,7 +32,7 @@ import net.runelite.client.config.Range;
     "<p>3. <strong>Nearby NPCs max distance:</strong> tile radius for the Nearby NPCs panel. Higher shows more NPCs and polls a little slower. Default 20, range 1 to 200.</p>" +
     "<p></p>" +
     "<h3>Layout</h3>" +
-    "<p>4. <strong>Panel toggles:</strong> one show or hide switch per panel (Player, Active Scripts, Plus Plugins, Inventory, Skills, Nearby NPCs, Watchdog, XP Chart, Event Dismiss Stats, Event Log, Guide). Untick any you do not want in the window. Hide the Guide once you know the panels.</p>" +
+    "<p>4. <strong>Panel toggles:</strong> one show or hide switch per panel (Player, Active Scripts, Plus Plugins, Inventory, Skills, Nearby NPCs, Watchdog, Antiban State, XP Chart, Event Dismiss Stats, Event Log, Guide). Untick any you do not want in the window. Hide the Guide once you know the panels.</p>" +
     "<p></p>" +
     "<h3>Notifications</h3>" +
     "<p>5. <strong>Discord webhook URL:</strong> paste a channel webhook to send alerts to Discord. Leave blank to disable Discord. Keep this URL secret.</p>" +
@@ -46,7 +46,14 @@ import net.runelite.client.config.Range;
     "<p>9. <strong>Notify on alert threshold:</strong> posts when a configured Alert Threshold is crossed.</p>" +
     "<p></p>" +
     "<h3>Alerts</h3>" +
-    "<p>10. <strong>Alert thresholds:</strong> comma-separated SKILL:LEVEL pairs, for example MINING:60, WOODCUTTING:80. Use uppercase OSRS skill names. A crossing fires an in-dashboard banner and, if enabled above, a Discord notification.</p>"
+    "<p>10. <strong>Alert thresholds:</strong> comma-separated SKILL:LEVEL pairs, for example MINING:60, WOODCUTTING:80. Use uppercase OSRS skill names. A crossing fires an in-dashboard banner and, if enabled above, a Discord notification.</p>" +
+    "<p></p>" +
+    "<p>11. <strong>Skill targets (ETA):</strong> comma-separated SKILL:LEVEL pairs, for example MINING:70, AGILITY:60. The Skills section shows an ETA to each target from the current XP per hour. A skill with no target still shows an ETA to its next level while it is being trained.</p>" +
+    "<p></p>" +
+    "<h3>Panels of note</h3>" +
+    "<p><strong>Watchdog:</strong> reads the external restart helper log and shows its health, how long ago it was last seen, uptime, last event, last restart, and total restarts. Shows Unavailable if you do not run the watchdog.</p>" +
+    "<p></p>" +
+    "<p><strong>Antiban State:</strong> shows whether the script is running or is being held by an intentional anti-AFK pause such as a micro break, an action cooldown, a global pause, or a blocking event. Use it to tell a real stall from expected behavior.</p>"
 )
 public interface MicrobotDashboardPlusConfig extends Config {
 
@@ -126,16 +133,19 @@ public interface MicrobotDashboardPlusConfig extends Config {
     @ConfigItem(keyName = "showWatchdog", name = "Show Watchdog", description = "Show the Watchdog section.", position = 6, section = layoutSection)
     default boolean showWatchdog() { return true; }
 
-    @ConfigItem(keyName = "showXpChart", name = "Show XP Chart", description = "Show the XP-over-time chart section.", position = 7, section = layoutSection)
+    @ConfigItem(keyName = "showAntibanState", name = "Show Antiban State", description = "Show the Antiban State section. It tells a silent stall apart from an intentional anti-AFK pause such as a micro break or action cooldown.", position = 7, section = layoutSection)
+    default boolean showAntibanState() { return true; }
+
+    @ConfigItem(keyName = "showXpChart", name = "Show XP Chart", description = "Show the XP-over-time chart section.", position = 8, section = layoutSection)
     default boolean showXpChart() { return true; }
 
-    @ConfigItem(keyName = "showEventDismissStats", name = "Show Event Dismiss Stats", description = "Show the EventDismissPlus stats section.", position = 8, section = layoutSection)
+    @ConfigItem(keyName = "showEventDismissStats", name = "Show Event Dismiss Stats", description = "Show the EventDismissPlus stats section.", position = 9, section = layoutSection)
     default boolean showEventDismissStats() { return true; }
 
-    @ConfigItem(keyName = "showEventLog", name = "Show Event Log", description = "Show the Event Log ring buffer section.", position = 9, section = layoutSection)
+    @ConfigItem(keyName = "showEventLog", name = "Show Event Log", description = "Show the Event Log ring buffer section.", position = 10, section = layoutSection)
     default boolean showEventLog() { return true; }
 
-    @ConfigItem(keyName = "showGuide", name = "Show Guide", description = "Show the Guide section at the bottom of the dashboard window. Hide it once you're familiar with the panels and config options.", position = 10, section = layoutSection)
+    @ConfigItem(keyName = "showGuide", name = "Show Guide", description = "Show the Guide section at the bottom of the dashboard window. Hide it once you're familiar with the panels and config options.", position = 11, section = layoutSection)
     default boolean showGuide() { return true; }
 
     // ------------------------------------------------------------------
@@ -210,6 +220,17 @@ public interface MicrobotDashboardPlusConfig extends Config {
             section = alertsSection
     )
     default String alertThresholds() {
+        return "";
+    }
+
+    @ConfigItem(
+            keyName = "skillTargets",
+            name = "Skill targets (ETA)",
+            description = "Comma-separated SKILL:LEVEL pairs the Skills section uses for its ETA column. Example: MINING:70, AGILITY:60. Skill names follow the OSRS API enum (uppercase). A skill with no target still shows an ETA to its next level while it is being trained.",
+            position = 1,
+            section = alertsSection
+    )
+    default String skillTargets() {
         return "";
     }
 }

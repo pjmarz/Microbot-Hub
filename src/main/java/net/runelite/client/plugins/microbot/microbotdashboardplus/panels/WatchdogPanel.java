@@ -13,19 +13,30 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 
 /**
- * Watchdog section: agent-server watchdog status, last event, last restart,
- * total restarts. v0.2.0 reports "unavailable" until the disk-log reader
- * reconnects in a follow-up patch.
+ * Watchdog section: shows the health of the external watchdog process.
+ *
+ * <p>The watchdog is a separate helper (the {@code watchdog.ps1} script) that
+ * pings the client and restarts it if it hangs. It records each ping and
+ * restart to {@code ~/.runelite/microbot-watchdog.csv}. This panel reads that
+ * file and reports the current health, how long ago the watchdog was last
+ * seen, how long the current run has been alive, the last event, the last
+ * restart, and the total restart count.
+ *
+ * <p>If no watchdog file is present the panel shows "unavailable" with a short
+ * hint. That is the graceful fallback for users who do not run the watchdog.
  */
 public class WatchdogPanel extends DashboardSection {
 
     private final JLabel status = mkValue();
+    private final JLabel lastSeen = mkValue();
+    private final JLabel uptime = mkValue();
     private final JLabel lastEvent = mkValue();
     private final JLabel lastRestart = mkValue();
     private final JLabel totalRestarts = mkValue();
 
     public WatchdogPanel(GameStatePoller poller) {
         super("Watchdog", poller);
+        setSubtitle("(external restart helper)");
         add(buildGrid(), java.awt.BorderLayout.CENTER);
     }
 
@@ -39,7 +50,9 @@ public class WatchdogPanel extends DashboardSection {
         c.insets = new Insets(2, 4, 2, 4);
 
         int row = 0;
-        addRow(grid, c, row++, "Status", status);
+        addRow(grid, c, row++, "Health", status);
+        addRow(grid, c, row++, "Last seen", lastSeen);
+        addRow(grid, c, row++, "Uptime", uptime);
         addRow(grid, c, row++, "Last event", lastEvent);
         addRow(grid, c, row++, "Last restart", lastRestart);
         addRow(grid, c, row, "Total restarts", totalRestarts);
@@ -75,16 +88,29 @@ public class WatchdogPanel extends DashboardSection {
             return;
         }
         PollSnapshot.WatchdogStatus w = snapshot.getWatchdog();
-        status.setText(w.getStatus() == null ? "--" : w.getStatus());
-        switch (w.getStatus() == null ? "" : w.getStatus()) {
+        String raw = w.getStatus() == null ? "" : w.getStatus();
+        status.setText(healthLabel(raw));
+        switch (raw) {
             case "ok":     status.setForeground(ColorScheme.PROGRESS_COMPLETE_COLOR); break;
             case "warn":   status.setForeground(ColorScheme.PROGRESS_INPROGRESS_COLOR); break;
             case "bad":    status.setForeground(ColorScheme.PROGRESS_ERROR_COLOR); break;
             default:       status.setForeground(Color.GRAY);
         }
+        lastSeen.setText(safe(w.getLastSeenText()));
+        uptime.setText(safe(w.getUptimeText()));
         lastEvent.setText(safe(w.getLastEventText()));
         lastRestart.setText(safe(w.getLastRestartText()));
         totalRestarts.setText(Integer.toString(w.getTotalRestarts()));
+    }
+
+    /** Plain-language health label so the user does not have to decode "ok / warn / bad". */
+    private static String healthLabel(String raw) {
+        switch (raw == null ? "" : raw) {
+            case "ok":   return "Healthy";
+            case "warn": return "Idle";
+            case "bad":  return "Stalled";
+            default:     return "Unavailable";
+        }
     }
 
     private static String safe(String s) {

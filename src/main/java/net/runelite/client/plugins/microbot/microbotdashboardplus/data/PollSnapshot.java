@@ -59,6 +59,9 @@ public class PollSnapshot {
     // ------- Watchdog (read from log file) -------
     WatchdogStatus watchdog;
 
+    // ------- Antiban + pause state (read in-process) -------
+    AntibanState antibanState;
+
     // ------- EventDismiss stats (read from CSV) -------
     List<EventDismissStatRow> eventDismissStats;
 
@@ -78,6 +81,10 @@ public class PollSnapshot {
                 .inventory(Collections.emptyList())
                 .nearbyNpcs(Collections.emptyList())
                 .eventDismissStats(Collections.emptyList())
+                .antibanState(AntibanState.builder()
+                        .antibanEnabled(false)
+                        .summary("--")
+                        .build())
                 .build();
     }
 
@@ -126,6 +133,44 @@ public class PollSnapshot {
         String lastEventText;
         String lastRestartText;
         int totalRestarts;
+        /** Human text for how long ago the watchdog last wrote a line, for example "12s ago". */
+        String lastSeenText;
+        /** Human text for how long the current watchdog run has been alive, for example "2h 05m". */
+        String uptimeText;
+    }
+
+    /**
+     * In-process antiban and pause state. Lets a user tell a silent stall
+     * (everything idle, nothing intentional) from a deliberate anti-AFK pause
+     * (a micro break or action cooldown is running).
+     */
+    @Value
+    @Builder
+    public static class AntibanState {
+        /** Whether antiban is globally enabled. */
+        boolean antibanEnabled;
+        /** True while an action cooldown is holding the script. */
+        boolean actionCooldownActive;
+        /** True while a micro break is holding the script. */
+        boolean microBreakActive;
+        /** Whether micro breaks are configured to fire at all. */
+        boolean takeMicroBreaks;
+        /** True when every script is globally paused (Microbot.pauseAllScripts). */
+        boolean allScriptsPaused;
+        /** Number of registered blocking-event handlers (login, level-up, death, and so on). */
+        int blockingEventCount;
+        /**
+         * True if a blocking event is actively running right now. Read by
+         * reflection; null when the running flag could not be read on this
+         * client version.
+         */
+        Boolean blockingEventRunning;
+        /**
+         * One-line plain reason for the current hold, or "Running" when nothing
+         * is holding the script. Examples: "Micro break in progress",
+         * "Action cooldown", "All scripts paused".
+         */
+        String summary;
     }
 
     @Value
