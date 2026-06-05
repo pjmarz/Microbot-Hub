@@ -365,7 +365,7 @@ public class AutoFishingPlusScript extends Script {
         int[] spotIds = selectedFish.getFishingSpot();
         return Microbot.getRs2NpcCache().query()
                 .where(npc -> Arrays.stream(spotIds).anyMatch(id -> npc.getId() == id))
-                .nearest();
+                .nearestOnClientThread();
     }
 
     /** Tools to keep when depositing (method items + harpoon). */
@@ -461,13 +461,25 @@ public class AutoFishingPlusScript extends Script {
     }
 
     private boolean hasRequiredGear() {
-        boolean hasTools = selectedFish.getMethod().getRequiredItems().stream()
-                .allMatch(tool -> Rs2Inventory.hasItem(tool) || Rs2Equipment.isWearing(tool));
+        boolean hasTools = selectedFish.getMethod().getRequiredItems().stream().allMatch(this::hasTool);
 
         if (selectedHarpoon != HarpoonType.NONE) {
             return hasTools && (Rs2Inventory.hasItem(selectedHarpoon.getName()) || Rs2Equipment.isWearing(selectedHarpoon.getName()));
         }
         return hasTools;
+    }
+
+    /**
+     * True if the player has the given tool. "Harpoon" matches any harpoon variant (Dragon,
+     * Crystal, Infernal, Barb-tail, etc.), so a special-attack harpoon on its own satisfies the
+     * requirement without also carrying a plain harpoon.
+     */
+    private boolean hasTool(String tool) {
+        if (tool.equalsIgnoreCase("Harpoon")) {
+            return Rs2Inventory.contains(i -> i.getName() != null && i.getName().toLowerCase().contains("harpoon"))
+                    || Rs2Equipment.isWearing(i -> i.getName() != null && i.getName().toLowerCase().contains("harpoon"));
+        }
+        return Rs2Inventory.hasItem(tool) || Rs2Equipment.isWearing(tool);
     }
 
     private boolean isAtFishingLocation() {
