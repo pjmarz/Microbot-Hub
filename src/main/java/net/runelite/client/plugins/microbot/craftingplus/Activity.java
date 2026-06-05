@@ -7,7 +7,9 @@ package net.runelite.client.plugins.microbot.craftingplus;
 public enum Activity {
     LEATHER("Leather"),
     GEM_CUTTING("Gem cutting"),
-    JEWELLERY("Furnace jewellery");
+    JEWELLERY("Furnace jewellery"),
+    AMETHYST("Amethyst cutting"),
+    STRINGING("Amulet stringing");
 
     private final String label;
 

@@ -223,6 +223,30 @@ public class AutoCraftingPlusOverlay extends OverlayPanel {
                 itemsPerBatch = needsGem ? 13 : 27; // mirrors the script's per-trip withdraw cap
                 break;
             }
+            case AMETHYST: {
+                // One amethyst -> yield products. "item" here is one amethyst cut; netPerItem is the
+                // product value it yields minus the amethyst cost (gross-ish, the chisel is reusable).
+                AmethystProduct product = script.getActiveAmethyst() != null
+                        ? script.getActiveAmethyst() : config.amethystProduct();
+                int productPrice = Microbot.getItemManager().getItemPrice(product.getProductId());
+                int amethystPrice = Microbot.getItemManager().getItemPrice(net.runelite.api.gameval.ItemID.AMETHYST);
+                if (productPrice <= 0) return 0;
+                netPerItem = (long) productPrice * product.getYieldPerAmethyst() - amethystPrice;
+                itemsPerBatch = 27; // full inventory of amethyst, less the chisel
+                break;
+            }
+            case STRINGING: {
+                // Net: strung amulet minus the unstrung amulet and the ball of wool it consumes.
+                StringAmulet amulet = script.getActiveAmulet() != null
+                        ? script.getActiveAmulet() : config.stringAmulet();
+                int strungPrice = Microbot.getItemManager().getItemPrice(amulet.getStrungId());
+                int unstrungPrice = Microbot.getItemManager().getItemPrice(amulet.getUnstrungId());
+                int woolPrice = Microbot.getItemManager().getItemPrice(net.runelite.api.gameval.ItemID.BALL_OF_WOOL);
+                if (strungPrice <= 0) return 0;
+                netPerItem = (long) strungPrice - unstrungPrice - woolPrice; // 1 amulet + 1 wool per item
+                itemsPerBatch = 14; // mirrors the script's per-trip 1:1 split
+                break;
+            }
         }
 
         long itemsCrafted = batches * itemsPerBatch;

@@ -10,9 +10,12 @@ import net.runelite.client.config.ConfigSection;
 @ConfigInformation("<h2>Auto Crafting Plus</h2>" +
         "<h3>Version: " + AutoCraftingPlusPlugin.version + "</h3>" +
         "<p>1. <strong>Activity:</strong> Leather (needle + thread + leather, free to play from " +
-        "level 1), Gem cutting (chisel + uncut gems, from 20 for sapphire), or Furnace jewellery " +
-        "(gold or silver bar + mould, plus a cut gem for gem rings and necklaces).</p>" +
-        "<p>2. <strong>Leather item / Gem / Jewellery:</strong> what to make for the chosen activity.</p>" +
+        "level 1), Gem cutting (chisel + uncut gems, from 20 for sapphire), Furnace jewellery " +
+        "(gold or silver bar + mould, plus a cut gem for gem rings and necklaces), Amethyst cutting " +
+        "(chisel + amethyst into bolt tips, arrowtips, javelin heads, or dart tips, from 83), or " +
+        "Amulet stringing (ball of wool on an unstrung amulet, from level 1).</p>" +
+        "<p>2. <strong>Leather item / Gem / Jewellery / Amethyst product / Amulet:</strong> what to " +
+        "make for the chosen activity.</p>" +
         "<p>3. <strong>Dragonhide:</strong> in the Leather activity, set this to a d'hide piece " +
         "(green from 57, up to black) to sew dragonhide armour instead of soft leather. Needs the " +
         "matching dragon leather in the bank. Leave it on None to make soft leather.</p>" +
@@ -87,10 +90,32 @@ public interface AutoCraftingPlusConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "amethystProduct",
+            name = "Amethyst product",
+            description = "Which product to cut amethyst into (Amethyst cutting activity). Bolt tips need 83, arrowtips 85, javelin heads 87, dart tips 89.",
+            position = 5,
+            section = generalSection
+    )
+    default AmethystProduct amethystProduct() {
+        return AmethystProduct.BOLT_TIPS;
+    }
+
+    @ConfigItem(
+            keyName = "stringAmulet",
+            name = "Amulet",
+            description = "Which unstrung amulet to string with wool (Amulet stringing activity). Gold is free to play; the gem amulets are members only. No level requirement.",
+            position = 6,
+            section = generalSection
+    )
+    default StringAmulet stringAmulet() {
+        return StringAmulet.GOLD;
+    }
+
+    @ConfigItem(
             keyName = "progressiveCraft",
             name = "Progressive",
-            description = "Auto-pick the highest item your Crafting level allows with materials in the bank. Re-checks each bank trip. Covers Leather (soft + dragonhide) and Gem cutting. No effect on Jewellery.",
-            position = 5,
+            description = "Auto-pick the highest item your Crafting level allows with materials in the bank. Re-checks each bank trip. Covers Leather (soft + dragonhide) and Gem cutting. No effect on Jewellery, Amethyst, or Stringing.",
+            position = 7,
             section = generalSection
     )
     default boolean progressiveCraft() {
@@ -101,7 +126,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "furnaceLocation",
             name = "Furnace",
             description = "Which furnace + bank to use for jewellery. Edgeville is the closest F2P furnace-to-bank.",
-            position = 6,
+            position = 8,
             section = generalSection
     )
     default CraftingLocation furnaceLocation() {
@@ -112,7 +137,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "stopAfterMinutes",
             name = "Stop after (minutes)",
             description = "Auto-shutdown after this many minutes of runtime. 0 = no limit.",
-            position = 7,
+            position = 9,
             section = generalSection
     )
     default int stopAfterMinutes() {
@@ -123,7 +148,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "stopAfterXp",
             name = "Stop after (XP gained)",
             description = "Auto-shutdown after gaining this much Crafting XP. 0 = no limit.",
-            position = 8,
+            position = 10,
             section = generalSection
     )
     default int stopAfterXp() {
@@ -134,7 +159,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "targetLevel",
             name = "Target level",
             description = "Stop when Crafting reaches this level. Banks the inventory first. 0 = disabled.",
-            position = 9,
+            position = 11,
             section = generalSection
     )
     default int targetLevel() {
@@ -145,7 +170,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "leagueMode",
             name = "League mode (anti-AFK)",
             description = "Periodically presses an arrow key to reset the idle-logout timer.",
-            position = 10,
+            position = 12,
             section = generalSection
     )
     default boolean leagueMode() {
@@ -156,7 +181,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "speedMode",
             name = "Speed mode (less antiban)",
             description = "Disables Microbot's antiban. Faster, more pattern-detectable. Throwaway only.",
-            position = 11,
+            position = 13,
             section = generalSection
     )
     default boolean speedMode() {

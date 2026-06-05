@@ -23,12 +23,14 @@ import java.awt.event.KeyEvent;
 import java.util.concurrent.TimeUnit;
 
 /**
- * AutoCraftingPlus v0.1.1 - leather crafting + gem cutting, on a bank-and-do loop with the Plus
- * layer (stop conditions, target level + clean shutdown, overlay/pause, speed mode, league mode).
+ * AutoCraftingPlus - leather crafting, gem cutting, furnace jewellery, amethyst cutting, and amulet
+ * stringing, on a bank-and-do loop with the Plus layer (stop conditions, target level + clean
+ * shutdown, overlay/pause, speed mode, league mode).
  *
  * <p>Leather (v0.1.1) forks the make-X interaction proven by the base DragonLeatherScript
  * (use needle + leather -&gt; make-X interface widget 17694733 -&gt; select the product). Gem
- * cutting (v0.1.0) forks GemsScript. Furnace jewellery is v0.2.0.</p>
+ * cutting (v0.1.0) forks GemsScript. Furnace jewellery is v0.2.0. Amethyst cutting and amulet
+ * stringing are v0.4.0 (chisel/wool -&gt; make-X production dialog).</p>
  */
 @Slf4j
 public class AutoCraftingPlusScript extends Script {
@@ -47,6 +49,8 @@ public class AutoCraftingPlusScript extends Script {
     private Leather activeSoftLeather = null;
     private DragonLeather activeDragonLeather = null;
     private Gems activeGem = null;
+    private AmethystProduct activeAmethyst = null;
+    private StringAmulet activeAmulet = null;
 
     public long getStartTimeMillis() { return startTimeMillis; }
     public int getStartSkillXp() { return startSkillXp; }
@@ -58,6 +62,10 @@ public class AutoCraftingPlusScript extends Script {
     public DragonLeather getActiveDragonLeather() { return activeDragonLeather; }
     /** The gem currently being cut (resolves progressive mode), for the overlay. */
     public Gems getActiveGem() { return activeGem; }
+    /** The amethyst product currently being cut, for the overlay. */
+    public AmethystProduct getActiveAmethyst() { return activeAmethyst; }
+    /** The amulet currently being strung, for the overlay. */
+    public StringAmulet getActiveAmulet() { return activeAmulet; }
 
     public boolean run(AutoCraftingPlusConfig config) {
         startTimeMillis = System.currentTimeMillis();
@@ -70,6 +78,8 @@ public class AutoCraftingPlusScript extends Script {
         activeSoftLeather = null;
         activeDragonLeather = null;
         activeGem = null;
+        activeAmethyst = null;
+        activeAmulet = null;
 
         Microbot.enableAutoRunOn = true;
         Rs2Walker.disableTeleports = true; // keep banking on foot (the RC v0.1.1 lesson)
@@ -129,6 +139,12 @@ public class AutoCraftingPlusScript extends Script {
                         break;
                     case JEWELLERY:
                         runJewellery(config);
+                        break;
+                    case AMETHYST:
+                        runAmethyst(config);
+                        break;
+                    case STRINGING:
+                        runStringing(config);
                         break;
                 }
 
@@ -584,6 +600,163 @@ public class AutoCraftingPlusScript extends Script {
         Rs2Keyboard.keyPress(KeyEvent.VK_SPACE); // confirm "make all" on the quantity dialog
         sleep(1800);
         sleepUntil(() -> !Rs2Inventory.hasItem(uncutGemName), 60000);
+        actionsCompleted++;
+    }
+
+    // --- Amethyst cutting (v0.4.0, chisel + amethyst -> make-X product, forked from GemsScript) ---
+
+    /**
+     * Cuts amethyst (item {@link ItemID#AMETHYST}) into the chosen product. Mirrors the GEM_CUTTING
+     * chisel flow but uses the production / make-X dialog (widget group 270) to pick the product,
+     * because one amethyst can become bolt tips / arrowtips / javelin heads / dart tips.
+     */
+    private void runAmethyst(AutoCraftingPlusConfig config) {
+        final AmethystProduct product = config.amethystProduct();
+        activeAmethyst = product;
+
+        if (!Rs2Player.getSkillRequirement(Skill.CRAFTING, product.getLevelRequired())) {
+            Microbot.showMessage("Crafting level too low to make " + product.getProductName() + ".");
+            super.shutdown();
+            return;
+        }
+
+        boolean needBank = shutdownAfterCleanup
+                || !Rs2Inventory.hasItem(ItemID.AMETHYST)
+                || !Rs2Inventory.hasItem("chisel");
+
+        if (needBank) {
+            handleAmethystBanking(product);
+        } else {
+            cutAmethyst(product);
+        }
+    }
+
+    private void handleAmethystBanking(AmethystProduct product) {
+        if (Rs2Player.isMoving()) return;
+        Microbot.status = "Banking";
+        boolean isBankOpen = Rs2Bank.walkToBankAndUseBank();
+        if (!isBankOpen || !Rs2Bank.isOpen()) return;
+
+        // Deposit the finished product (keep the chisel + any remaining amethyst).
+        Rs2Bank.depositAll(product.getProductId());
+        sleep(400);
+
+        if (shutdownAfterCleanup) {
+            Rs2Bank.closeBank();
+            Microbot.log("AutoCraftingPlus: target reached, banked, shutting down.");
+            super.shutdown();
+            return;
+        }
+
+        if (!Rs2Inventory.hasItem("chisel")) {
+            if (!Rs2Bank.hasItem("chisel")) {
+                Microbot.showMessage("No chisel in the bank!");
+                super.shutdown();
+                return;
+            }
+            Rs2Bank.withdrawItem(true, "chisel");
+        }
+
+        if (!Rs2Bank.hasItem(ItemID.AMETHYST)) {
+            Microbot.showMessage("Out of amethyst in the bank!");
+            super.shutdown();
+            return;
+        }
+        Microbot.status = "Withdrawing amethyst";
+        Rs2Bank.withdrawAll(ItemID.AMETHYST);
+        Rs2Random.wait(400, 900);
+        Rs2Bank.closeBank();
+    }
+
+    /**
+     * Chisel on amethyst -&gt; wait for the production/make-X dialog (group 270) -&gt; click the chosen
+     * product by name (which makes the whole batch) -&gt; wait until the amethyst is used up. Mirrors
+     * the amethyst branch of crafting/scripts/GemsScript.
+     */
+    private void cutAmethyst(AmethystProduct product) {
+        Microbot.status = "Cutting amethyst (" + product.getLabel() + ")";
+        Rs2Inventory.use("chisel");
+        Rs2Inventory.use(ItemID.AMETHYST);
+        // The production dialog header text lives in group 270; wait for it, then pick the product.
+        if (Rs2Widget.sleepUntilHasWidgetText("How many do you wish to make?", 270, 5, false, 5000)) {
+            Rs2Widget.clickWidget(product.getProductName(), true);
+            sleep(1800);
+            sleepUntil(() -> !Rs2Inventory.hasItem(ItemID.AMETHYST), 60000);
+            actionsCompleted++;
+        }
+    }
+
+    // --- Amulet stringing (v0.4.0, ball of wool on unstrung amulet -> make-X batch) ---
+
+    /**
+     * Strings the chosen unstrung amulet "(u)" with a ball of wool. Using wool on the amulet opens a
+     * make-X / production dialog and strings the whole batch (4 Crafting XP each, no level
+     * requirement). Bank withdraws the unstrung amulet + wool 1:1 and banks the strung result.
+     */
+    private void runStringing(AutoCraftingPlusConfig config) {
+        final StringAmulet amulet = config.stringAmulet();
+        activeAmulet = amulet;
+
+        boolean needBank = shutdownAfterCleanup
+                || !Rs2Inventory.hasItem(amulet.getUnstrungId())
+                || !Rs2Inventory.hasItem(ItemID.BALL_OF_WOOL);
+
+        if (needBank) {
+            handleStringingBanking(amulet);
+        } else {
+            stringAmulets(amulet);
+        }
+    }
+
+    private void handleStringingBanking(StringAmulet amulet) {
+        if (Rs2Player.isMoving()) return;
+        Microbot.status = "Banking";
+        boolean isBankOpen = Rs2Bank.walkToBankAndUseBank();
+        if (!isBankOpen || !Rs2Bank.isOpen()) return;
+
+        // Deposit strung amulets and any leftover wool / wrong-tier amulets, then restock.
+        Rs2Bank.depositAll(amulet.getStrungId());
+        sleep(400);
+
+        if (shutdownAfterCleanup) {
+            Rs2Bank.closeBank();
+            Microbot.log("AutoCraftingPlus: target reached, banked, shutting down.");
+            super.shutdown();
+            return;
+        }
+
+        // String 1:1 -> split a full inventory half wool, half amulets (14 each).
+        final int perTrip = 14;
+        int unstrungStock = Rs2Bank.count(amulet.getUnstrungId());
+        int woolStock = Rs2Bank.count(ItemID.BALL_OF_WOOL);
+        int amount = Math.min(perTrip, Math.min(unstrungStock, woolStock));
+
+        if (amount <= 0) {
+            Microbot.showMessage("Out of " + amulet.getLabel() + " (u) or balls of wool in the bank!");
+            super.shutdown();
+            return;
+        }
+
+        Microbot.status = "Withdrawing amulets + wool";
+        Rs2Bank.withdrawX(ItemID.BALL_OF_WOOL, amount);
+        sleep(300);
+        Rs2Bank.withdrawX(amulet.getUnstrungId(), amount);
+        Rs2Random.wait(400, 900);
+        Rs2Bank.closeBank();
+    }
+
+    /**
+     * Use a ball of wool on the unstrung amulet to open the make-X / production dialog, then make the
+     * whole batch (space confirms "make all"). Waits until the unstrung amulets are gone.
+     */
+    private void stringAmulets(StringAmulet amulet) {
+        Microbot.status = "Stringing " + amulet.getLabel();
+        Rs2Inventory.use(ItemID.BALL_OF_WOOL);
+        Rs2Inventory.use(amulet.getUnstrungId());
+        sleep(600);
+        Rs2Keyboard.keyPress(KeyEvent.VK_SPACE); // confirm "make all" on the quantity dialog
+        sleep(1800);
+        sleepUntil(() -> !Rs2Inventory.hasItem(amulet.getUnstrungId()), 60000);
         actionsCompleted++;
     }
 

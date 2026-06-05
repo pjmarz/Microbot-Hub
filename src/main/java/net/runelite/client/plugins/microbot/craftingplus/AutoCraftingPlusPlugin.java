@@ -14,8 +14,8 @@ import java.awt.*;
 
 @PluginDescriptor(
         name = PluginDescriptor.Mocrosoft + "Auto Crafting Plus",
-        description = "Leather, gem cutting, and furnace jewellery on a bank-and-do loop, with stop conditions, target level, and overlay/pause.",
-        tags = {"crafting", "leather", "gems", "jewellery", "microbot", "plus"},
+        description = "Leather, gem cutting, furnace jewellery, amethyst cutting, and amulet stringing on a bank-and-do loop, with stop conditions, target level, and overlay/pause.",
+        tags = {"crafting", "leather", "gems", "jewellery", "amethyst", "stringing", "microbot", "plus"},
         authors = {"Mocrosoft", "pjmarz"},
         version = AutoCraftingPlusPlugin.version,
         minClientVersion = "2.0.13",
@@ -26,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoCraftingPlusPlugin extends Plugin {
-    public static final String version = "0.3.0";
+    public static final String version = "0.4.0";
 
     @Inject
     private AutoCraftingPlusConfig config;
