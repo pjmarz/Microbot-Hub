@@ -60,7 +60,11 @@ public class AutoSmeltingPlusScript extends Script {
     private long startTimeMillis = 0;
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
+    // v0.5.15: now an exact bar count, not a smelt-cycle count. Each Smithing XP increase is one
+    // bar produced (one bar per smelt, any tier), mirroring AutoMiningPlus's per-ore counter.
     private int actionsCompleted = 0;
+    // v0.5.15: last-seen Smithing XP for the accurate per-bar counter. Seeded to startSkillXp in run().
+    private int lastSmithingXp = 0;
 
     // v0.5.0: set when targetLevel is reached; intercepted after the deposit step in
     // handleBankAndWithdraw so we shutdown before withdrawing new ores.
@@ -69,6 +73,7 @@ public class AutoSmeltingPlusScript extends Script {
     public long getStartTimeMillis() { return startTimeMillis; }
     public int getStartSkillXp() { return startSkillXp; }
     public int getStartSkillLevel() { return startSkillLevel; }
+    /** Exact count of bars smelted (one per Smithing XP increase). v0.5.15. */
     public int getActionsCompleted() { return actionsCompleted; }
     /** The bar currently being smelted (resolves progressive mode), for the overlay GP/hr line. */
     public Bars getActiveBar() { return activeBar; }
@@ -87,6 +92,7 @@ public class AutoSmeltingPlusScript extends Script {
         startSkillLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getRealSkillLevel(Skill.SMITHING)).orElse(1);
         actionsCompleted = 0;
+        lastSmithingXp = startSkillXp; // v0.5.15: seed accurate per-bar counter
         shutdownAfterCleanup = false; // v0.5.0: reset target-level cleanup flag on startup
 
         Rs2Walker.disableTeleports = true;
@@ -107,6 +113,18 @@ public class AutoSmeltingPlusScript extends Script {
                 if (Microbot.pauseAllScripts.get()) {
                     Microbot.status = "[PAUSED]";
                     return;
+                }
+
+                // v0.5.15: accurate bar counter. Read Smithing XP once per tick; each increase is
+                // one bar produced (one bar per smelt, any tier). The 600ms tick is well below
+                // smelt cadence, so one increment per XP drop is exact. Replaces the old
+                // per-cycle actionsCompleted++ in smeltAtFurnace, so the overlay GP/hr can use the
+                // real bar count instead of the cycle->bars estimate. Mirrors AutoMiningPlus.
+                int currentSmithingXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
+                        Microbot.getClient().getSkillExperience(Skill.SMITHING)).orElse(lastSmithingXp);
+                if (currentSmithingXp > lastSmithingXp) {
+                    actionsCompleted++;
+                    lastSmithingXp = currentSmithingXp;
                 }
 
                 // stopAfterMinutes / stopAfterXp threshold check.
@@ -328,7 +346,8 @@ public class AutoSmeltingPlusScript extends Script {
         Rs2Widget.sleepUntilHasWidgetText("What would you like to smelt?", 270, 5, false, 4000);
         Rs2Widget.clickWidget(activeBar.getName());
         Rs2Widget.sleepUntilHasNotWidgetText("What would you like to smelt?", 270, 5, false, 4000);
-        actionsCompleted++; // count completed smelt cycles
+        // v0.5.15: bar counting moved to the accurate XP-drop detector at the top of the tick.
+        // The old per-cycle actionsCompleted++ was here.
     }
 
     // --- RESETTING state ---

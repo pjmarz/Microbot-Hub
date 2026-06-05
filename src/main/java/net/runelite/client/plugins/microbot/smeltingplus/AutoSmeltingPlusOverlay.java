@@ -116,15 +116,15 @@ public class AutoSmeltingPlusOverlay extends OverlayPanel {
                         .build());
 
                 panelComponent.getChildren().add(LineComponent.builder()
-                        .left("Smelt cycles:")
+                        .left("Bars smelted:")
                         .right(String.valueOf(script.getActionsCompleted()))
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
-                // GP/hr: NET profit per bar = bar GE price minus the cost of its input ores. The
-                // counter is smelt cycles, so multiply by bars per full inventory to estimate bars
-                // smelted. Can be negative when ore costs more than the bar. Guards runtime 0 and
-                // price 0. The "~" marks it an estimate (cycle->bar conversion, coal bag ignored).
+                // GP/hr: NET profit per bar = bar GE price minus the cost of its input ores. v0.5.15
+                // the counter is now an exact bar count (one per Smithing XP drop), so GP/hr uses it
+                // directly with no cycle->bar conversion. Can be negative when ore costs more than
+                // the bar. Guards runtime 0 and price 0.
                 long gpPerHour = 0;
                 Bars activeBar = script.getActiveBar();
                 if (activeBar != null && runtimeMillis > 1000) {
@@ -138,13 +138,13 @@ public class AutoSmeltingPlusOverlay extends OverlayPanel {
                     }
                     if (barPrice > 0) {
                         long netPerBar = (long) barPrice - inputOreCost;
-                        long barsSmelted = (long) script.getActionsCompleted() * activeBar.maxBarsForFullInventory();
+                        long barsSmelted = script.getActionsCompleted();
                         gpPerHour = netPerBar * barsSmelted * 3600000L / runtimeMillis;
                     }
                 }
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("GP/hr:")
-                        .right("~" + NumberFormat.getInstance().format(gpPerHour))
+                        .right(NumberFormat.getInstance().format(gpPerHour))
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
