@@ -16,16 +16,17 @@ import java.awt.*;
         name = PluginDescriptor.Mocrosoft + "Auto Runecraft Plus",
         description = "Runs essence to an altar and crafts runes, with pouches (fill/empty/repair) and rune/pure/daeyalt essence. Stop conditions, target level, overlay/pause.",
         tags = {"runecraft", "runecrafting", "rc", "microbot", "plus"},
+        authors = {"ChillX", "pjmarz"},
         version = AutoRunecraftPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AutoRunecraftPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AutoRunecraftPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class AutoRunecraftPlusPlugin extends Plugin {
-    public static final String version = "0.2.1";
+    public static final String version = "0.2.2";
 
     @Inject
     private AutoRunecraftPlusConfig config;
