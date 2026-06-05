@@ -45,7 +45,7 @@ public class RandomEventNpcHandler implements BlockingEvent {
         if (oldModel == null) return null;
         return Microbot.getRs2NpcCache().query()
                 .where(n -> n.getNpc().equals(oldModel.getRuneliteNpc()))
-                .nearest();
+                .nearestOnClientThread();
     }
 
     @Override
