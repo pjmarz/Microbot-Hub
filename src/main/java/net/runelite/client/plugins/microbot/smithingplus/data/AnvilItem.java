@@ -108,6 +108,39 @@ public enum AnvilItem {
     }
 
     /**
+     * The product's in-game name minus the bar-tier prefix (e.g. "dagger" -> "Bronze dagger",
+     * "med helm" -> "Bronze med helm"). Combined with {@link Bars#getProductPrefix()} to look up
+     * the finished item's GE price for the overlay GP/hr line. Returns null for items whose
+     * product name does not follow the simple "Tier base" pattern (wire/spit/studs, lamps, bolts,
+     * dart tips, arrowtips, nails, knives); the overlay then shows GP/hr 0 for those rather than
+     * pricing the wrong item.
+     */
+    public String getProductBaseName() {
+        switch (this) {
+            case DAGGER:         return "dagger";
+            case SWORD:          return "sword";
+            case SCIMITAR:       return "scimitar";
+            case LONG_SWORD:     return "longsword";
+            case TWO_HAND_SWORD: return "2h sword";
+            case AXE:            return "axe";
+            case MACE:           return "mace";
+            case WARHAMMER:      return "warhammer";
+            case BATTLE_AXE:     return "battleaxe";
+            case CLAWS:          return "claws";
+            case CHAIN_BODY:     return "chainbody";
+            case PLATE_LEGS:     return "platelegs";
+            case PLATE_SKIRT:    return "plateskirt";
+            case PLATE_BODY:     return "platebody";
+            case MEDIUM_HELM:    return "med helm";
+            case FULL_HELM:      return "full helm";
+            case SQUARE_SHIELD:  return "sq shield";
+            case KITE_SHIELD:    return "kiteshield";
+            // Non-standard product names (multi-output, tier-locked, or unusual naming) - priced 0.
+            default:             return null;
+        }
+    }
+
+    /**
      * v0.2.0: members-only filter. Bronze claws (and all higher-tier claws) require completion of
      * the Cabin Fever members quest, so the smithing widget doesn't show that slot on F2P. Picking
      * a members-only item on F2P would stall the bot. Pre-flight check uses this to refuse-start.

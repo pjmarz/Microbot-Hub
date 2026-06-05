@@ -79,7 +79,15 @@ public class AutoSmithingPlusScript extends Script {
     public int getStartSkillLevel() { return startSkillLevel; }
     public int getActionsCompleted() { return actionsCompleted; }
 
+    // Config reference kept so the overlay can resolve the active bar + item for the GP/hr line.
+    private AutoSmithingPlusConfig config;
+    /** The bar tier currently being smithed, for the overlay GP/hr line. */
+    public Bars getActiveBar() { return config != null ? config.selectedBar() : null; }
+    /** The item currently being smithed (resolves progressive mode), for the overlay GP/hr line. */
+    public AnvilItem getActiveItem() { return config != null ? activeItem(config) : null; }
+
     public boolean run(AutoSmithingPlusConfig config) {
+        this.config = config;
         initialPlayerLocation = null;
         state = State.SMITHING;
 

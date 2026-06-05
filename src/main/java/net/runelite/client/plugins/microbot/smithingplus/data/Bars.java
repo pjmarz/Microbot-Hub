@@ -63,4 +63,22 @@ public enum Bars {
         int amountForOneBar = requiredMaterials.values().stream().reduce(0, Integer::sum);
         return Rs2Inventory.capacity() / amountForOneBar;
     }
+
+    /**
+     * In-game name prefix for smithed products at this tier (e.g. "Bronze dagger", "Rune
+     * platebody"). Note products use "Adamant" and "Rune", not the bar's "Adamantite"/"Runite".
+     * Combined with {@link AnvilItem#getProductBaseName()} to look up the product's GE price for
+     * the overlay GP/hr line.
+     */
+    public String getProductPrefix() {
+        switch (this) {
+            case BRONZE:     return "Bronze";
+            case IRON:       return "Iron";
+            case STEEL:      return "Steel";
+            case MITHRIL:    return "Mithril";
+            case ADAMANTITE: return "Adamant";
+            case RUNITE:     return "Rune";
+            default:         return null;
+        }
+    }
 }
