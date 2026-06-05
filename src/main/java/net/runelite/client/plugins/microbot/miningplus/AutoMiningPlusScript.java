@@ -73,6 +73,8 @@ public class AutoMiningPlusScript extends Script {
     public int getStartSkillXp() { return startSkillXp; }
     public int getStartSkillLevel() { return startSkillLevel; }
     public int getActionsCompleted() { return actionsCompleted; }
+    /** The ore currently being mined (resolves progressive mode), for the overlay GP/hr line. */
+    public Rocks getActiveRock() { return activeRock; }
 
     public boolean run(AutoMiningPlusConfig config) {
         initialPlayerLocation = null;

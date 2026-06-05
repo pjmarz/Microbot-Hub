@@ -3,6 +3,7 @@ package net.runelite.client.plugins.microbot.miningplus;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
 import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.miningplus.data.Rocks;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.OverlayPanel;
@@ -131,6 +132,23 @@ public class AutoMiningPlusOverlay extends OverlayPanel {
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("Ores mined:")
                         .right(String.valueOf(script.getActionsCompleted()))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
+                // GP/hr: gross profit (mined ore is free). orePrice = GE price of the active ore's
+                // raw item, oresMined = the ore counter. Guards runtime 0 and price 0 (gem rocks,
+                // basalt and salts have no single priced ore, so oreItemId is 0 -> shows 0).
+                long gpPerHour = 0;
+                Rocks activeRock = script.getActiveRock();
+                if (activeRock != null && activeRock.getOreItemId() > 0 && runtimeMillis > 1000) {
+                    int orePrice = Microbot.getItemManager().getItemPrice(activeRock.getOreItemId());
+                    if (orePrice > 0) {
+                        gpPerHour = (long) script.getActionsCompleted() * orePrice * 3600000L / runtimeMillis;
+                    }
+                }
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("GP/hr:")
+                        .right(NumberFormat.getInstance().format(gpPerHour))
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
