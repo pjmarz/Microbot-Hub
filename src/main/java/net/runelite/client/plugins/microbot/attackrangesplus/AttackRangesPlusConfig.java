@@ -3,11 +3,29 @@ package net.runelite.client.plugins.microbot.attackrangesplus;
 import net.runelite.client.config.Alpha;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
+import net.runelite.client.config.ConfigInformation;
 import net.runelite.client.config.ConfigItem;
 
 import java.awt.Color;
 
 @ConfigGroup("attackrangesplus")
+@ConfigInformation("<h2>Attack Ranges Plus</h2>" +
+        "<h3>Version: " + AttackRangesPlusPlugin.version + "</h3>" +
+        "<p>This overlay draws your attack range on the ground, clipped to line of sight. It runs no script and never moves or banks for you.</p>" +
+        "<p></p>" +
+        "<p>1. <strong>Attack style:</strong> how the range is sized. Auto reads your weapon and falls back to melee. Pick Melee, Ranged, or Magic to force a size. Use Magic when casting at 10 tiles.</p>" +
+        "<p></p>" +
+        "<p>2. <strong>Line color:</strong> the color of the range outline.</p>" +
+        "<p></p>" +
+        "<p>3. <strong>Fill area:</strong> shades the tiles inside your range. The shading is redrawn every frame and can cost FPS at large ranges like magic. Leave it off for the cheapest outline only overlay.</p>" +
+        "<p></p>" +
+        "<p>4. <strong>Fill color:</strong> the color and opacity of the shaded area. Used only when Fill area is on.</p>" +
+        "<p></p>" +
+        "<p>5. <strong>Show overlay:</strong> when to draw it. Always shows it everywhere. In PvP areas limits it to the Wilderness, PvP and Deadman worlds, and PvP flagged zones.</p>" +
+        "<p></p>" +
+        "<p>6. <strong>Show target's range:</strong> also outline the range of the player you are fighting. Their exact style is not knowable, so this is their weapon's base reach.</p>" +
+        "<p></p>" +
+        "<p>7. <strong>Target line color:</strong> the outline color used for your target's range.</p>")
 public interface AttackRangesPlusConfig extends Config
 {
     @ConfigItem(

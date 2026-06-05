@@ -15,16 +15,17 @@ import javax.inject.Inject;
         name = PluginDescriptor.Mocrosoft + "Attack Ranges Plus",
         description = "Draws your attack range (and optionally your target's), auto-detected from your weapon and clipped to line of sight.",
         tags = {"range", "pvp", "combat", "overlay", "microbot", "plus"},
+        authors = {"pjmarz"},
         version = AttackRangesPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AttackRangesPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AttackRangesPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 public class AttackRangesPlusPlugin extends Plugin
 {
-    public static final String version = "0.2.1";
+    public static final String version = "0.2.2";
 
     @Inject
     private OverlayManager overlayManager;
