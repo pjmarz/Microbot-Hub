@@ -26,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoCraftingPlusPlugin extends Plugin {
-    public static final String version = "0.2.1";
+    public static final String version = "0.3.0";
 
     @Inject
     private AutoCraftingPlusConfig config;

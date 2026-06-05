@@ -10,11 +10,15 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.ButtonComponent;
 import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
+import net.runelite.http.api.item.ItemPrice;
 
 import javax.inject.Inject;
 import java.awt.*;
 import java.text.NumberFormat;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class AutoCraftingPlusOverlay extends OverlayPanel {
     private static final Color TITLE_COLOR = new Color(0, 170, 0);
@@ -108,6 +112,22 @@ public class AutoCraftingPlusOverlay extends OverlayPanel {
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
+                // GP/hr: NET per item = product GE price minus the materials it consumes, branched
+                // on the active activity. The counter is batches (one full inventory crafted per
+                // increment), not items, so items = batches * a per-activity batch size estimate ->
+                // the "~" marks it an estimate. Can be negative. Guards runtime 0 and price 0; any
+                // item with no GE price drops that side to 0 (shows GP/hr 0 rather than mispricing).
+                //   LEATHER: product - leather. 1 leather/item, ~26 per inventory (less needle+thread).
+                //   GEM_CUTTING: cut gem - uncut gem. 1:1, ~27 per inventory (less chisel).
+                //   JEWELLERY: product - bar (- cut gem for gem jewellery). 1 bar (+1 gem)/item;
+                //     batch size mirrors the script's withdraw cap (13 with a gem, else 27).
+                long gpPerHour = computeGpPerHour(runtimeMillis);
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("GP/hr:")
+                        .right("~" + NumberFormat.getInstance().format(gpPerHour))
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("Runtime:")
                         .right(formatDuration(Duration.ofMillis(runtimeMillis)))
@@ -140,5 +160,103 @@ public class AutoCraftingPlusOverlay extends OverlayPanel {
 
     private String formatDuration(Duration duration) {
         return String.format("%02d:%02d:%02d", duration.toHours(), duration.toMinutesPart(), duration.toSecondsPart());
+    }
+
+    /**
+     * NET GP/hr for the active activity. batches = the script's cycle counter; itemsCrafted =
+     * batches * a per-activity batch-size estimate. Returns 0 (rather than mispricing) when the
+     * product cannot be priced.
+     */
+    private long computeGpPerHour(long runtimeMillis) {
+        AutoCraftingPlusScript script = plugin.getScript();
+        if (script == null || runtimeMillis <= 1000) {
+            return 0;
+        }
+        long batches = script.getActionsCompleted();
+        if (batches <= 0) {
+            return 0;
+        }
+
+        long netPerItem = 0;
+        long itemsPerBatch = 0;
+
+        switch (config.activity()) {
+            case LEATHER: {
+                // Prefer the script's resolved pick (progressive / dragonhide) over the config item.
+                DragonLeather dragon = script.getActiveDragonLeather();
+                if (dragon != null && dragon != DragonLeather.NONE) {
+                    int productPrice = Microbot.getItemManager().getItemPrice(dragon.getItemId());
+                    int leatherPrice = Microbot.getItemManager().getItemPrice(dragon.getLeatherId());
+                    if (productPrice <= 0) return 0;
+                    int perCraft = dragon.getLeatherPerCraft(); // body 3, chaps 2, else 1
+                    netPerItem = (long) productPrice - (long) leatherPrice * perCraft;
+                    itemsPerBatch = 27 / perCraft; // full inventory of dragon leather, less tools
+                    break;
+                }
+                Leather product = script.getActiveSoftLeather() != null
+                        ? script.getActiveSoftLeather() : config.leatherProduct();
+                int productPrice = price(product.getProductName());
+                int leatherPrice = Microbot.getItemManager().getItemPrice(product.getMaterialId());
+                if (productPrice <= 0) return 0;
+                netPerItem = (long) productPrice - leatherPrice; // 1 leather per item
+                itemsPerBatch = 26; // full inventory of leather, less needle + thread
+                break;
+            }
+            case GEM_CUTTING: {
+                Gems gem = script.getActiveGem() != null ? script.getActiveGem() : config.gemType();
+                String gemName = gem.getName();
+                int cutPrice = price(gemName);
+                int uncutPrice = price("Uncut " + gemName);
+                if (cutPrice <= 0) return 0;
+                netPerItem = (long) cutPrice - uncutPrice; // 1 uncut -> 1 cut
+                itemsPerBatch = 27; // full inventory of uncut gems, less chisel
+                break;
+            }
+            case JEWELLERY: {
+                Jewelry jewelry = config.jewellery();
+                boolean needsGem = jewelry.getGem() != Gem.NONE;
+                int productPrice = Microbot.getItemManager().getItemPrice(jewelry.getItemID());
+                int barPrice = Microbot.getItemManager().getItemPrice(jewelry.getJewelryType().getItemID());
+                int gemPrice = needsGem ? Microbot.getItemManager().getItemPrice(jewelry.getGem().getCutItemID()) : 0;
+                if (productPrice <= 0) return 0;
+                netPerItem = (long) productPrice - barPrice - gemPrice; // 1 bar (+1 cut gem) per item
+                itemsPerBatch = needsGem ? 13 : 27; // mirrors the script's per-trip withdraw cap
+                break;
+            }
+        }
+
+        long itemsCrafted = batches * itemsPerBatch;
+        return netPerItem * itemsCrafted * 3600000L / runtimeMillis;
+    }
+
+    // Cache resolved item ids by display name so the name search runs only when a new name is seen,
+    // not every render frame. search() scans the whole item database; getItemPrice by id is cheap.
+    // Used for leather products and cut/uncut gems, whose enums carry only names (no item ids).
+    private final Map<String, Integer> nameIdCache = new HashMap<>();
+
+    /** GE price of the item with this exact display name, name-resolved once then cached. 0 if none. */
+    private int price(String name) {
+        if (name == null || name.isEmpty()) {
+            return 0;
+        }
+        Integer id = nameIdCache.get(name);
+        if (id == null) {
+            id = resolveId(name);
+            nameIdCache.put(name, id);
+        }
+        return id > 0 ? Microbot.getItemManager().getItemPrice(id) : 0;
+    }
+
+    private int resolveId(String name) {
+        List<ItemPrice> matches = Microbot.getItemManager().search(name);
+        if (matches == null || matches.isEmpty()) {
+            return 0;
+        }
+        for (ItemPrice match : matches) {
+            if (match.getName() != null && match.getName().equalsIgnoreCase(name)) {
+                return match.getId();
+            }
+        }
+        return 0;
     }
 }

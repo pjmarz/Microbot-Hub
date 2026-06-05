@@ -43,10 +43,21 @@ public class AutoCraftingPlusScript extends Script {
 
     private boolean shutdownAfterCleanup = false;
 
+    // Resolved active picks (manual or progressive). Exactly one leather field is non-null at a time.
+    private Leather activeSoftLeather = null;
+    private DragonLeather activeDragonLeather = null;
+    private Gems activeGem = null;
+
     public long getStartTimeMillis() { return startTimeMillis; }
     public int getStartSkillXp() { return startSkillXp; }
     public int getStartSkillLevel() { return startSkillLevel; }
     public int getActionsCompleted() { return actionsCompleted; }
+    /** The soft-leather piece currently being made, or null when d'hide/other is active. For the overlay. */
+    public Leather getActiveSoftLeather() { return activeSoftLeather; }
+    /** The dragonhide piece currently being made, or null when soft/other is active. For the overlay. */
+    public DragonLeather getActiveDragonLeather() { return activeDragonLeather; }
+    /** The gem currently being cut (resolves progressive mode), for the overlay. */
+    public Gems getActiveGem() { return activeGem; }
 
     public boolean run(AutoCraftingPlusConfig config) {
         startTimeMillis = System.currentTimeMillis();
@@ -56,6 +67,9 @@ public class AutoCraftingPlusScript extends Script {
                 Microbot.getClient().getRealSkillLevel(Skill.CRAFTING)).orElse(1);
         actionsCompleted = 0;
         shutdownAfterCleanup = false;
+        activeSoftLeather = null;
+        activeDragonLeather = null;
+        activeGem = null;
 
         Microbot.enableAutoRunOn = true;
         Rs2Walker.disableTeleports = true; // keep banking on foot (the RC v0.1.1 lesson)
@@ -129,8 +143,135 @@ public class AutoCraftingPlusScript extends Script {
 
     // --- Leather ---
 
+    /**
+     * Dispatches the LEATHER activity to either the soft-leather flow or the dragonhide flow.
+     *
+     * <p>Selection order:
+     * <ol>
+     *   <li><b>Progressive on</b>: pick the highest-level item (soft Leather L1-28 and DragonLeather
+     *       L57-84 considered together, ordered by level) the player's Crafting level allows AND whose
+     *       material is in the bank. Only re-evaluates while the bank is open (so we can read stock);
+     *       otherwise it keeps the last pick for the in-progress trip. The chosen item's type then
+     *       dispatches to the soft or d'hide flow below.</li>
+     *   <li><b>Progressive off, Dragonhide set</b>: run the d'hide flow for that piece.</li>
+     *   <li><b>Otherwise</b>: run the soft-leather flow for the manually picked Leather item.</li>
+     * </ol></p>
+     */
     private void runLeather(AutoCraftingPlusConfig config) {
-        final Leather product = config.leatherProduct();
+        if (config.progressiveCraft()) {
+            runProgressiveLeather(config);
+            return;
+        }
+
+        if (config.dragonLeather() != DragonLeather.NONE) {
+            activeSoftLeather = null;
+            activeDragonLeather = config.dragonLeather();
+            runDragonLeather(config.dragonLeather());
+        } else {
+            activeDragonLeather = null;
+            activeSoftLeather = config.leatherProduct();
+            runSoftLeather(config.leatherProduct());
+        }
+    }
+
+    /**
+     * Progressive LEATHER: hold the current pick to decide craft-vs-bank, but re-resolve the pick at
+     * the bank (where stock is readable). If the inventory still has the active material we craft;
+     * otherwise we bank, and the banking step re-evaluates and may switch soft &lt;-&gt; d'hide before
+     * withdrawing. Dispatch to the soft or d'hide craft flow based on the resolved type.
+     */
+    private void runProgressiveLeather(AutoCraftingPlusConfig config) {
+        // Seed a pick so the very first tick can travel to the bank.
+        if (activeSoftLeather == null && activeDragonLeather == null) {
+            activeSoftLeather = config.leatherProduct();
+        }
+
+        boolean haveActiveMaterial;
+        if (activeDragonLeather != null) {
+            haveActiveMaterial = Rs2Inventory.hasItemAmount(
+                    activeDragonLeather.getLeatherId(), activeDragonLeather.getLeatherPerCraft());
+        } else {
+            haveActiveMaterial = Rs2Inventory.hasItem(activeSoftLeather.getMaterialId());
+        }
+
+        boolean needBank = shutdownAfterCleanup
+                || !haveActiveMaterial
+                || !Rs2Inventory.hasItem(ItemID.NEEDLE)
+                || !Rs2Inventory.hasItem(ItemID.THREAD);
+
+        if (needBank) {
+            handleProgressiveLeatherBanking(config);
+        } else if (activeDragonLeather != null) {
+            craftDragonLeather(activeDragonLeather);
+        } else {
+            craftLeather(activeSoftLeather);
+        }
+    }
+
+    /**
+     * Banking for progressive leather. Walks to the bank, deposits crafted output and stale leftovers
+     * (keeping tools and all leather types), re-evaluates the best pick with the bank open, then
+     * withdraws needle + thread + the chosen leather. Stops cleanly if no leather is craftable.
+     */
+    private void handleProgressiveLeatherBanking(AutoCraftingPlusConfig config) {
+        if (Rs2Player.isMoving()) return;
+        Microbot.status = "Banking";
+        boolean isBankOpen = Rs2Bank.walkToBankAndUseBank();
+        if (!isBankOpen || !Rs2Bank.isOpen()) return;
+
+        // Keep tools; deposit everything else so leftover leather of the wrong type goes back.
+        Rs2Bank.depositAllExcept(ItemID.NEEDLE, ItemID.THREAD);
+        sleep(400);
+
+        if (shutdownAfterCleanup) {
+            Rs2Bank.closeBank();
+            Microbot.log("AutoCraftingPlus: target reached, banked, shutting down.");
+            super.shutdown();
+            return;
+        }
+
+        // Now the bank is open: pick the highest craftable item with banked materials.
+        updateProgressiveLeather(config);
+
+        if (!Rs2Inventory.hasItem(ItemID.NEEDLE)) {
+            if (!Rs2Bank.hasItem(ItemID.NEEDLE)) {
+                Microbot.showMessage("No needle in the bank!");
+                super.shutdown();
+                return;
+            }
+            Rs2Bank.withdrawItem(true, ItemID.NEEDLE);
+        }
+        if (!Rs2Inventory.hasItem(ItemID.THREAD)) {
+            if (!Rs2Bank.hasItem(ItemID.THREAD)) {
+                Microbot.showMessage("No thread in the bank!");
+                super.shutdown();
+                return;
+            }
+            Rs2Bank.withdrawX(true, ItemID.THREAD, 10);
+        }
+
+        int materialId;
+        String materialLabel;
+        if (activeDragonLeather != null) {
+            materialId = activeDragonLeather.getLeatherId();
+            materialLabel = "dragon leather for " + activeDragonLeather.getName();
+        } else {
+            materialId = activeSoftLeather.getMaterialId();
+            materialLabel = activeSoftLeather.getMaterialName();
+        }
+
+        if (!Rs2Bank.hasItem(materialId)) {
+            Microbot.showMessage("Out of " + materialLabel + " in the bank!");
+            super.shutdown();
+            return;
+        }
+        Microbot.status = "Withdrawing leather";
+        Rs2Bank.withdrawAll(materialId);
+        Rs2Random.wait(400, 900);
+        Rs2Bank.closeBank();
+    }
+
+    private void runSoftLeather(Leather product) {
         if (!Rs2Player.getSkillRequirement(Skill.CRAFTING, product.getLevelRequired())) {
             Microbot.showMessage("Crafting level too low to make " + product.getProductName() + ".");
             super.shutdown();
@@ -210,39 +351,37 @@ public class AutoCraftingPlusScript extends Script {
         }
     }
 
-    // --- Gem cutting (v0.1.0, forked from GemsScript) ---
+    // --- Dragonhide leather (mirrors crafting/scripts/DragonLeatherScript) ---
 
-    private void runGems(AutoCraftingPlusConfig config) {
-        int requiredLevel = config.gemType().getLevelRequired();
-        if (!Rs2Player.getSkillRequirement(Skill.CRAFTING, requiredLevel)) {
-            Microbot.showMessage("Crafting level too low to cut " + config.gemType().getName() + ".");
+    private void runDragonLeather(DragonLeather product) {
+        if (!Rs2Player.getSkillRequirement(Skill.CRAFTING, product.getLevelRequired())) {
+            Microbot.showMessage("Crafting level too low to make " + product.getName() + ".");
             super.shutdown();
             return;
         }
 
-        final String gemName = config.gemType().getName();
-        final String uncutGemName = "uncut " + gemName;
-
+        int perCraft = product.getLeatherPerCraft();
         boolean needBank = shutdownAfterCleanup
-                || !Rs2Inventory.hasItem(uncutGemName)
-                || !Rs2Inventory.hasItem("chisel");
+                || !Rs2Inventory.hasItemAmount(product.getLeatherId(), perCraft)
+                || !Rs2Inventory.hasItem(ItemID.NEEDLE)
+                || !Rs2Inventory.hasItem(ItemID.THREAD);
 
         if (needBank) {
-            handleGemBanking(gemName, uncutGemName);
+            handleDragonLeatherBanking(product);
         } else {
-            cutGems(uncutGemName);
+            craftDragonLeather(product);
         }
     }
 
-    private void handleGemBanking(String gemName, String uncutGemName) {
+    private void handleDragonLeatherBanking(DragonLeather product) {
         if (Rs2Player.isMoving()) return;
         Microbot.status = "Banking";
         boolean isBankOpen = Rs2Bank.walkToBankAndUseBank();
         if (!isBankOpen || !Rs2Bank.isOpen()) return;
 
-        Rs2Bank.depositAll(gemName);
-        Rs2Bank.depositAll("crushed gem");
-        sleepUntil(() -> !Rs2Inventory.hasItem(gemName) && !Rs2Inventory.hasItem("crushed gem"), 3000);
+        // Deposit crafted pieces and leftovers, keeping needle + thread + the dragon leather.
+        Rs2Bank.depositAllExcept(ItemID.NEEDLE, ItemID.THREAD, product.getLeatherId());
+        sleep(400);
 
         if (shutdownAfterCleanup) {
             Rs2Bank.closeBank();
@@ -251,14 +390,188 @@ public class AutoCraftingPlusScript extends Script {
             return;
         }
 
-        if (!Rs2Bank.hasItem(uncutGemName)) {
-            Microbot.showMessage("Out of " + uncutGemName + " in the bank!");
+        if (!Rs2Inventory.hasItem(ItemID.NEEDLE)) {
+            if (!Rs2Bank.hasItem(ItemID.NEEDLE)) {
+                Microbot.showMessage("No needle in the bank!");
+                super.shutdown();
+                return;
+            }
+            Rs2Bank.withdrawItem(true, ItemID.NEEDLE);
+        }
+        if (!Rs2Inventory.hasItem(ItemID.THREAD)) {
+            if (!Rs2Bank.hasItem(ItemID.THREAD)) {
+                Microbot.showMessage("No thread in the bank!");
+                super.shutdown();
+                return;
+            }
+            Rs2Bank.withdrawX(true, ItemID.THREAD, 10); // bounded so leather still fits
+        }
+
+        if (!Rs2Bank.hasItem(product.getLeatherId())) {
+            Microbot.showMessage("Out of dragon leather for " + product.getName() + " in the bank!");
+            super.shutdown();
+            return;
+        }
+        Microbot.status = "Withdrawing dragon leather";
+        Rs2Bank.withdrawAll(product.getLeatherId());
+        Rs2Random.wait(400, 900);
+        Rs2Bank.closeBank();
+    }
+
+    /**
+     * Mirrors DragonLeatherScript.handleCrafting: use needle on the dragon leather, wait for the
+     * make-X production dialog (widget 17694733), then press the piece's menuEntry digit to select
+     * it (body=1, vambraces=2, chaps=3 -- the number keys the dialog lists for that colour). The
+     * batch then sews until the leather runs out (chaps use 2, body uses 3 per piece) or thread runs
+     * out, at which point the next tick banks to restock.
+     */
+    private void craftDragonLeather(DragonLeather product) {
+        Microbot.status = "Crafting " + product.getName();
+        Rs2Inventory.use(ItemID.NEEDLE);
+        Rs2Inventory.use(product.getLeatherId());
+        if (sleepUntil(() -> Rs2Widget.getWidget(MAKE_INTERFACE_WIDGET) != null, 5000)) {
+            Rs2Keyboard.keyPress(product.getMenuEntry());
+            sleep(1800);
+            int perCraft = product.getLeatherPerCraft();
+            sleepUntil(() -> !Rs2Inventory.hasItemAmount(product.getLeatherId(), perCraft)
+                    || !Rs2Inventory.hasItem(ItemID.THREAD), 60000);
+            actionsCompleted++;
+        }
+    }
+
+    // --- Progressive leather selection (soft Leather + DragonLeather, ordered by level) ---
+
+    /**
+     * Resolves the best progressive leather pick. Soft Leather (L1-28) and DragonLeather (L57-84) are
+     * considered together; we choose the highest-level item the Crafting level allows whose material
+     * is in the bank. Called only with the bank open (from handleProgressiveLeatherBanking) so stock
+     * is readable. Sets exactly one of activeSoftLeather / activeDragonLeather (the other is nulled)
+     * so the craft step dispatches to the right flow. If nothing is craftable it leaves the prior
+     * pick unchanged, and the caller then reports the shortage and stops.
+     */
+    private void updateProgressiveLeather(AutoCraftingPlusConfig config) {
+        int crafting = Rs2Player.getRealSkillLevel(Skill.CRAFTING);
+        int bestLevel = -1;
+        Leather bestSoft = null;
+        DragonLeather bestDragon = null;
+
+        for (Leather l : Leather.values()) {
+            if (l.getLevelRequired() > crafting) continue;
+            if (!Rs2Bank.hasItem(l.getMaterialId())) continue;
+            if (l.getLevelRequired() > bestLevel) {
+                bestLevel = l.getLevelRequired();
+                bestSoft = l;
+                bestDragon = null;
+            }
+        }
+        for (DragonLeather d : DragonLeather.values()) {
+            if (d == DragonLeather.NONE) continue;
+            if (d.getLevelRequired() > crafting) continue;
+            if (!Rs2Bank.hasItem(d.getLeatherId())) continue;
+            if (d.getLevelRequired() > bestLevel) {
+                bestLevel = d.getLevelRequired();
+                bestDragon = d;
+                bestSoft = null;
+            }
+        }
+
+        if (bestDragon != null) {
+            activeDragonLeather = bestDragon;
+            activeSoftLeather = null;
+        } else if (bestSoft != null) {
+            activeSoftLeather = bestSoft;
+            activeDragonLeather = null;
+        }
+        // If neither found (no materials banked), leave the prior pick; the caller reports + stops.
+    }
+
+    // --- Gem cutting (v0.1.0, forked from GemsScript) ---
+
+    private void runGems(AutoCraftingPlusConfig config) {
+        updateActiveGem(config);
+        final Gems gem = activeGem;
+
+        if (!Rs2Player.getSkillRequirement(Skill.CRAFTING, gem.getLevelRequired())) {
+            Microbot.showMessage("Crafting level too low to cut " + gem.getName() + ".");
+            super.shutdown();
+            return;
+        }
+
+        final String gemName = gem.getName();
+        final String uncutGemName = "uncut " + gemName;
+
+        boolean needBank = shutdownAfterCleanup
+                || !Rs2Inventory.hasItem(uncutGemName)
+                || !Rs2Inventory.hasItem("chisel");
+
+        if (needBank) {
+            handleGemBanking(config, gemName, uncutGemName);
+        } else {
+            cutGems(uncutGemName);
+        }
+    }
+
+    /**
+     * Resolves the gem to cut. Manual mode uses the config pick. Progressive mode chooses the
+     * highest-level Gems the Crafting level allows whose uncut gem is in the bank; bank-aware, so it
+     * only re-evaluates while the bank is open and otherwise keeps the in-progress pick.
+     */
+    private void updateActiveGem(AutoCraftingPlusConfig config) {
+        if (!config.progressiveCraft()) {
+            activeGem = config.gemType();
+            return;
+        }
+        if (activeGem == null) {
+            activeGem = config.gemType();
+        }
+        if (!Rs2Bank.isOpen()) {
+            return; // can't read bank stock yet; keep the in-progress pick
+        }
+
+        int crafting = Rs2Player.getRealSkillLevel(Skill.CRAFTING);
+        Gems best = null;
+        for (Gems g : Gems.values()) {
+            if (g.getLevelRequired() > crafting) continue;
+            if (!Rs2Bank.hasItem("uncut " + g.getName())) continue;
+            if (best == null || g.getLevelRequired() > best.getLevelRequired()) {
+                best = g;
+            }
+        }
+        if (best != null) {
+            activeGem = best;
+        }
+    }
+
+    private void handleGemBanking(AutoCraftingPlusConfig config, String gemName, String uncutGemName) {
+        if (Rs2Player.isMoving()) return;
+        Microbot.status = "Banking";
+        boolean isBankOpen = Rs2Bank.walkToBankAndUseBank();
+        if (!isBankOpen || !Rs2Bank.isOpen()) return;
+
+        // Re-evaluate the progressive gem now the bank is open (so we can read uncut-gem stock).
+        updateActiveGem(config);
+        final String gem = activeGem.getName();
+        final String uncutGem = "uncut " + gem;
+
+        Rs2Bank.depositAll(gem);
+        Rs2Bank.depositAll("crushed gem");
+        sleepUntil(() -> !Rs2Inventory.hasItem(gem) && !Rs2Inventory.hasItem("crushed gem"), 3000);
+
+        if (shutdownAfterCleanup) {
+            Rs2Bank.closeBank();
+            Microbot.log("AutoCraftingPlus: target reached, banked, shutting down.");
+            super.shutdown();
+            return;
+        }
+
+        if (!Rs2Bank.hasItem(uncutGem)) {
+            Microbot.showMessage("Out of " + uncutGem + " in the bank!");
             super.shutdown();
             return;
         }
         Microbot.status = "Withdrawing gems";
         Rs2Bank.withdrawItem(true, "chisel");
-        Rs2Bank.withdrawAll(true, uncutGemName);
+        Rs2Bank.withdrawAll(true, uncutGem);
         Rs2Random.wait(400, 900);
         Rs2Bank.closeBank();
     }

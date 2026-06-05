@@ -9,14 +9,23 @@ import net.runelite.client.config.ConfigSection;
 @ConfigGroup("CraftingPlus")
 @ConfigInformation("<h2>Auto Crafting Plus</h2>" +
         "<h3>Version: " + AutoCraftingPlusPlugin.version + "</h3>" +
-        "<p>1. <strong>Activity:</strong> Leather (needle + thread + leather, F2P from level 1), " +
-        "Gem cutting (chisel + uncut gems, from 20 for sapphire), or Furnace jewellery (gold/silver " +
-        "bar + mould, plus a cut gem for gem rings/necklaces/etc.).</p>" +
+        "<p>1. <strong>Activity:</strong> Leather (needle + thread + leather, free to play from " +
+        "level 1), Gem cutting (chisel + uncut gems, from 20 for sapphire), or Furnace jewellery " +
+        "(gold or silver bar + mould, plus a cut gem for gem rings and necklaces).</p>" +
         "<p>2. <strong>Leather item / Gem / Jewellery:</strong> what to make for the chosen activity.</p>" +
-        "<p>3. <strong>Furnace:</strong> which furnace+bank to use for jewellery (Edgeville is the F2P default).</p>" +
-        "<p>4. <strong>Stop after / Target level:</strong> auto-shutdown thresholds. Target level banks first.</p>" +
-        "<p>5. <strong>League mode:</strong> periodic arrow-key press to defeat the idle-logout.</p>" +
-        "<p>6. <strong>Speed mode:</strong> disables Microbot antiban. Throwaway accounts only.</p>")
+        "<p>3. <strong>Dragonhide:</strong> in the Leather activity, set this to a d'hide piece " +
+        "(green from 57, up to black) to sew dragonhide armour instead of soft leather. Needs the " +
+        "matching dragon leather in the bank. Leave it on None to make soft leather.</p>" +
+        "<p>4. <strong>Progressive:</strong> when on, picks the highest item your Crafting level " +
+        "allows that also has materials in the bank, and re-checks at every bank trip. Covers " +
+        "Leather (soft and dragonhide together) and Gem cutting. It does not change Jewellery, so " +
+        "pick the jewellery piece yourself.</p>" +
+        "<p>5. <strong>Furnace:</strong> which furnace and bank to use for jewellery (Edgeville is " +
+        "the free to play default).</p>" +
+        "<p>6. <strong>Stop after / Target level:</strong> auto-shutdown thresholds. Target level " +
+        "banks first.</p>" +
+        "<p>7. <strong>League mode:</strong> periodic arrow-key press to beat the idle-logout.</p>" +
+        "<p>8. <strong>Speed mode:</strong> turns off Microbot antiban. Throwaway accounts only.</p>")
 public interface AutoCraftingPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)
@@ -36,7 +45,7 @@ public interface AutoCraftingPlusConfig extends Config {
     @ConfigItem(
             keyName = "leatherProduct",
             name = "Leather item",
-            description = "Which leather item to make (Leather activity).",
+            description = "Which soft leather item to make (Leather activity). Ignored if Dragonhide is set or Progressive is on.",
             position = 1,
             section = generalSection
     )
@@ -45,10 +54,21 @@ public interface AutoCraftingPlusConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "dragonLeather",
+            name = "Dragonhide",
+            description = "Sew dragonhide armour instead of soft leather. Needs the matching dragon leather banked. None = make soft leather. Ignored if Progressive is on.",
+            position = 2,
+            section = generalSection
+    )
+    default DragonLeather dragonLeather() {
+        return DragonLeather.NONE;
+    }
+
+    @ConfigItem(
             keyName = "gemType",
             name = "Gem",
-            description = "Which gem to cut (Gem cutting activity).",
-            position = 2,
+            description = "Which gem to cut (Gem cutting activity). Ignored if Progressive is on.",
+            position = 3,
             section = generalSection
     )
     default Gems gemType() {
@@ -58,8 +78,8 @@ public interface AutoCraftingPlusConfig extends Config {
     @ConfigItem(
             keyName = "jewellery",
             name = "Jewellery",
-            description = "Which piece to cast (Furnace jewellery activity). Gold/silver bar + mould; gem pieces also need the cut gem banked.",
-            position = 3,
+            description = "Which piece to cast (Furnace jewellery activity). Gold/silver bar + mould; gem pieces also need the cut gem banked. Progressive does not change this.",
+            position = 4,
             section = generalSection
     )
     default Jewelry jewellery() {
@@ -67,10 +87,21 @@ public interface AutoCraftingPlusConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "progressiveCraft",
+            name = "Progressive",
+            description = "Auto-pick the highest item your Crafting level allows with materials in the bank. Re-checks each bank trip. Covers Leather (soft + dragonhide) and Gem cutting. No effect on Jewellery.",
+            position = 5,
+            section = generalSection
+    )
+    default boolean progressiveCraft() {
+        return false;
+    }
+
+    @ConfigItem(
             keyName = "furnaceLocation",
             name = "Furnace",
             description = "Which furnace + bank to use for jewellery. Edgeville is the closest F2P furnace-to-bank.",
-            position = 4,
+            position = 6,
             section = generalSection
     )
     default CraftingLocation furnaceLocation() {
@@ -81,7 +112,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "stopAfterMinutes",
             name = "Stop after (minutes)",
             description = "Auto-shutdown after this many minutes of runtime. 0 = no limit.",
-            position = 5,
+            position = 7,
             section = generalSection
     )
     default int stopAfterMinutes() {
@@ -92,7 +123,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "stopAfterXp",
             name = "Stop after (XP gained)",
             description = "Auto-shutdown after gaining this much Crafting XP. 0 = no limit.",
-            position = 6,
+            position = 8,
             section = generalSection
     )
     default int stopAfterXp() {
@@ -103,7 +134,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "targetLevel",
             name = "Target level",
             description = "Stop when Crafting reaches this level. Banks the inventory first. 0 = disabled.",
-            position = 7,
+            position = 9,
             section = generalSection
     )
     default int targetLevel() {
@@ -114,7 +145,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "leagueMode",
             name = "League mode (anti-AFK)",
             description = "Periodically presses an arrow key to reset the idle-logout timer.",
-            position = 8,
+            position = 10,
             section = generalSection
     )
     default boolean leagueMode() {
@@ -125,7 +156,7 @@ public interface AutoCraftingPlusConfig extends Config {
             keyName = "speedMode",
             name = "Speed mode (less antiban)",
             description = "Disables Microbot's antiban. Faster, more pattern-detectable. Throwaway only.",
-            position = 9,
+            position = 11,
             section = generalSection
     )
     default boolean speedMode() {
