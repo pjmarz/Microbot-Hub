@@ -7,8 +7,6 @@ import net.runelite.api.gameval.ObjectID;
 import net.runelite.api.Skill;
 import net.runelite.api.TileObject;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
 import net.runelite.client.plugins.microbot.autofishingplus.enums.AutoFishingPlusState;
@@ -33,8 +31,6 @@ import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.awt.event.KeyEvent;
@@ -199,8 +195,24 @@ public class AutoFishingPlusScript extends Script {
     private void handleFishing() {
         Rs2NpcModel fishingSpot = findNearestFishingSpot();
         if (fishingSpot == null) {
+            // v0.2.3: no spot of the chosen fish is nearby. Don't busy-idle on the same null tick
+            // after tick. Walk back toward the anchor so a drifted/depleted spot can come back into
+            // range; if there is no anchor to walk to, stop with a clear status instead of spinning.
+            WorldPoint anchor = resolveFishingAnchor();
+            WorldPoint here = Rs2Player.getWorldLocation();
+            if (anchor != null && here != null && here.distanceTo(anchor) > 5) {
+                fishingLocation = anchor;
+                Microbot.status = "No " + selectedFish + " spot in range -- walking to fishing spot";
+                if (!Rs2Player.isMoving()) {
+                    Rs2Walker.walkTo(anchor, 5);
+                }
+                return;
+            }
             Microbot.status = "No " + selectedFish + " spot here -- check fish/location match";
-            sleep(1_000, 2_000); // if by chance the same spotfish disappears, we wait to see if it reappears
+            // At the anchor but still no spot: wait a beat for it to respawn rather than spamming
+            // the cache query every tick. Not a walk target, so spinning here is unavoidable, but
+            // the back-off keeps it from hammering.
+            sleep(1_000, 2_000);
             return;
         }
         Microbot.status = "Fishing " + selectedFish + " @ " + selectedLocation;
@@ -273,48 +285,23 @@ public class AutoFishingPlusScript extends Script {
         }
 
         if (Rs2Bank.walkToBankAndUseBank()) {
-            if (Microbot.getVarbitValue(VarbitID.BANK_SIDE_SLOT_SHOWOP) != 1 ||
-            Microbot.getVarbitValue(VarbitID.BANK_SIDE_SLOT_IGNOREINVLOCKS) != 0) {
-                Rs2Widget.clickWidget(InterfaceID.Bankmain.MENU_BUTTON);
-                sleepUntil(()->Rs2Widget.isWidgetVisible(InterfaceID.Bankmain.MENU_CONTAINER), 2000);
-                Rs2Widget.clickWidget(InterfaceID.Bankmain.LOCKS);
-                sleepUntil(()->Rs2Widget.isWidgetVisible(InterfaceID.BankSideLocks.DONE), 2000);
-                if (Microbot.getVarbitValue(VarbitID.BANK_SIDE_SLOT_IGNOREINVLOCKS) != 0) {
-                    Rs2Widget.clickWidget(InterfaceID.BankSideLocks.IGNORELOCKS);
-                    sleepUntil(() -> Microbot.getVarbitValue(VarbitID.BANK_SIDE_SLOT_IGNOREINVLOCKS) == 0, 2000);
-                }
-                if (Microbot.getVarbitValue(VarbitID.BANK_SIDE_SLOT_SHOWOP) != 1){
-                    Rs2Widget.clickWidget(InterfaceID.BankSideLocks.EXTRAOPTIONS);
-                    sleepUntil(()->Microbot.getVarbitValue(VarbitID.BANK_SIDE_SLOT_SHOWOP) == 1, 2000);
-                }
-                Rs2Widget.clickWidget(InterfaceID.BankSideLocks.DONE);
-                sleepUntil(()->!Rs2Widget.isWidgetVisible(InterfaceID.BankSideLocks.DONE), 2000);
-                Rs2Widget.clickWidget(InterfaceID.Bankmain.MENU_BUTTON);
+            // v0.2.3: tool retention by name instead of slot-locks. The old path locked the tool
+            // slots then called depositAll(), which only keeps the tool if the bank's "deposit
+            // ignores inventory locks" varbit is 0 -- and the widget dance that set it could fail
+            // on timing, dumping the whole inventory (the Draynor net-loss the journal flagged).
+            // lockAllBySlot also returns false when every slot is already locked, so its sleepUntil
+            // wrapper could spin to timeout even on success. depositAllExcept(names) keeps the tools
+            // directly and is the same mechanism the deposit-box path already uses reliably.
+            List<String> keep = toolsToKeep();
+
+            // Empty the fish barrel (banks its catch) before depositing, and keep the barrel itself.
+            if (Rs2Inventory.hasItem(ItemID.FISH_BARREL_CLOSED) || Rs2Inventory.hasItem(ItemID.FISH_BARREL_OPEN)) {
+                Rs2Bank.emptyFishBarrel();
+                keep.add("Fish barrel");
             }
 
-            Set<Integer> itemsLock = new HashSet<>();
-            if (Rs2Inventory.hasItem(selectedHarpoon.getName())) {
-                itemsLock.add(Rs2Inventory.get(selectedHarpoon.getName()).getSlot());
-            }
-            for (String item : selectedFish.getMethod().getRequiredItems()) {
-                if (Rs2Inventory.hasItem(item)) {
-                    itemsLock.add(Rs2Inventory.get(item).getSlot());
-                }
-            }
-            if (Rs2Inventory.hasItem(ItemID.FISH_BARREL_CLOSED)) {
-                itemsLock.add(Rs2Inventory.get(ItemID.FISH_BARREL_CLOSED).getSlot());
-            } else if (Rs2Inventory.hasItem(ItemID.FISH_BARREL_OPEN)) {
-                itemsLock.add(Rs2Inventory.get(ItemID.FISH_BARREL_OPEN).getSlot());
-            }
-            int[] slotsToLock = itemsLock.stream()
-                             .mapToInt(Integer::intValue)
-                             .toArray();
-
-            sleepUntil(() -> Rs2Bank.lockAllBySlot(slotsToLock));
-            Rs2Bank.emptyFishBarrel();
-            Rs2Bank.depositAll();
+            Rs2Bank.depositAllExcept(keep);
             sleepUntil(() -> !Rs2Inventory.isFull());
-            Rs2Bank.toggleAllLocks();
             Rs2Bank.closeBank();
         }
     }
