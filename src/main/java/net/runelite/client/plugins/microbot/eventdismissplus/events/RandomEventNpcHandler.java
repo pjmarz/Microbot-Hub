@@ -288,6 +288,14 @@ public class RandomEventNpcHandler implements BlockingEvent {
     }
 
     private Skill pickLampSkill() {
+        // v0.2.6: user override. When Force lamp skill is set to a specific skill, use it
+        // directly and skip both auto-detect and the fallback. AUTO_DETECT (default) maps to
+        // null and preserves the original auto-detect -> fallback behavior below unchanged.
+        EventDismissPlusConfig.LampSkillOverride override = config.forceLampSkill();
+        if (override != null && override.getSkill() != null) {
+            return override.getSkill();
+        }
+
         if (config.autoDetectLampSkill()) {
             Skill active = script.getActiveSkill();
             if (active != null) return active;
