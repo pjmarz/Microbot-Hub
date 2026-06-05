@@ -1,6 +1,7 @@
 package net.runelite.client.plugins.microbot.firemakingplus;
 
 import net.runelite.api.Client;
+import net.runelite.api.Experience;
 import net.runelite.api.Skill;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
@@ -108,6 +109,21 @@ public class AutoFiremakingPlusOverlay extends OverlayPanel {
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
+                // Firemaking spends logs (no product), so this is a cost rate, not profit. Uses the
+                // configured log's GE price (approximate under Progressive, which varies the log).
+                long logCostPerHour = 0;
+                if (config.logType() != null && runtimeMillis > 1000) {
+                    int logPrice = Microbot.getItemManager().getItemPrice(config.logType().getItemId());
+                    if (logPrice > 0) {
+                        logCostPerHour = (long) script.getActionsCompleted() * logPrice * 3600000L / runtimeMillis;
+                    }
+                }
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("Log cost/hr:")
+                        .right(logCostPerHour > 0 ? "-" + NumberFormat.getInstance().format(logCostPerHour) : "0")
+                        .rightColor(NORMAL_TEXT_COLOR)
+                        .build());
+
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("Runtime:")
                         .right(formatDuration(Duration.ofMillis(runtimeMillis)))
@@ -121,6 +137,14 @@ public class AutoFiremakingPlusOverlay extends OverlayPanel {
                             .right(config.targetLevel() + (toGo > 0 ? " (" + toGo + " to go)" : " (reached)"))
                             .rightColor(HIGHLIGHT_COLOR)
                             .build());
+                    if (toGo > 0 && xpPerHour > 0) {
+                        long xpRemaining = Math.max(0, Experience.getXpForLevel(config.targetLevel()) - currentXp);
+                        panelComponent.getChildren().add(LineComponent.builder()
+                                .left("ETA:")
+                                .right(formatDuration(Duration.ofMillis(xpRemaining * 3600000L / xpPerHour)))
+                                .rightColor(HIGHLIGHT_COLOR)
+                                .build());
+                    }
                 }
             } else {
                 panelComponent.getChildren().add(LineComponent.builder()

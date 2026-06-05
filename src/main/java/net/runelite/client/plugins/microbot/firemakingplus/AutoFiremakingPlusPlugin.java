@@ -16,16 +16,17 @@ import java.awt.*;
         name = PluginDescriptor.Mocrosoft + "Auto Firemaking Plus",
         description = "Firemaking trainer: add logs to a Forester's Campfire or light a line of fires, with stop conditions, target level, and overlay/pause.",
         tags = {"firemaking", "campfire", "skilling", "microbot", "plus"},
+        authors = {"pjmarz"},
         version = AutoFiremakingPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AutoFiremakingPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AutoFiremakingPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class AutoFiremakingPlusPlugin extends Plugin {
-    public static final String version = "0.1.11";
+    public static final String version = "0.2.1";
 
     @Inject
     private AutoFiremakingPlusConfig config;
