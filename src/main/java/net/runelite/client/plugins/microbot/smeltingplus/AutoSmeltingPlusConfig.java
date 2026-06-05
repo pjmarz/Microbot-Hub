@@ -9,21 +9,32 @@ import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
 @ConfigGroup("SmeltingPlus")
 @ConfigInformation("<h2>Auto Smelting Plus</h2>" +
         "<h3>Version: " + AutoSmeltingPlusPlugin.version + "</h3>" +
-        "<p>1. <strong>Bar:</strong> the bar to smelt. Sets the required ore mix automatically. Lower bars take 1 ore; higher bars take ore plus coal (e.g. steel is 1 iron and 2 coal).</p>" +
+        "<h3>General</h3>" +
+        "<p>1. <strong>Bar:</strong> the bar to smelt. This sets the required ore mix for you. Lower bars take 1 ore. Higher bars take ore plus coal, for example steel is 1 iron and 2 coal.</p>" +
         "<p></p>" +
-        "<p>2. <strong>Progressive smelt:</strong> ignores the Bar pick and auto selects the highest bar your Smithing level and bank stock can support, re-checked each banking trip.</p>" +
+        "<p>2. <strong>Progressive smelt:</strong> ignores the Bar pick and auto selects the highest bar your Smithing level and bank stock can support. It is re checked every bank trip.</p>" +
         "<p></p>" +
-        "<p>3. <strong>Furnace:</strong> the furnace to walk to. AUTO_NEAREST uses the closest (stand near a furnace at start, restart to switch).</p>" +
+        "<p>3. <strong>Furnace:</strong> the furnace to walk to and stay near. AUTO NEAREST uses the closest one. Stand near a furnace at start and restart to switch.</p>" +
         "<p></p>" +
-        "<p>4. <strong>Max players in area:</strong> hop worlds if more than this many other players are within Distance to Stray. 0 disables hopping.</p>" +
+        "<p>4. <strong>Distance to stray:</strong> how far the bot may wander from the furnace tile. This is also the radius used to count nearby players for world hopping.</p>" +
         "<p></p>" +
-        "<p>5. <strong>League mode:</strong> presses an arrow key to reset the idle logout timer.</p>" +
+        "<p>5. <strong>Max players in area:</strong> hop worlds if more than this many other players are within Distance to stray. Set 0 to never hop.</p>" +
         "<p></p>" +
-        "<p>6. <strong>Preferred bank:</strong> override the nearest by distance choice.</p>" +
+        "<p>6. <strong>League mode:</strong> presses an arrow key now and then to reset the idle logout timer.</p>" +
         "<p></p>" +
-        "<p>7. <strong>Items to bank / keep:</strong> comma separated lists matched on item name. Items to bank wins; if empty it deposits all except your keep list.</p>" +
+        "<p>7. <strong>Speed mode:</strong> turns off Microbot antiban for a faster pace. This is more detectable, so use throwaway accounts only.</p>" +
         "<p></p>" +
-        "<p>8. <strong>Speed mode:</strong> disables Microbot antiban for a faster pace. Throwaway accounts only.</p>")
+        "<p>8. <strong>Stop conditions:</strong> the bot shuts down when any limit you set is hit. Stop after minutes ends after that much runtime. Stop after XP ends after that much Smithing XP. Target level ends when Smithing reaches that level and deposits first. Set any to 0 to ignore it.</p>" +
+        "<p></p>" +
+        "<h3>Banking</h3>" +
+        "<p>9. <strong>Use bank:</strong> runs the normal cycle of bank, withdraw ores, walk to the furnace, smelt, then walk back.</p>" +
+        "<p></p>" +
+        "<p>10. <strong>Preferred bank:</strong> overrides the nearest by distance pick. AUTO NEAREST uses the closest one.</p>" +
+        "<p></p>" +
+        "<p>11. <strong>Items to bank and Items to keep:</strong> comma separated name matches. Items to bank deposits anything whose name contains a listed word. Items to keep is never deposited. If Items to bank is empty the bot deposits everything except your keep list.</p>" +
+        "<p></p>" +
+        "<h3>Dropping</h3>" +
+        "<p>12. <strong>Drop order:</strong> the order to drop items when not banking. Smelting always banks, so this is unused for now and kept for parity.</p>")
 public interface AutoSmeltingPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)
@@ -49,9 +60,8 @@ public interface AutoSmeltingPlusConfig extends Config {
     }
 
     /**
-     * Cycle A v0.2.0 borrow from WC's progressiveMode. Auto-picks the highest-tier bar where
-     * Smithing level >= bar.requiredSmithingLevel AND the bank has the required ores.
-     * Re-evaluated each bank trip.
+     * Auto-picks the highest-tier bar where Smithing level >= bar.requiredSmithingLevel
+     * AND the bank has the required ores. Re-evaluated each bank trip.
      */
     @ConfigItem(
             keyName = "progressiveSmelt",
@@ -67,7 +77,7 @@ public interface AutoSmeltingPlusConfig extends Config {
     @ConfigItem(
             keyName = "furnaceLocation",
             name = "Furnace",
-            description = "Walk to and anchor at this furnace. AUTO_NEAREST = require start-near-furnace (upstream behavior).",
+            description = "Walk to and anchor at this furnace. AUTO NEAREST means you must start near a furnace.",
             position = 2,
             section = generalSection
     )
@@ -87,7 +97,7 @@ public interface AutoSmeltingPlusConfig extends Config {
     }
 
     /**
-     * Cycle A v0.2.0 borrow from MiningPlus / WC. Anti-PK / busy-furnace safety.
+     * Anti-PK and busy-furnace safety: hop worlds when the area gets crowded.
      */
     @ConfigItem(
             keyName = "maxPlayersInArea",
@@ -101,7 +111,7 @@ public interface AutoSmeltingPlusConfig extends Config {
     }
 
     /**
-     * Cycle A v0.2.0 borrow from MiningPlus. Defends against the game's 5-min idle-logout.
+     * Defends against the game's 5-minute idle-logout.
      */
     @ConfigItem(
             keyName = "leagueMode",
@@ -126,7 +136,7 @@ public interface AutoSmeltingPlusConfig extends Config {
     }
 
     /**
-     * Polish-Cycle 2 v0.3.0: runtime/XP threshold for auto-shutdown.
+     * Runtime threshold for auto-shutdown.
      */
     @ConfigItem(
             keyName = "stopAfterMinutes",
@@ -151,8 +161,8 @@ public interface AutoSmeltingPlusConfig extends Config {
     }
 
     /**
-     * v0.5.0: target-level threshold. When Smithing level reaches this value, the script
-     * flips to RESETTING for a deposit pass, then shuts down. 0 = disabled.
+     * Target-level threshold. When Smithing level reaches this value, the script
+     * does a final deposit pass, then shuts down. 0 = disabled.
      */
     @ConfigItem(
             keyName = "targetLevel",
@@ -165,8 +175,8 @@ public interface AutoSmeltingPlusConfig extends Config {
         return 0;
     }
 
-    // v0.5.1: paused config item removed. Pause is now an overlay button toggling
-    // Microbot.pauseAllScripts (shared global flag). See AutoSmeltingPlusOverlay.
+    // Pause is an overlay button toggling Microbot.pauseAllScripts (shared global flag).
+    // See AutoSmeltingPlusOverlay.
 
     // --- Banking section ---
 
@@ -193,8 +203,7 @@ public interface AutoSmeltingPlusConfig extends Config {
     }
 
     /**
-     * Cycle A v0.2.0 borrow. CSV inclusion list (substring match on item name) replaces the
-     * v0.1.1 hardcoded depositAllExcept(COAL_BAG_ID) call.
+     * CSV inclusion list, substring match on item name.
      */
     @ConfigItem(
             keyName = "itemsToBank",
@@ -208,8 +217,8 @@ public interface AutoSmeltingPlusConfig extends Config {
     }
 
     /**
-     * Cycle A v0.2.0 borrow. Exclusion list when itemsToBank is empty; also a safety net so
-     * critical items aren't deposited even if the user widens the bank filter.
+     * Exclusion list when itemsToBank is empty; also a safety net so critical items
+     * aren't deposited even if the user widens the bank filter.
      */
     @ConfigItem(
             keyName = "itemsToKeep",
@@ -225,8 +234,8 @@ public interface AutoSmeltingPlusConfig extends Config {
     // --- Dropping section ---
 
     /**
-     * Cycle A v0.2.0 borrow. Unused at v0.2.0 (smelting always banks); reserved for a future
-     * "drop bars" mode and for cross-plugin config parity.
+     * Unused for now (smelting always banks); reserved for a future "drop bars" mode
+     * and for cross-plugin config parity.
      */
     @ConfigItem(
             keyName = "dropOrder",

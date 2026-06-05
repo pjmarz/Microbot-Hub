@@ -17,7 +17,7 @@ import java.text.NumberFormat;
 import java.time.Duration;
 
 /**
- * Polish-Cycle 2 (v0.3.0): rebuilt overlay matching AutoWoodcuttingPlus standard.
+ * rebuilt overlay matching AutoWoodcuttingPlus standard.
  * Shows runtime, Smithing XP gained, XP/hr, smelt cycles, current level + delta, status.
  */
 public class AutoSmeltingPlusOverlay extends OverlayPanel {

@@ -14,18 +14,19 @@ import java.awt.*;
 
 @PluginDescriptor(
         name = PluginDescriptor.Mocrosoft + "Auto Smelting Plus",
-        description = "Smelts ores into bars at a configured furnace. Pick a Bar + Furnace; bot walks there, banks ores, smelts, repeats. Polish-cycle Cycle A.",
+        description = "Smelts ores into bars at a configured furnace. Pick a Bar and Furnace; the bot walks there, banks ores, smelts, and repeats. Part of the Plus suite.",
         tags = {"smithing", "smelting", "microbot", "plus"},
+        authors = {"Vince", "pjmarz"},
         version = AutoSmeltingPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AutoSmeltingPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AutoSmeltingPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class AutoSmeltingPlusPlugin extends Plugin {
-    public static final String version = "0.5.12";
+    public static final String version = "0.5.13";
 
     @Inject
     private AutoSmeltingPlusConfig config;
@@ -68,7 +69,7 @@ public class AutoSmeltingPlusPlugin extends Plugin {
         overlayManager.remove(overlay);
     }
 
-    /** Polish-Cycle 2 v0.3.0: overlay reads script stats via this getter. */
+    /** overlay reads script stats via this getter. */
     public AutoSmeltingPlusScript getScript() {
         return script;
     }

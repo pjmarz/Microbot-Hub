@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * AutoSmeltingPlus v0.2.0 (Cycle A of the polish cycle).
+ * AutoSmeltingPlus v0.2.0.
  *
  * <p>v0.1.x shipped the auto-travel MVP + bank routing + speed mode. v0.2.0 adds the WC borrows:
  * <ul>
@@ -56,7 +56,7 @@ public class AutoSmeltingPlusScript extends Script {
     private boolean coalBagEmpty = true;
     private boolean coalBagHasBeenFilled = false;
 
-    // Polish-Cycle 2 v0.3.0: runtime stats tracking (read by AutoSmeltingPlusOverlay).
+    // runtime stats tracking (read by AutoSmeltingPlusOverlay).
     private long startTimeMillis = 0;
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
@@ -78,7 +78,7 @@ public class AutoSmeltingPlusScript extends Script {
         state = State.SMELTING;
         activeBar = null;
 
-        // Polish-Cycle 2 v0.3.0: seed stats trackers from client thread.
+        // seed stats trackers from client thread.
         startTimeMillis = System.currentTimeMillis();
         startSkillXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getSkillExperience(Skill.SMITHING)).orElse(0);
@@ -107,7 +107,7 @@ public class AutoSmeltingPlusScript extends Script {
                     return;
                 }
 
-                // Polish-Cycle 2 v0.3.0: stopAfterMinutes / stopAfterXp threshold check.
+                // stopAfterMinutes / stopAfterXp threshold check.
                 if (config.stopAfterMinutes() > 0
                         && (System.currentTimeMillis() - startTimeMillis) / 60000 >= config.stopAfterMinutes()) {
                     Microbot.log("AutoSmeltingPlus: reached stopAfterMinutes (" + config.stopAfterMinutes()
@@ -217,7 +217,7 @@ public class AutoSmeltingPlusScript extends Script {
         Rs2Antiban.resetAntibanSettings();
     }
 
-    // --- Active bar selection (Cycle A v0.2.0) ---
+    // --- Active bar selection ---
 
     private void updateActiveBar(AutoSmeltingPlusConfig config) {
         if (!config.progressiveSmelt()) {
@@ -251,7 +251,7 @@ public class AutoSmeltingPlusScript extends Script {
         return best;
     }
 
-    // --- Autohop (Cycle A v0.2.0) ---
+    // --- Autohop ---
 
     private boolean hopIfCrowded(AutoSmeltingPlusConfig config) {
         int maxPlayers = config.maxPlayersInArea();
@@ -326,7 +326,7 @@ public class AutoSmeltingPlusScript extends Script {
         Rs2Widget.sleepUntilHasWidgetText("What would you like to smelt?", 270, 5, false, 4000);
         Rs2Widget.clickWidget(activeBar.getName());
         Rs2Widget.sleepUntilHasNotWidgetText("What would you like to smelt?", 270, 5, false, 4000);
-        actionsCompleted++; // Polish-Cycle 2 v0.3.0: count completed smelt cycles
+        actionsCompleted++; // count completed smelt cycles
     }
 
     // --- RESETTING state ---
@@ -341,7 +341,7 @@ public class AutoSmeltingPlusScript extends Script {
         Rs2Player.waitForWalking();
         sleep(600, 1200);
 
-        // CSV-driven deposit (Cycle A v0.2.0). Inclusion list wins; exclusion list as fallback.
+        // CSV-driven deposit. Inclusion list wins; exclusion list as fallback.
         depositByCsv(config);
         sleepUntil(() -> !Rs2Inventory.isFull(), 3000);
 

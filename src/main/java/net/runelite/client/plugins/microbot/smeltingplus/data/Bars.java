@@ -19,14 +19,14 @@ import java.util.Map;
  *
  * <h2>Audit log</h2>
  * <ul>
- *   <li><b>2026-05-14 (Pilot #2 v0.1.0):</b> Forked verbatim from upstream
+ *   <li><b>Origin:</b> Forked verbatim from upstream
  *       {@code chsami/Microbot-Hub/.../smelting/enums/Bars.java}. Recipes match the wiki
  *       Smelting bars table as of fork date.</li>
- *   <li><b>2026-05-14 (Cycle A v0.2.0):</b> Ran new {@code tools/wiki-audit-bars.ps1} against
+ *   <li><b>2026-05-14:</b> Ran new {@code tools/wiki-audit-bars.ps1} against
  *       the OSRS Wiki Smithing page. 9 of 9 bars confirmed by name. One fuzzy level warning
  *       on Iron bar (level 15 not found in 200-char window near "Iron bar") is a false
  *       positive caused by table-structure formatting; level 15 verified manually on the wiki.
- *       Required by Cycle A's new progressive-smelt feature, which keys off
+ *       Required by the progressive-smelt feature, which keys off
  *       {@code getRequiredSmithingLevel()}.</li>
  *   <li><b>2026-05-25 (v0.5.9):</b> Dropped MOLTEN_GLASS entry. The default
  *       {@code itemsToBank="bar"} filter missed it (fixed generically in v0.5.8 via
