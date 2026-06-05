@@ -22,8 +22,31 @@ import net.runelite.client.config.Range;
 @ConfigInformation(
     "<h2>Microbot Dashboard Plus</h2>" +
     "<h3>Version: " + MicrobotDashboardPlusPlugin.version + "</h3>" +
-    "<p>Aggregate session dashboard. A floating window with ten live-updating panels covering player state, scripts, inventory, skills, NPCs, and more. A green chart-line icon in the right sidebar (while the plugin is enabled) opens the dashboard.</p>" +
-    "<p>For a full reference of panels and config options, see the <strong>Guide</strong> section inside the dashboard window.</p>"
+    "<p>Aggregate session dashboard. A floating window with eleven live-updating panels: Player, Active Scripts, Plus Plugins, Inventory, Skills, Nearby NPCs, Watchdog, XP Chart, Event Dismiss Stats, Event Log, and Guide. A green chart-line icon in the right sidebar (while the plugin is enabled) opens the dashboard.</p>" +
+    "<p></p>" +
+    "<h3>Behavior</h3>" +
+    "<p>1. <strong>Auto-open dashboard:</strong> opens the floating window automatically when the plugin enables. Untick to launch it manually from the sidebar.</p>" +
+    "<p></p>" +
+    "<p>2. <strong>Poll interval:</strong> seconds between dashboard refreshes from game state. Lower is more responsive but uses slightly more CPU. Default 5, range 1 to 60.</p>" +
+    "<p></p>" +
+    "<p>3. <strong>Nearby NPCs max distance:</strong> tile radius for the Nearby NPCs panel. Higher shows more NPCs and polls a little slower. Default 20, range 1 to 200.</p>" +
+    "<p></p>" +
+    "<h3>Layout</h3>" +
+    "<p>4. <strong>Panel toggles:</strong> one show or hide switch per panel (Player, Active Scripts, Plus Plugins, Inventory, Skills, Nearby NPCs, Watchdog, XP Chart, Event Dismiss Stats, Event Log, Guide). Untick any you do not want in the window. Hide the Guide once you know the panels.</p>" +
+    "<p></p>" +
+    "<h3>Notifications</h3>" +
+    "<p>5. <strong>Discord webhook URL:</strong> paste a channel webhook to send alerts to Discord. Leave blank to disable Discord. Keep this URL secret.</p>" +
+    "<p></p>" +
+    "<p>6. <strong>Notify on level-up:</strong> posts to Discord when any skill levels up.</p>" +
+    "<p></p>" +
+    "<p>7. <strong>Notify on random event:</strong> posts when a new random-event row is logged (engaged, dismissed, or declined).</p>" +
+    "<p></p>" +
+    "<p>8. <strong>Notify on session start or stop:</strong> posts when the plugin enables or disables. Off by default.</p>" +
+    "<p></p>" +
+    "<p>9. <strong>Notify on alert threshold:</strong> posts when a configured Alert Threshold is crossed.</p>" +
+    "<p></p>" +
+    "<h3>Alerts</h3>" +
+    "<p>10. <strong>Alert thresholds:</strong> comma-separated SKILL:LEVEL pairs, for example MINING:60, WOODCUTTING:80. Use uppercase OSRS skill names. A crossing fires an in-dashboard banner and, if enabled above, a Discord notification.</p>"
 )
 public interface MicrobotDashboardPlusConfig extends Config {
 
@@ -122,7 +145,7 @@ public interface MicrobotDashboardPlusConfig extends Config {
     @ConfigItem(
             keyName = "discordWebhookUrl",
             name = "Discord webhook URL",
-            description = "Paste a Discord channel webhook URL (https://discord.com/api/webhooks/...). Leave blank to disable Discord notifications. Treat this URL as a secret -- do not share it.",
+            description = "Paste a Discord channel webhook URL (https://discord.com/api/webhooks/...). Leave blank to disable Discord notifications. Treat this URL as a secret. Do not share it.",
             position = 0,
             section = notificationsSection,
             secret = true

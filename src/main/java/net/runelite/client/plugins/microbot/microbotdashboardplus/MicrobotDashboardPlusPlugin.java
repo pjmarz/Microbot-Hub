@@ -25,7 +25,7 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
 /**
- * MicrobotDashboardPlus -- Pilot #6 of the Skill Plus Template (SPT) lineage.
+ * MicrobotDashboardPlus is part of the Microbot Plus suite.
  *
  * <p>v0.2.0 (Swing rewrite): the dashboard now opens in a native floating
  * RuneLite window instead of a browser tab. A compact sidebar panel lives in
@@ -53,18 +53,18 @@ import java.awt.image.BufferedImage;
         name = PluginDescriptor.Mocrosoft + "Microbot Dashboard Plus",
         description = "Native Swing monitoring dashboard for your Microbot session. Floating window plus a compact sidebar panel. No HTTP, no Agent Server dependency.",
         tags = {"dashboard", "monitoring", "microbot", "plus"},
-        authors = {"Mocrosoft", "Pete (Plus fork)"},
+        authors = {"pjmarz"},
         version = MicrobotDashboardPlusPlugin.version,
         minClientVersion = "2.0.13",
-        cardUrl = "",
-        iconUrl = "",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/MicrobotDashboardPlusPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/MicrobotDashboardPlusPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class MicrobotDashboardPlusPlugin extends Plugin {
 
-    public static final String version = "1.0.0";
+    public static final String version = "1.0.1";
 
     @Inject
     private MicrobotDashboardPlusConfig config;

@@ -1,68 +1,56 @@
 # Microbot Dashboard Plus
 
-**Aggregate session dashboard for Microbot.** A floating window outside the game with ten live-updating panels covering player state, scripts, inventory, skills, NPCs, and more. Optional Discord webhook for level-ups and alerts.
+![preview](assets/dashboard-top.png)
 
-![Dashboard window — top half](assets/dashboard-top.png)
-
-![Dashboard window — bottom half (XP chart, event stats, log, guide)](assets/dashboard-bottom.png)
+Microbot Dashboard Plus is a passive monitoring plugin for the Microbot RuneLite client. It opens a floating Swing window outside the game canvas with ten live-updating panels covering your session state, plus a compact sidebar panel for quick access. No HTTP server, no port binding, and no Agent Server dependency - it reads game state in-process. Part of the Microbot "Plus" suite.
 
 ---
 
-## The problem
+## Feature Overview
 
-Microbot's default UX puts a separate in-game overlay in the top-left corner for every running plugin. With 3-4 Plus plugins active those overlays stack up and cover a large fraction of the game screen, and each one shows only its own slice of state.
+| Feature | Description |
+|---------|-------------|
+| **Floating dashboard window** | A native Swing window that opens outside the game, keeping your canvas clear of stacked overlays |
+| **Sidebar panel** | A compact summary in the RuneLite right toolbar with status, player, world, script count, and quick-launch buttons |
+| **Player section** | Name, combat level, login state, game state, world, profile, session duration, tile position, and current animation |
+| **Active Scripts section** | All enabled Microbot plugins with per-plugin runtime and a Stop button per row |
+| **Plus Plugins section** | Quick start/stop grid for every plugin whose name ends in "Plus" |
+| **Inventory section** | Slot grid showing item names and quantities; noted items styled distinctly |
+| **Skills section** | All 22 skills with current level, total XP, session gain, and rolling 5-minute XP/hr |
+| **Nearby NPCs section** | NPC list sorted by distance; random-event NPCs highlighted orange |
+| **Watchdog section** | Status from the Microbot watchdog log file |
+| **XP Over Time chart** | Java2D line chart with skill and time-window selectors (5m to 24h) |
+| **Event Dismiss Stats section** | Per-event-type counts from the EventDismissPlus CSV log |
+| **Event Log section** | Rolling 10-entry ring buffer of login, logout, and world-hop events |
+| **Discord notifications** | Optional webhook for level-ups, random events, alert threshold crossings, and session start/stop |
+| **Alert thresholds** | Comma-separated SKILL:LEVEL pairs that fire an in-dashboard banner and optional Discord ping when crossed |
+| **Per-section visibility** | Toggle any of the ten panels on or off; the window updates immediately |
+| **Auto-open on enable** | Dashboard window launches automatically when the plugin enables (configurable) |
+| **Configurable poll rate** | Refresh interval from 1 to 60 seconds |
 
-The built-in **Discord** plugin forwards chat-log lines but has no concept of game state changes. The **Agent Server** plugin exposes an HTTP API but consuming it requires writing your own client.
-
-Dashboard Plus fills the gap: one floating window outside the game, optional Discord notifications driven by real game state, and an XP-over-time chart.
-
-| Without Dashboard Plus | With Dashboard Plus |
-|---|---|
-| Stacked per-plugin overlays cover the game screen | One floating window, game screen clean |
-| No XP-over-time trend | Java2D line chart, 5m / 15m / 30m / 1h / 4h / 24h windows |
-| Stop scripts one at a time from the plugin list | One click on any row in Active Scripts |
-| No notifications for level-ups, random events, or alert thresholds | Optional Discord webhook covering all three |
-
----
-
-## What it does
-
-The floating window has ten panels:
-
-| Section | Shows |
-|---|---|
-| **Player** | Name, combat level, login state, world, profile, session duration, position, animation |
-| **Active Scripts** | User-facing Microbot plugins currently enabled, per-plugin runtime, Stop button per row |
-| **Plus Plugins** | Quick start/stop grid for every plugin whose name ends in "Plus" |
-| **Inventory** | Slot grid with item names + quantities; noted items styled distinctly |
-| **Skills** | All 22 skills with current level, total XP, gain since session start, rolling 5-min XP/hr |
-| **Nearby NPCs** | NPC list sorted by distance, max-distance JSpinner, random-event NPCs highlighted orange |
-| **Watchdog** | Real-time status from `~/.runelite/microbot-watchdog.csv` |
-| **XP Over Time** | Java2D line chart with skill + window selectors (5m to 24h) |
-| **Event Dismiss Stats** | Per-event-type counts from EventDismissPlus's CSV log |
-| **Event Log** | Rolling 10-entry ring buffer of login/logout/world-hop events |
-
-A compact summary lives in the right sidebar as a plugin panel: status, player, world, active-script count, plus **Open Dashboard** and **Refresh now** buttons.
-
----
-
-## How to use it
-
-1. Enable **Microbot Dashboard Plus** from the plugin list
-2. A green chart-line icon appears in the right sidebar
-3. Click the icon to open the panel, then click **Open Dashboard** to launch the floating window
-4. The floating window remembers its size and position across launches
-
-The sidebar icon and panel are only present while the plugin is enabled. Disabling the plugin removes both, along with the floating window.
+![Dashboard window - bottom half](assets/dashboard-bottom.png)
 
 ---
 
 ## Requirements
 
-- **Microbot client** v2.0.13 or newer
-- No external dependencies (no HTTP server, no port binding, no other plugins required)
+- Microbot RuneLite client v2.0.13 or newer
+- No external dependencies - no HTTP server, no port binding, no other plugins required
 - Optional: a Discord channel webhook URL for notifications
-- Optional: EventDismissPlus v0.2.0+ for the Event Dismiss Stats section to populate (sibling Plus plugin, not yet upstreamed; without it that one section just shows "no events logged yet")
+- Optional: EventDismissPlus v0.2.0+ for the Event Dismiss Stats section to populate (without it, that section shows "no events logged yet")
+
+---
+
+## How It Works
+
+1. Enable **Microbot Dashboard Plus** from the plugin list
+2. A green chart-line icon appears in the right sidebar toolbar
+3. Click the icon to open the sidebar panel, then click **Open Dashboard** to launch the floating window (or enable "Auto-open dashboard on startup" to skip this step)
+4. The dashboard polls game state on a background thread at the configured interval and updates all visible panels
+5. The floating window remembers its size and position across launches
+6. Disabling the plugin removes the sidebar icon, the panel, and the floating window cleanly
+
+![Plugin settings panel](assets/settings-panel.png)
 
 ---
 
@@ -70,75 +58,37 @@ The sidebar icon and panel are only present while the plugin is enabled. Disabli
 
 The plugin config has four sections.
 
-![Plugin settings panel in the launcher sidebar](assets/settings-panel.png)
+**Behavior** - controls the window and polling:
+- Auto-open dashboard on startup (default ON) - launches the floating window when the plugin enables
+- Poll interval in seconds (default 5, range 1-60) - how often to refresh from game state
+- Nearby NPCs max distance in tiles (default 20, range 1-200) - filter for the NPC section
 
-### Behavior
+**Layout** - ten boolean toggles, one per panel, all default ON. Untick any section to hide it; the window re-evaluates immediately.
 
-| Setting | Default | Notes |
-|---|---|---|
-| Auto-open dashboard on startup | ON | Open the floating window when the plugin enables |
-| Poll interval (sec) | 5 | How often to refresh from game state (1-60) |
-| Nearby NPCs max distance (tiles) | 20 | Filter for the NPC section (1-200) |
+**Notifications** - requires a Discord webhook URL in the field (masked in the UI, treated as a secret):
+- Notify on level-up (default ON)
+- Notify on random event (default ON)
+- Notify on alert threshold crossing (default ON)
+- Notify on session start/stop (default OFF)
 
-### Layout
-
-Ten boolean toggles, one per panel. All default ON. Untick any section to hide it; the floating window re-evaluates immediately.
-
-### Notifications
-
-| Setting | Default | Notes |
-|---|---|---|
-| Discord webhook URL | (blank) | Paste your channel webhook here. Field is masked in the UI. Leave blank to disable Discord entirely. |
-| Notify on level-up | ON | "Level up: Mining 53 → 54" |
-| Notify on random event | ON | "Random event detected (1 new entry in EventDismiss log)" |
-| Notify on session start/stop | OFF | "Dashboard session started." / "Dashboard session stopped." |
-| Notify on alert threshold | ON | "ALERT: Mining reached level 60!" |
-
-### Alerts
-
-| Setting | Default | Notes |
-|---|---|---|
-| Alert thresholds | (blank) | Comma-separated `SKILL:LEVEL` pairs, e.g. `MINING:60, WOODCUTTING:80, FISHING:70` |
-
-When any skill reaches its threshold, the dashboard shows a yellow banner at the top of the window and (if Discord is configured) sends a notification. Each threshold fires exactly once per session.
+**Alerts** - comma-separated `SKILL:LEVEL` pairs, e.g. `MINING:60, WOODCUTTING:80`. Skill names follow the OSRS API enum (uppercase). Each threshold fires exactly once per session.
 
 ---
 
-## Discord webhook setup
+## Limitations
 
-If you've never created a Discord webhook:
-
-1. In Discord, open the channel you want notifications sent to
-2. Channel name → gear icon → **Integrations** → **Webhooks** → **New Webhook**
-3. Give it a name + avatar (optional) → **Copy Webhook URL**
-4. Paste into the plugin config's **Discord webhook URL** field
-
-The webhook URL is treated as a secret: never logged on error, never returned in exception messages. The UI field is masked.
-
----
-
-## What this plugin is NOT
-
-- **Not a bot controller.** Observes and reports. Doesn't schedule, decide, or run game logic.
-- **Not a replacement for in-game overlays.** Per-plugin overlays still appear in-game. The dashboard adds an aggregate layer.
-- **Not a remote-view tool.** Lives in the client process. No HTTP, no port, no LAN access.
-- **Not for vanilla RuneLite users.** Requires Microbot client APIs.
-
----
-
-## Disclaimer
-
-This plugin is for educational and research purposes only. Use at your own risk. Automation or integration may violate OSRS or Discord terms of service. The developers are not responsible for any consequences resulting from the use of this plugin.
+- This plugin observes and reports only - it does not run game logic, schedule scripts, or make decisions
+- Not a remote-view tool - lives in the client process with no HTTP server or LAN access
+- Not for vanilla RuneLite users - requires Microbot client APIs
+- The Active Scripts list is heuristic: it enumerates enabled plugins rather than reading a dedicated script registry
+- The Event Dismiss Stats section requires EventDismissPlus to be installed and have logged at least one event
+- Watchdog status depends on the Microbot watchdog CSV log being present on disk
 
 ---
 
 ## Credits
 
-Pilot #6 of the Skill Plus Template (SPT) lineage. First non-skilling Plus plugin in the Hub.
-
-- Original PowerShell dashboard concept + Java port: Pete (pjmarz)
+- Original dashboard concept and Java port: pjmarz
 - Iterative development via Claude Code
-
-Built on the **Microbot Agent Server** API. See `CHANGELOG.md` for per-version notes.
 
 For issues or suggestions, open an issue on the Microbot Hub repository.
