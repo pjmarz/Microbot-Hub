@@ -19,9 +19,9 @@ import java.text.NumberFormat;
 import java.time.Duration;
 
 /**
- * Stats + Pause overlay for AutoCookingPlus. Mirrors AutoFishingPlusOverlay: the Pause button
- * toggles {@link Microbot#pauseAllScripts} and the parent plugin's startUp() must call
- * {@link ButtonComponent#hookMouseListener()} or the click passes through to the game.
+ * Stats + Pause overlay for AutoCookingPlus. The Pause button toggles {@link Microbot#pauseAllScripts}.
+ * The parent plugin's startUp() must call {@link ButtonComponent#hookMouseListener()} or the click
+ * passes through to the game.
  */
 public class AutoCookingPlusOverlay extends OverlayPanel {
     private static final Color TITLE_COLOR = Color.decode("#77DD77");
@@ -35,6 +35,12 @@ public class AutoCookingPlusOverlay extends OverlayPanel {
 
     // public final so the parent Plugin can hook/unhook the mouse listener in startUp()/shutDown().
     public final ButtonComponent pauseButton;
+
+    // GP/hr price cache: the cooked/raw GE prices only change when the active food changes, so the
+    // ItemManager lookups are recomputed on food change rather than every render frame.
+    private CookingItem cachedPriceItem;
+    private int cachedCookedPrice;
+    private int cachedRawPrice;
 
     @Inject
     AutoCookingPlusOverlay(AutoCookingPlusPlugin plugin, Client client, AutoCookingPlusConfig config) {
@@ -128,10 +134,13 @@ public class AutoCookingPlusOverlay extends OverlayPanel {
                 long gpPerHour = 0;
                 CookingItem activeItem = script.getActiveItem();
                 if (activeItem != null && runtimeMillis > 1000) {
-                    int cookedPrice = Microbot.getItemManager().getItemPrice(activeItem.getCookedItemID());
-                    int rawPrice = Microbot.getItemManager().getItemPrice(activeItem.getRawItemID());
-                    if (cookedPrice > 0) {
-                        long netPerCook = (long) cookedPrice - rawPrice;
+                    if (activeItem != cachedPriceItem) {
+                        cachedCookedPrice = Microbot.getItemManager().getItemPrice(activeItem.getCookedItemID());
+                        cachedRawPrice = Microbot.getItemManager().getItemPrice(activeItem.getRawItemID());
+                        cachedPriceItem = activeItem;
+                    }
+                    if (cachedCookedPrice > 0) {
+                        long netPerCook = (long) cachedCookedPrice - cachedRawPrice;
                         gpPerHour = netPerCook * script.getItemsCooked() * 3600000L / runtimeMillis;
                     }
                 }

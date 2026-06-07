@@ -22,11 +22,10 @@ import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
 import java.awt.event.KeyEvent;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
- * AutoCookingPlus v0.1.0.
+ * AutoCookingPlus.
  *
  * <p>Forks the base AutoCooking loop (useItemOnObject -> production widget -> space to cook all ->
  * full-bank deposit/withdraw -> drop burnt) and adds the Plus layer:
@@ -34,7 +33,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>Stop conditions (minutes / XP / target level / cooked count) checked each tick.</li>
  *   <li>RESETTING + shutdownAfterCleanup for a clean stop (one bank/drop pass first).</li>
  *   <li>Pause via the shared {@link Microbot#pauseAllScripts} flag (overlay button).</li>
- *   <li>Speed mode (antiban off) + League mode (arrow-key anti-AFK), copied from smelting-plus.</li>
+ *   <li>Speed mode (antiban off) + League mode (arrow-key anti-AFK).</li>
  *   <li>Progressive food selection by Cooking level requirement.</li>
  *   <li>Accurate cooked counter via Cooking XP-drop detection.</li>
  * </ul>
@@ -42,13 +41,15 @@ import java.util.concurrent.TimeUnit;
  */
 public class AutoCookingPlusScript extends Script {
 
+    private static final String CLEANUP_COMPLETE_LOG = "AutoCookingPlus: cleanup complete. Shutting down.";
+
     private AutoCookingPlusConfig config;
     private State state = State.COOKING;
     private boolean init = true;
     private CookingItem activeItem;
     private CookingLocation location;
 
-    // Plus layer: runtime stats (read by the overlay/dashboard) + accurate cooked counter.
+    // Plus layer: runtime stats (read by the overlay) + accurate cooked counter.
     private long startTimeMillis = 0;
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
@@ -118,10 +119,10 @@ public class AutoCookingPlusScript extends Script {
                 lastCookingXp = currentXp;
             }
 
-            // League mode: periodic key press resets the idle-logout (smelting-plus pattern).
+            // League mode: periodic key press resets the idle-logout timer.
             if (config.leagueMode() && Rs2Player.checkIdleLogout(Rs2Random.between(500, 1500))) {
                 int[] arrowKeys = { KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT, KeyEvent.VK_UP, KeyEvent.VK_DOWN };
-                Rs2Keyboard.keyPress(arrowKeys[Rs2Random.between(0, arrowKeys.length - 1)]);
+                Rs2Keyboard.keyPress(arrowKeys[Rs2Random.between(0, arrowKeys.length)]);
             }
 
             // Stop conditions -> shutdownAfterCleanup. Once set, run one bank/drop pass (so the
@@ -131,7 +132,7 @@ public class AutoCookingPlusScript extends Script {
             }
             if (shutdownAfterCleanup) {
                 if (Rs2Inventory.isEmpty()) {
-                    Microbot.log("AutoCookingPlus: cleanup complete. Shutting down.");
+                    Microbot.log(CLEANUP_COMPLETE_LOG);
                     Rs2Bank.closeBank();
                     super.shutdown();
                     return;
@@ -188,13 +189,19 @@ public class AutoCookingPlusScript extends Script {
 
     /**
      * Resolve the food to cook (progressive vs manual) and the location (nearest vs configured).
+     * Runs once at init. Afterwards handleBanking() re-evaluates activeItem (and refreshes the
+     * nearest location) on each bank trip; this method is not re-run.
      * Returns false if resolution failed and the script was shut down.
      */
     private boolean resolveActiveItemAndLocation() {
-        // Progressive: pick the highest-level food the player's level allows. Re-evaluated lazily
-        // on each init pass (set after every bank trip).
+        // When a fixed location is configured, constrain progressive selection to food that location
+        // can actually cook so it never hands us an incompatible item (e.g. a RANGE-only pie for a fire).
+        CookingAreaType areaConstraint = config.useNearestLocation()
+                ? null
+                : config.cookingLocation().getCookingAreaType();
+
         if (config.progressiveCook()) {
-            CookingItem best = chooseProgressiveItem();
+            CookingItem best = chooseProgressiveItem(areaConstraint);
             if (best != null) {
                 activeItem = best;
             }
@@ -224,12 +231,16 @@ public class AutoCookingPlusScript extends Script {
 
     /**
      * Highest-level-requirement food whose requirements the player meets. Ordering by
-     * levelRequired gives the F2P-first progressive ladder the plan asks for.
+     * levelRequired gives the F2P-first progressive ladder the plan asks for. When areaConstraint is
+     * non-null (a fixed location is configured), food the location cannot cook is skipped.
      */
-    private CookingItem chooseProgressiveItem() {
+    private CookingItem chooseProgressiveItem(CookingAreaType areaConstraint) {
         CookingItem best = null;
         for (CookingItem item : CookingItem.values()) {
             if (!item.hasRequirements()) continue;
+            if (areaConstraint != null
+                    && item.getCookingAreaType() != CookingAreaType.BOTH
+                    && item.getCookingAreaType() != areaConstraint) continue;
             if (best == null || item.getLevelRequired() > best.getLevelRequired()) {
                 best = item;
             }
@@ -239,12 +250,16 @@ public class AutoCookingPlusScript extends Script {
 
     /**
      * Progressive choice that also requires the food to be in the bank, so we never pick a food the
-     * player cannot withdraw. Used at the bank (after depositAll, all food is in the bank).
+     * player cannot withdraw. Used at the bank (after depositAll, all food is in the bank). When
+     * areaConstraint is non-null (a fixed location is configured), food the location cannot cook is skipped.
      */
-    private CookingItem chooseProgressiveItemInBank() {
+    private CookingItem chooseProgressiveItemInBank(CookingAreaType areaConstraint) {
         CookingItem best = null;
         for (CookingItem item : CookingItem.values()) {
             if (!item.hasRequirements()) continue;
+            if (areaConstraint != null
+                    && item.getCookingAreaType() != CookingAreaType.BOTH
+                    && item.getCookingAreaType() != areaConstraint) continue;
             if (!hasRawItemInBank(item)) continue;
             if (best == null || item.getLevelRequired() > best.getLevelRequired()) {
                 best = item;
@@ -257,7 +272,7 @@ public class AutoCookingPlusScript extends Script {
 
     private void getState() {
         if (!hasRawItem(activeItem)) {
-            if (config.shouldDropBurntItems() && hasBurntItem(activeItem) && !activeItem.getBurntItemName().isEmpty()) {
+            if (config.shouldDropBurntItems() && hasBurntItem(activeItem)) {
                 state = State.DROPPING_BURNT;
                 init = false;
                 return;
@@ -335,7 +350,7 @@ public class AutoCookingPlusScript extends Script {
             return;
         }
 
-        if (config.shouldDropBurntItems() && hasBurntItem(activeItem) && !activeItem.getBurntItemName().isEmpty()) {
+        if (config.shouldDropBurntItems() && hasBurntItem(activeItem)) {
             state = State.DROPPING_BURNT;
             return;
         }
@@ -365,9 +380,18 @@ public class AutoCookingPlusScript extends Script {
         // Re-evaluate progressive food now that the bank is open. Bank-aware so we never pick a food
         // the player cannot withdraw (after depositAll, all food sits in the bank).
         if (config.progressiveCook()) {
-            CookingItem best = chooseProgressiveItemInBank();
+            CookingItem best = chooseProgressiveItemInBank(config.useNearestLocation()
+                    ? null
+                    : config.cookingLocation().getCookingAreaType());
             if (best != null) {
                 activeItem = best;
+                // Food may have upgraded; refresh the nearest cooking spot to match it.
+                if (config.useNearestLocation()) {
+                    CookingLocation nearest = CookingLocation.findNearestCookingLocation(activeItem);
+                    if (nearest != null) {
+                        location = nearest;
+                    }
+                }
             }
         }
 
@@ -377,10 +401,10 @@ public class AutoCookingPlusScript extends Script {
             return;
         }
 
-        if (Objects.equals(activeItem.getRawItemName(), "giant seaweed")) {
-            Rs2Bank.withdrawX(activeItem.getRawItemName(), 4, true);
+        if (activeItem == CookingItem.GIANT_SEAWEED) {
+            Rs2Bank.withdrawX(activeItem.getRawItemID(), 4);
         } else {
-            Rs2Bank.withdrawAll(activeItem.getRawItemName(), true);
+            Rs2Bank.withdrawAll(activeItem.getRawItemID());
         }
         Rs2Inventory.waitForInventoryChanges(1800);
 
@@ -418,14 +442,14 @@ public class AutoCookingPlusScript extends Script {
 
     private void handleResetting() {
         // Burnt food first (if dropping), then bank everything else, then shut down.
-        if (config.shouldDropBurntItems() && hasBurntItem(activeItem) && !activeItem.getBurntItemName().isEmpty()) {
+        if (config.shouldDropBurntItems() && hasBurntItem(activeItem)) {
             Microbot.status = "Cleaning up: dropping burnt food";
             Rs2Inventory.dropAll(item -> item.getName().equalsIgnoreCase(activeItem.getBurntItemName()), config.getDropOrder());
             sleepUntilTrue(() -> !hasBurntItem(activeItem), 500, 150000);
         }
 
         if (Rs2Inventory.isEmpty()) {
-            Microbot.log("AutoCookingPlus: cleanup complete. Shutting down.");
+            Microbot.log(CLEANUP_COMPLETE_LOG);
             Rs2Bank.closeBank();
             super.shutdown();
             return;
@@ -437,7 +461,7 @@ public class AutoCookingPlusScript extends Script {
         Rs2Bank.depositAll();
         sleepUntil(() -> Rs2Inventory.isEmpty(), 3000);
         Rs2Bank.closeBank();
-        Microbot.log("AutoCookingPlus: cleanup complete. Shutting down.");
+        Microbot.log(CLEANUP_COMPLETE_LOG);
         super.shutdown();
     }
 
@@ -496,14 +520,15 @@ public class AutoCookingPlusScript extends Script {
     }
 
     private boolean hasRawItem(CookingItem cookingItem) {
-        return Rs2Inventory.hasItem(cookingItem.getRawItemName(), true);
+        return Rs2Inventory.hasItem(cookingItem.getRawItemID());
     }
 
     private boolean hasRawItemInBank(CookingItem cookingItem) {
-        return Rs2Bank.hasBankItem(cookingItem.getRawItemName(), true);
+        return Rs2Bank.hasBankItem(cookingItem.getRawItemID(), 1);
     }
 
     private boolean hasBurntItem(CookingItem cookingItem) {
-        return Rs2Inventory.hasItem(cookingItem.getBurntItemName(), true);
+        // burntItemID == 0 is the "no burnt variant" sentinel (e.g. giant seaweed).
+        return cookingItem.getBurntItemID() > 0 && Rs2Inventory.hasItem(cookingItem.getBurntItemID());
     }
 }

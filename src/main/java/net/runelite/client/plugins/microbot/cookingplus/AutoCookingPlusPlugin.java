@@ -2,7 +2,6 @@ package net.runelite.client.plugins.microbot.cookingplus;
 
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Skill;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -27,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoCookingPlusPlugin extends Plugin {
-    public static final String version = "0.1.1";
+    public static final String version = "0.1.2";
 
     @Inject
     private AutoCookingPlusConfig config;
@@ -69,36 +68,8 @@ public class AutoCookingPlusPlugin extends Plugin {
         overlayManager.remove(cookingOverlay);
     }
 
-    /** Overlay + dashboard read script stats via this getter. */
+    /** The overlay reads script stats via this getter. */
     public AutoCookingPlusScript getScript() {
         return cookingScript;
-    }
-
-    public int getXpGained() {
-        if (cookingScript == null) return 0;
-        return Microbot.getClient().getSkillExperience(Skill.COOKING) - cookingScript.getStartSkillXp();
-    }
-
-    public long getRuntimeMillis() {
-        if (cookingScript == null || cookingScript.getStartTimeMillis() == 0) return 0;
-        return System.currentTimeMillis() - cookingScript.getStartTimeMillis();
-    }
-
-    public String getFormattedRuntime() {
-        long millis = getRuntimeMillis();
-        long hours = millis / 3600000;
-        long minutes = (millis % 3600000) / 60000;
-        long seconds = ((millis % 3600000) % 60000) / 1000;
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
-    }
-
-    public int getXpPerHour() {
-        long runtime = getRuntimeMillis();
-        if (runtime == 0) return 0;
-        return (int) (getXpGained() * 3600000.0 / runtime);
-    }
-
-    public int getItemsCooked() {
-        return cookingScript == null ? 0 : cookingScript.getItemsCooked();
     }
 }

@@ -10,8 +10,8 @@ import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.Comparator;
 
 @Getter
 @RequiredArgsConstructor
@@ -57,29 +57,11 @@ public enum CookingLocation
 
 	public static CookingLocation findNearestCookingLocation(CookingItem item)
 	{
-		Map<Integer, CookingLocation> distanceMap = new HashMap<>();
-
-		for (CookingLocation location : values())
-		{
-			if (!location.hasRequirements())
-			{
-				continue;
-			}
-
-			if ((item.getCookingAreaType() != CookingAreaType.BOTH) &&
-				(location.getCookingAreaType() != item.getCookingAreaType()))
-			{
-				continue;
-			}
-
-			int distance = Rs2Player.distanceTo(location.getCookingObjectWorldPoint());
-			distanceMap.put(distance, location);
-		}
-
-		return distanceMap.entrySet()
-			.stream()
-			.min(Map.Entry.comparingByKey())
-			.map(Map.Entry::getValue)
+		return Arrays.stream(values())
+			.filter(CookingLocation::hasRequirements)
+			.filter(location -> item.getCookingAreaType() == CookingAreaType.BOTH
+				|| location.getCookingAreaType() == item.getCookingAreaType())
+			.min(Comparator.comparingInt(location -> Rs2Player.distanceTo(location.getCookingObjectWorldPoint())))
 			.orElse(null);
 	}
 
