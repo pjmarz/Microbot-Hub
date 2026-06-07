@@ -18,22 +18,13 @@ import java.text.NumberFormat;
 import java.time.Duration;
 
 /**
- * runtime + XP + ores-mined overlay.
- * v0.5.0: target-level progress + paused config + overlay updates.
- * v0.5.1: Pause overlay button (mirrors AIO Fighter) toggling Microbot.pauseAllScripts.
- * v0.5.2: removed panelComponent.getChildren().clear() — was wiping click registry.
- * v0.5.3: diagnostic log on click + "Resume" text (Pete's preference) when paused.
- * v0.5.4: button add moved outside conditional render branch (race-condition theory; wrong).
- * v0.5.5: minimal overlay diagnostic (button still didn't work; not a render-complexity issue).
- * v0.5.6: AIOFighterPlugin source revealed the missing call: ButtonComponent requires
- *   {@code pauseButton.hookMouseListener()} from the parent Plugin's startUp(), after
- *   overlayManager.add(). Restored full overlay; the hook lives in {@link AutoMiningPlusPlugin}.
- * v0.5.7: kill in-flight walker on pause via {@code Rs2Walker.setTarget(null)}. v0.5.6 fixed
- *   click registration; v0.5.7 fixes the actual pause behavior. Symptom: bot kept walking to
- *   bank after pause click. Root cause: WebWalker runs on its own executor and doesn't honor
- *   {@code Microbot.pauseAllScripts}. AIO Fighter pattern (AIOFighterInfoOverlay:39) calls
- *   {@code Rs2Walker.setTarget(null)} in the pause-on branch; we missed this in the v0.5.1
- *   borrow. Diagnosis hit on the first source-read this time.
+ * Runtime + XP + ores-mined overlay, with target-level progress and a Pause button.
+ *
+ * <p>The Pause button toggles {@link Microbot#pauseAllScripts}. A ButtonComponent only fires
+ * its click handler once the parent Plugin calls {@code pauseButton.hookMouseListener()} after
+ * {@code overlayManager.add()}; that hook lives in {@link AutoMiningPlusPlugin}. Pausing also
+ * calls {@code Rs2Walker.setTarget(null)} because WebWalker runs on its own executor and does
+ * not honor {@code Microbot.pauseAllScripts}, so an in-flight walk would otherwise continue.
  */
 public class AutoMiningPlusOverlay extends OverlayPanel {
     private static final Color TITLE_COLOR = new Color(0, 170, 0);
@@ -46,7 +37,7 @@ public class AutoMiningPlusOverlay extends OverlayPanel {
     private final AutoMiningPlusConfig config;
 
     // public final so the parent Plugin can call hookMouseListener() / unhookMouseListener()
-    // in startUp() / shutDown(). Wired in v0.5.6.
+    // in startUp() / shutDown().
     public final ButtonComponent pauseButton;
 
     @Inject
@@ -65,9 +56,8 @@ public class AutoMiningPlusOverlay extends OverlayPanel {
         pauseButton.setOnClick(() -> {
             Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
             if (Microbot.pauseAllScripts.get()) {
-                // v0.5.7: kill in-flight walker. Matches AIO Fighter (AIOFighterInfoOverlay:39).
-                // Without this, Rs2Walker keeps walking on its own executor after the script's
-                // main loop pauses.
+                // Kill the in-flight walker. Without this, Rs2Walker keeps walking on its own
+                // executor after the script's main loop pauses.
                 Rs2Walker.setTarget(null);
                 pauseButton.setText("Resume");
             } else {
@@ -80,7 +70,7 @@ public class AutoMiningPlusOverlay extends OverlayPanel {
     public Dimension render(Graphics2D graphics) {
         try {
             panelComponent.setPreferredSize(new Dimension(240, 300));
-            // v0.5.2: do NOT clear children -- preserves click-target registry across frames.
+            // Do NOT clear children: that preserves the click-target registry across frames.
 
             panelComponent.getChildren().add(TitleComponent.builder()
                     .text("AutoMiningPlus v" + AutoMiningPlusPlugin.version)
@@ -173,8 +163,8 @@ public class AutoMiningPlusOverlay extends OverlayPanel {
                         .build());
             }
 
-            // v0.5.6: pause button added unconditionally. Click handler now actually fires
-            // because the parent Plugin's startUp() calls pauseButton.hookMouseListener().
+            // Pause button is added unconditionally. Its click handler fires because the parent
+            // Plugin's startUp() calls pauseButton.hookMouseListener().
             panelComponent.getChildren().add(pauseButton);
         } catch (Exception ex) {
             Microbot.logStackTrace(this.getClass().getSimpleName(), ex);

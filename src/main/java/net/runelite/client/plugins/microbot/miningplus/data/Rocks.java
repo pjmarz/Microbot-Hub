@@ -10,8 +10,8 @@ import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 @RequiredArgsConstructor
 public enum Rocks {
     // oreItemId is the raw item the rock yields, used by the overlay for the GP/hr line via the
-    // GE price. 0 means "no single priced ore" (gem rocks yield mixed gems; basalt and salts have
-    // no standard GE price), so the overlay shows GP/hr 0 for those rather than guessing.
+    // GE price. 0 means "no single priced ore" (basalt and salts have no standard GE price), so
+    // the overlay shows GP/hr 0 for those rather than guessing.
     TIN("tin rocks", 1, ItemID.TIN_ORE),
     COPPER("copper rocks", 1, ItemID.COPPER_ORE),
     CLAY("clay rocks", 1, ItemID.CLAY),
@@ -19,7 +19,6 @@ public enum Rocks {
     SILVER("silver rocks", 20, ItemID.SILVER_ORE),
     COAL("coal rocks", 30, ItemID.COAL),
     GOLD("gold rocks", 40, ItemID.GOLD_ORE),
-    GEM("gem rocks", 40, 0),
     MITHRIL("mithril rocks", 55, ItemID.MITHRIL_ORE),
     ADAMANTITE("adamantite rocks", 70, ItemID.ADAMANTITE_ORE),
     BASALT("Basalt rocks", 72, 0),

@@ -17,7 +17,6 @@ import net.runelite.client.plugins.microbot.util.antiban.Rs2Antiban;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2AntibanSettings;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
 import net.runelite.client.plugins.microbot.util.combat.Rs2Combat;
-import net.runelite.client.plugins.microbot.util.depositbox.Rs2DepositBox;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
 import net.runelite.client.plugins.microbot.util.Global;
 import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
@@ -47,9 +46,18 @@ enum State {
 @Slf4j
 public class AutoMiningPlusScript extends Script {
 
-    private static final int GEM_MINE_UNDERGROUND = 11410;
     State state = State.MINING;
-    private static final List<Rocks> PROGRESSIVE_ROCKS = buildProgressiveRocks();
+    // Progressive mode follows the standard F2P smithing-ore ladder (the ores worth smelting into
+    // bars). COPPER, SILVER and members-only ores (BASALT, salts) are intentionally skipped.
+    private static final List<Rocks> PROGRESSIVE_ROCKS = Arrays.asList(
+            Rocks.TIN,
+            Rocks.IRON,
+            Rocks.COAL,
+            Rocks.GOLD,
+            Rocks.MITHRIL,
+            Rocks.ADAMANTITE,
+            Rocks.RUNITE
+    );
     private Rocks activeRock;
     private LocationOption activeLocation;
     // True when the user picked a specific MineLocationOption that does not host the configured ore.
@@ -61,11 +69,11 @@ public class AutoMiningPlusScript extends Script {
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
     private int actionsCompleted = 0;
-    // v0.5.12: last-seen Mining XP, for the accurate per-ore counter (one ore per XP increase).
+    // Last-seen Mining XP, for the accurate per-ore counter (one ore per XP increase).
     // Seeded to startSkillXp in run().
     private int lastMiningXp = 0;
 
-    // v0.5.0: set when targetLevel is reached; intercepted before state-flip-back in RESETTING
+    // Set when targetLevel is reached; intercepted before the state-flip-back in RESETTING
     // so we shutdown immediately after the cleanup pass (one bank or drop cycle).
     private boolean shutdownAfterCleanup = false;
 
@@ -89,8 +97,8 @@ public class AutoMiningPlusScript extends Script {
         startSkillLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getRealSkillLevel(Skill.MINING)).orElse(1);
         actionsCompleted = 0;
-        lastMiningXp = startSkillXp; // v0.5.12: seed accurate ore counter
-        shutdownAfterCleanup = false; // v0.5.0: reset target-level cleanup flag on startup
+        lastMiningXp = startSkillXp; // seed accurate ore counter
+        shutdownAfterCleanup = false; // reset target-level cleanup flag on startup
 
         // Speed mode: flip Microbot's master antiban switch off. Every check inside
         // Rs2Antiban.actionCooldown(), takeMicroBreakByChance(), naturalMouseMovement() etc.
@@ -104,19 +112,19 @@ public class AutoMiningPlusScript extends Script {
                 if (!super.run()) return;
                 if (!Microbot.isLoggedIn()) return;
 
-                // v0.5.1: pause check using global Microbot.pauseAllScripts (shared across all
-                // plugins). Toggled via the overlay's Pause button. Stats keep accumulating
-                // naturally -- runtime grows, XP/hr trends down. Unpause and the flow resumes.
+                // Pause check using global Microbot.pauseAllScripts (shared across all plugins).
+                // Toggled via the overlay's Pause button. Stats keep accumulating naturally
+                // (runtime grows, XP/hr trends down). Unpause and the flow resumes.
                 if (Microbot.pauseAllScripts.get()) {
                     Microbot.status = "[PAUSED]";
                     return;
                 }
 
-                // v0.5.12: accurate ore counter. Read Mining XP once per tick; each increase is one
-                // ore obtained (one ore per successful mine, any ore type). The 100ms tick is well
-                // below ore cadence (2.4s+), so one increment per XP drop is exact. Replaces the
-                // v0.3.0 per-click "approximate" counter -- drives the overlay "Ores mined" stat AND
-                // the stopAfterOres target. Reused for the stopAfterXp check below.
+                // Accurate ore counter. Read Mining XP once per tick; each increase is one ore
+                // obtained (one ore per successful mine, any ore type). The 100ms tick is well
+                // below ore cadence (2.4s+), so one increment per XP drop is exact. Drives the
+                // overlay "Ores mined" stat AND the stopAfterOres target. Reused for the
+                // stopAfterXp check below.
                 int currentMiningXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                         Microbot.getClient().getSkillExperience(Skill.MINING)).orElse(lastMiningXp);
                 if (currentMiningXp > lastMiningXp) {
@@ -139,9 +147,9 @@ public class AutoMiningPlusScript extends Script {
                     return;
                 }
 
-                // v0.5.0: target-level check. When Mining hits the target, run one cleanup
-                // cycle (bank or drop) then shutdown. The shutdownAfterCleanup flag is checked
-                // at the end of RESETTING just before the state-flip-back to MINING.
+                // Target-level check. When Mining hits the target, run one cleanup cycle (bank or
+                // drop) then shutdown. The shutdownAfterCleanup flag is checked at the end of
+                // RESETTING just before the state-flip-back to MINING.
                 if (config.targetLevel() > 0 && !shutdownAfterCleanup) {
                     int currentLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                             Microbot.getClient().getRealSkillLevel(Skill.MINING)).orElse(startSkillLevel);
@@ -154,12 +162,13 @@ public class AutoMiningPlusScript extends Script {
                             return;
                         }
                         state = State.RESETTING;
+                        return;
                     }
                 }
 
-                // v0.5.12: stop-after-ores target. When the accurate ore counter hits the target,
-                // run one cleanup pass (bank, or drop if UseBank off) then shutdown -- same flow as
-                // targetLevel, so your ore ends up banked rather than left in the pack. 0 = disabled.
+                // Stop-after-ores target. When the accurate ore counter hits the target, run one
+                // cleanup pass (bank, or drop if UseBank off) then shutdown, same flow as
+                // targetLevel, so the ore ends up banked rather than left in the pack. 0 = disabled.
                 if (config.stopAfterOres() > 0 && !shutdownAfterCleanup
                         && actionsCompleted >= config.stopAfterOres()) {
                     Microbot.log("AutoMiningPlus: reached stopAfterOres (" + actionsCompleted + " >= "
@@ -170,6 +179,7 @@ public class AutoMiningPlusScript extends Script {
                         return;
                     }
                     state = State.RESETTING;
+                    return;
                 }
 
                 if (config.leagueMode() && Rs2Player.checkIdleLogout(Rs2Random.between(500, 1500))) {
@@ -207,9 +217,6 @@ public class AutoMiningPlusScript extends Script {
                     Microbot.log("You do not have the required mining level to mine this ore.");
                     return;
                 }
-
-                if (Rs2Equipment.isWearing("Dragon pickaxe"))
-                    Rs2Combat.setSpecState(true, 1000);
 
                 if (Rs2Player.isMoving() || Rs2Player.isAnimating()) return;
 
@@ -258,17 +265,11 @@ public class AutoMiningPlusScript extends Script {
                             return;
                         }
 
-                        // v0.3.1 switched from Rs2GameObject.findReachableObject (slow,
-                        // reachability churn on crowded mines) to the v2.x Queryable cache for
-                        // speed, but that dropped the reachability check: the nearest rock by raw
-                        // distance can sit behind a P2P door we cannot path to (e.g. mithril at the
-                        // Mining Guild). v0.5.13 keeps the fast cache query but filters to rocks
-                        // with a reachable adjacent tile. We compute the reachable tiles once per
-                        // tick via a strict BFS flood-fill from the mining anchor (the same origin
-                        // the within() filter uses, so a strayed player can't shrink the set), with
-                        // ignoreCollision=false so closed doors and walls stop the fill. The radius
-                        // pads distanceToStray to allow path detours around obstacles. One BFS per
-                        // tick, not one per rock, so no churn on crowded mines.
+                        // Filter cache hits to rocks with a reachable adjacent tile via one BFS
+                        // per tick. The reachable set is a strict flood-fill from the mining anchor
+                        // (ignoreCollision=false so closed doors and walls stop the fill), which
+                        // excludes rocks behind a P2P door we cannot path to. The radius pads
+                        // distanceToStray to allow path detours around obstacles.
                         final Set<WorldPoint> reachable = (initialPlayerLocation == null)
                                 ? Collections.emptySet()
                                 : Rs2Tile.getReachableTilesFromTile(initialPlayerLocation, config.distanceToStray() + 12, false).keySet();
@@ -282,8 +283,8 @@ public class AutoMiningPlusScript extends Script {
 
                         if (rock == null) {
                             // No rock found in stray range. If we've actually drifted off the
-                            // mine, walk back. Otherwise just wait — neighboring miners
-                            // may free a rock soon.
+                            // mine, walk back. Otherwise just wait (neighboring miners
+                            // may free a rock soon).
                             WorldPoint loc = Rs2Player.getWorldLocation();
                             if (loc != null && initialPlayerLocation != null
                                     && loc.distanceTo(initialPlayerLocation) > config.distanceToStray()) {
@@ -293,15 +294,19 @@ public class AutoMiningPlusScript extends Script {
                             return;
                         }
 
+                        // Arm the Dragon pickaxe spec only when we have a rock to mine and the spec
+                        // bar is full, instead of re-toggling every tick.
+                        if (Rs2Equipment.isWearing("Dragon pickaxe") && Rs2Combat.getSpecEnergy() >= 1000) {
+                            Rs2Combat.setSpecState(true, 1000);
+                        }
+
                         if (rock.click("Mine")) {
-                            // v0.5.12: ore counting moved to the accurate XP-drop detector at the top
-                            // of the tick. The old per-click "approximate" actionsCompleted++ was here.
-                            // Wait up to 1.2 sec for the swing to start. Don't wait for an
-                            // XP drop — when the rock is depleted or another miner taps it
-                            // first, Rs2Player.waitForXpDrop(skill, true) blocks for its full
-                            // 5-10 sec timeout with no XP, wasting time. The outer loop's
-                            // isAnimating() check pauses subsequent ticks while the swing
-                            // plays out; once animation ends we pick a new rock.
+                            // Wait up to 1.2 sec for the swing to start. Don't wait for an XP drop:
+                            // when the rock is depleted or another miner taps it first,
+                            // Rs2Player.waitForXpDrop blocks for its full 5-10 sec timeout with no
+                            // XP, wasting time. The outer loop's isAnimating() check pauses
+                            // subsequent ticks while the swing plays out; once animation ends we
+                            // pick a new rock.
                             Global.sleepUntil(Rs2Player::isAnimating, 1200);
                             Rs2Antiban.actionCooldown();
                             Rs2Antiban.takeMicroBreakByChance();
@@ -322,36 +327,27 @@ public class AutoMiningPlusScript extends Script {
 
                                 // deposit all non-locked items to make room for bracelet of clay
                                 Rs2Bank.depositAll();
-                                if (Rs2Bank.hasItem(11074)) {
-                                    Rs2Bank.withdrawAndEquip(11074);
+                                if (Rs2Bank.hasItem(ItemID.JEWL_BRACELET_OF_CLAY)) {
+                                    Rs2Bank.withdrawAndEquip(ItemID.JEWL_BRACELET_OF_CLAY);
+                                } else {
+                                    log.debug("No bracelet of clay left in the bank");
                                 }
-                                else {
-                                    log.info("You don't have any more bracelet of clays");
-                                }
-                                Rs2Bank.bankItemsAndWalkBackToOriginalPosition(itemNames, initialPlayerLocation, 0, config.distanceToStray());
+                                Rs2Bank.closeBank();
+                                Rs2Walker.walkTo(initialPlayerLocation, config.distanceToStray());
                             }
-                            else if (activeRock == Rocks.GEM && Rs2Player.getWorldLocation().getRegionID() == GEM_MINE_UNDERGROUND) {
-                                if (Rs2DepositBox.openDepositBox()) {
-                                    if (Rs2Inventory.contains("Open gem bag")) {
-                                        Rs2Inventory.interact("Open gem bag", "Empty");
-                                        Rs2DepositBox.depositAllExcept("Open gem bag");
-                                    } else {
-                                        Rs2DepositBox.depositAll();
-                                    }
-                                    Rs2DepositBox.closeDepositBox();
-                                }
-                                // v0.5.17: only flip back to MINING once the pack is actually clear.
-                                // A failed or partial deposit (box closed early, item still held)
-                                // would otherwise return to MINING with a full inventory and
-                                // immediately re-trip RESETTING, looping forever. Stay in RESETTING
-                                // and retry the deposit next tick instead.
-                                if (!Rs2Inventory.isEmpty()) {
-                                    return;
-                                }
-                            } else if (Rocks.BASALT == activeRock) {
+                            else if (Rocks.BASALT == activeRock) {
                                 if (Rs2Walker.walkTo(2872, 3935, 0)) {
                                     Rs2Inventory.useItemOnNpc(ItemID.BASALT, NpcID.MY2ARM_SNOWFLAKE);
-                                    Rs2Walker.walkTo(2841, 10339, 0);
+                                    // Stay in RESETTING and process one basalt per tick until the
+                                    // pack is clear. Without this, the branch flips back to MINING
+                                    // after a single conversion, re-trips the isFull() check, and
+                                    // walks the full snowflake round-trip once per basalt.
+                                    if (!Rs2Inventory.isEmpty()) {
+                                        return;
+                                    }
+                                    Rs2Walker.walkTo(2841, 10339, 0); // only leave once empty
+                                } else {
+                                    return; // still walking to the snowflake
                                 }
                             } else {
                                 if (!Rs2Bank.isOpen()) {
@@ -361,15 +357,13 @@ public class AutoMiningPlusScript extends Script {
                                     return;
                                 }
 
-                                // v0.4.1 fix: auto-include the active rock's first-word as a filter
-                                // term. Most OSRS ores match the user's default "ore" filter (Tin ore,
-                                // Iron ore, etc. all contain "ore"), but Coal / Clay / Basalt are named
-                                // literally "Coal" / "Clay" / "Basalt" without an "ore" suffix and slip
-                                // through. The result was an oscillation: bot arrives at bank, deposit
-                                // predicate matches nothing, bank closes empty, walks back to mine,
-                                // inv still full, flips back to RESETTING, loops forever.
-                                // Rocks.getName() returns e.g. "coal rocks" -- first word "coal" then
-                                // substring-matches the inventory item "Coal".
+                                // Auto-include the active rock's first word as a filter term. Most
+                                // OSRS ores match the user's default "ore" filter (Tin ore, Iron
+                                // ore, etc. all contain "ore"), but Coal / Clay / Basalt are named
+                                // literally without an "ore" suffix and would slip through, leaving
+                                // the deposit predicate matching nothing and looping bank<->mine
+                                // forever. Rocks.getName() returns e.g. "coal rocks"; the first word
+                                // "coal" substring-matches the inventory item "Coal".
                                 List<String> filterNames = new ArrayList<>(itemNames);
                                 if (activeRock != null && activeRock.getName() != null) {
                                     String firstWord = activeRock.getName().split("\\s+")[0].toLowerCase();
@@ -396,7 +390,7 @@ public class AutoMiningPlusScript extends Script {
                             Rs2Inventory.dropAllExcept(false, config.interactOrder(), Arrays.stream(config.itemsToKeep().split(",")).map(String::trim).toArray(String[]::new));
                         }
 
-                        // v0.5.0: targetLevel cleanup done -- shutdown before flipping back to MINING.
+                        // Cleanup pass done; shutdown before flipping back to MINING.
                         if (shutdownAfterCleanup) {
                             Microbot.log("AutoMiningPlus: targetLevel cleanup complete. Shutting down.");
                             super.shutdown();
@@ -407,7 +401,7 @@ public class AutoMiningPlusScript extends Script {
                         break;
                 }
             } catch (Exception ex) {
-                Microbot.log(ex.getMessage());
+                Microbot.logStackTrace(getClass().getSimpleName(), ex);
             }
         }, 0, 100, TimeUnit.MILLISECONDS);
         return true;
@@ -422,9 +416,9 @@ public class AutoMiningPlusScript extends Script {
     /**
      * True when at least one cardinally-adjacent tile of {@code rockTile} is in the reachable
      * set. Ore rocks occupy a blocked tile, so we test the tiles a miner could stand on. Used to
-     * skip rocks behind doors or walls the player cannot path to (v0.5.13 mithril at the Mining
-     * Guild fix). {@code reachable} is the strict BFS flood-fill from the mining anchor, so an
-     * empty set (no anchor yet) filters everything out and the caller falls back to wait/walk-back.
+     * skip rocks behind doors or walls the player cannot path to. {@code reachable} is the strict
+     * BFS flood-fill from the mining anchor, so an empty set (no anchor yet) filters everything
+     * out and the caller falls back to wait/walk-back.
      */
     private static boolean hasReachableAdjacent(WorldPoint rockTile, Set<WorldPoint> reachable) {
         if (rockTile == null || reachable.isEmpty()) {
@@ -436,23 +430,7 @@ public class AutoMiningPlusScript extends Script {
                 || reachable.contains(rockTile.dy(-1));
     }
 
-    private static List<Rocks> buildProgressiveRocks() {
-        List<Rocks> rocks = new ArrayList<>(Arrays.asList(
-                Rocks.TIN,
-                Rocks.IRON,
-                Rocks.COAL,
-                Rocks.GOLD,
-                Rocks.MITHRIL,
-                Rocks.ADAMANTITE,
-                Rocks.RUNITE
-        ));
-        return rocks;
-    }
-
     private void updateActiveRock(AutoMiningPlusConfig config) {
-        Rocks previousRock = activeRock;
-        LocationOption previousLocation = activeLocation;
-
         if (config.progressiveMode()) {
             activeRock = PROGRESSIVE_ROCKS.stream()
                     .filter(Rocks::hasRequiredLevel)
@@ -471,11 +449,11 @@ public class AutoMiningPlusScript extends Script {
             log.warn("AutoMiningPlus: {} does not host {}. Walking there anyway; mining will idle until you switch ore or location.",
                     choice.name(), activeRock != null ? activeRock.name() : "null");
         }
-        // Re-anchor the script's "home tile" to the resolved mine's WorldPoint each tick.
-        // Without this, initialPlayerLocation stays pinned to wherever the user toggled the
-        // script — bank lobby, login spawn, anywhere — and the MINING-case "walked too far
-        // from start" check drags the player back to that spawn tile instead of letting them
-        // mine at the configured location.
+        // The anchor ("home tile") is the resolved mine's WorldPoint by design, owned here and
+        // re-pinned each tick. Without this, initialPlayerLocation stays pinned to wherever the
+        // user toggled the script (bank lobby, login spawn, anywhere) and the MINING-case
+        // "walked too far from start" check drags the player back to that spawn tile instead of
+        // letting them mine at the configured location.
         if (activeLocation != null && activeLocation.getWorldPoint() != null) {
             initialPlayerLocation = activeLocation.getWorldPoint();
         }
@@ -536,8 +514,8 @@ public class AutoMiningPlusScript extends Script {
 
         WorldPoint targetPoint = activeLocation.getWorldPoint();
 
-        // Only update initialPlayerLocation if it's null
-        // Don't update just because player is far away (e.g., at bank) - that breaks return-to-location
+        // Fallback seed in case updateActiveRock has not pinned the anchor yet; that method is the
+        // owner of initialPlayerLocation and normally sets it to the table coord first.
         if (initialPlayerLocation == null) {
             initialPlayerLocation = targetPoint;
         }
@@ -572,7 +550,7 @@ public class AutoMiningPlusScript extends Script {
                 : "current area";
         if (wrongOreLocation) {
             Microbot.status = "WRONG ORE: no " + oreName + " at " + locationName
-                    + " — change ore or location";
+                    + " (change ore or location)";
         } else {
             Microbot.status = "Mining " + oreName + " @ " + locationName;
         }

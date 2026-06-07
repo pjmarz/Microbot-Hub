@@ -1,7 +1,5 @@
 package net.runelite.client.plugins.microbot.miningplus.data;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
 import net.runelite.api.Skill;
@@ -16,59 +14,22 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Mining rock location dataset — for each ore type, the list of mines where it can be found
+ * Mining rock location dataset. For each ore type, the list of mines where it can be found
  * with their WorldPoints, members/quest gates, and skill requirements.
  *
  * <h2>Source of truth</h2>
  * <ul>
- *   <li>Mine list and rock-types-per-mine: <a href="https://oldschool.runescape.wiki/w/Mines">OSRS Wiki — Mines</a></li>
+ *   <li>Mine list and rock-types-per-mine: <a href="https://oldschool.runescape.wiki/w/Mines">OSRS Wiki, Mines</a></li>
  *   <li>Per-mine details: each named mine's own wiki page (e.g.
  *       <a href="https://oldschool.runescape.wiki/w/East_Lumbridge_Swamp_mine">East Lumbridge Swamp mine</a>)
  *       has the canonical "Rocks" table with quantity, level, XP per rock</li>
  *   <li>Quest/skill/varbit requirements: from each mine's wiki page</li>
  * </ul>
- *
- * <h2>Audit log</h2>
- * <ul>
- *   <li><b>2026-05-14 (v0.1.3):</b> Full audit via {@code tools/wiki-audit-mines.ps1} found
- *       15 discrepancies and applied corrections. Notable: Lumbridge East/West tin↔mithril
- *       swap (v0.1.2), Al Kharid Gem rock removal, Dwarven Silver removal, Varrock SW Copper
- *       removal, Heroes' Guild + Bandit Camp + several others got missing rocks added.
- *       Final audit at v0.1.3: 17 OK / 0 mismatch / 0 not found.</li>
- *   <li><b>2026-05-21 (v0.4.0 -- wiki-driven data expansion):</b> Added F2P entries surfaced by
- *       comprehensive OSRS Wiki re-audit. Rimmington Mine (F2P, 2 tin + 5 copper + 6 iron +
- *       2 clay + 2 gold rocks per wiki; "best F2P gold spot pre-Crafting Guild"). Edgeville
- *       Dungeon Mine (F2P underground; 2 tin + 2 copper + 3 iron + 3 silver + 6 coal + 1 mithril
- *       + 2 adamantite rocks; wiki notes "almost never used due to monsters + bank distance" so
- *       flagged LOW UTILITY in inline comments). Coords are wiki-derived approximations -- needs
- *       in-game verification on next throwaway session. Trigger: Fadli's bank gap surfaced
- *       post-deploy in v0.3.3; this audit catches similar gaps proactively.</li>
- *   <li><b>2026-05-28 (v0.5.8 -- Mining Guild F2P correction, closes the v0.4.0 deferred verification):</b>
- *       The Mining Guild entries (iron/coal/mithril/adamant) were all coord {@code (3046, 9756)} and
- *       flagged members-only. Live-verification on a 60-Mining F2P account (dev-tool tile hovers +
- *       agent server {@code /state}) found {@code (3046, 9756)} is the chamber-divider DOOR, ~16 tiles
- *       north of the iron/coal field -- the walker was routed to the door, never the rocks. Corrected to
- *       verified per-ore tiles: IRON {@code (3028, 9737)}, COAL {@code (3045, 9741)} [chamber 1, south of
- *       door], MITHRIL {@code (3037, 9773)}, ADAMANT {@code (3042, 9772)} [chamber 2, north of door].
- *       Flipped membersOnly false (60 Mining is the only gate). Rock counts corrected to F2P-actual
- *       (4 iron / 37 coal / 5 mithril / 2 adamant) from the inflated members-combined numbers.
- *       NOTE: mithril/adamant are in chamber 2 behind the door -- depends on Rs2Walker handling that
- *       door; verify in a soak. The RUNITE Mining Guild entry is left at the old coord/members flag
- *       (runite is not in the F2P area and not in the members guild per wiki; likely a phantom entry,
- *       unverifiable without a members account -- flagged for a future members-side audit).</li>
- *   <li><b>2026-05-28 (v0.5.11 -- mithril re-anchor):</b> The v0.5.8 MITHRIL anchor {@code (3037, 9773)}
- *       (chamber 2, through the door) was the wrong call. Live verification found the full 5-rock F2P
- *       mithril cluster is in CHAMBER 1, co-located with coal/iron, no door transit: tiles
- *       {@code (3046,9733) (3047,9733) (3050,9738) (3052,9739) (3053,9737)}. Re-anchored to the cluster
- *       center {@code (3050, 9738)}. Removes the door-transit dependency for mithril (iron/coal/mithril
- *       are now all chamber 1). Adamant stays {@code (3042, 9772)} chamber 2 (only mithril was found in
- *       chamber 1; adamant needs 70 Mining regardless).</li>
- *   <li>Re-audit before each minor version bump that touches this file.</li>
- * </ul>
  */
-@Getter
-@RequiredArgsConstructor
-public class MiningRockLocations {
+public final class MiningRockLocations {
+
+    private MiningRockLocations() {
+    }
 
     /**
      * Gets the best locations for a specific rock/ore type.
@@ -90,8 +51,6 @@ public class MiningRockLocations {
                 return getCoalRockLocations();
             case GOLD:
                 return getGoldRockLocations();
-            case GEM:
-                return getGemRockLocations();
             case MITHRIL:
                 return getMithrilRockLocations();
             case ADAMANTITE:
@@ -140,144 +99,10 @@ public class MiningRockLocations {
         return accessibleLocations.get(0);
     }
 
-    /**
-     * Gets the best locations for a specific rock type with resource information.
-     * Locations are ordered by preference (best locations first).
-     * Returns ResourceLocationOption instances with rock count data.
-     */
-    public static List<ResourceLocationOption> getResourceLocationsForRock(Rocks rock) {
-        switch (rock) {
-            case TIN:
-                return getTinRockResourceLocations();
-            case COPPER:
-                return getCopperRockResourceLocations();
-            case IRON:
-                return getIronRockResourceLocations();
-            case COAL:
-                return getCoalRockResourceLocations();
-            // Add other rock types as needed
-            default:
-                return new ArrayList<>();
-        }
-    }
-
-    /**
-     * Gets accessible resource locations for a specific rock type - filters out locations
-     * the player cannot access based on quest and skill requirements.
-     */
-    public static List<ResourceLocationOption> getAccessibleResourceLocationsForRock(Rocks rock) {
-        return getResourceLocationsForRock(rock).stream()
-                .filter(ResourceLocationOption::hasRequirements)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Gets the best accessible resource location for a rock type with minimum resource requirements.
-     * Prioritizes accessible locations, then resource count, then proximity to player.
-     */
-    public static ResourceLocationOption getBestAccessibleResourceLocation(Rocks rock, int minResources) {
-        List<ResourceLocationOption> accessibleLocations = getAccessibleResourceLocationsForRock(rock);
-
-        if (accessibleLocations.isEmpty()) {
-            return null;
-        }
-
-        // Filter by minimum resource requirements
-        List<net.runelite.client.plugins.microbot.miningplus.data.ResourceLocationOption> suitableLocations = accessibleLocations.stream()
-                .filter(location -> location.hasMinimumResources(minResources))
-                .collect(Collectors.toList());
-
-        if (suitableLocations.isEmpty()) {
-            // If no locations meet minimum requirements, use the best available
-            suitableLocations = accessibleLocations;
-        }
-
-        WorldPoint playerLocation = Rs2Player.getWorldLocation();
-        if (playerLocation != null) {
-            return suitableLocations.stream()
-                    .max((loc1, loc2) -> Double.compare(
-                            loc1.calculateResourceEfficiencyScore(playerLocation),
-                            loc2.calculateResourceEfficiencyScore(playerLocation)
-                    ))
-                    .orElse(suitableLocations.get(0));
-        }
-
-        // If no player location, prefer locations with more resources
-        return suitableLocations.stream()
-                .max((loc1, loc2) -> Integer.compare(
-                        loc1.getNumberOfResources(),
-                        loc2.getNumberOfResources()
-                ))
-                .orElse(suitableLocations.get(0));
-    }
-
-    // Example resource location methods - showing tin and copper as examples
-    private static List<ResourceLocationOption> getTinRockResourceLocations() {
-        List<ResourceLocationOption> locations = new ArrayList<>();
-
-        // Lumbridge Swamp West Mine - great for beginners, close to bank (estimated 4-5 tin rocks)
-        locations.add(new ResourceLocationOption(
-                new WorldPoint(3149, 3148, 0),
-                "Lumbridge Swamp West Mine",
-                false, // F2P location
-                5 // Number of tin rock spawns
-        ));
-
-        // Al Kharid Mine - close to Al Kharid bank (estimated 3-4 tin rocks)
-        locations.add(new ResourceLocationOption(
-                new WorldPoint(3296, 3315, 0),
-                "Al Kharid Mine",
-                false, // F2P location
-                4 // Number of tin rock spawns
-        ));
-
-        return locations;
-    }
-
-    private static List<ResourceLocationOption> getCopperRockResourceLocations() {
-        List<ResourceLocationOption> locations = new ArrayList<>();
-
-        // Al Kharid Mine - excellent for beginners, close to bank (estimated 6-7 copper rocks)
-        locations.add(new ResourceLocationOption(
-                new WorldPoint(3296, 3315, 0),
-                "Al Kharid Mine",
-                false, // F2P location
-                7 // Number of copper rock spawns
-        ));
-
-        // Lumbridge Swamp West Mine - good for F2P (estimated 4-5 copper rocks)
-        locations.add(new ResourceLocationOption(
-                new WorldPoint(3149, 3148, 0),
-                "Lumbridge Swamp West Mine",
-                false, // F2P location
-                5 // Number of copper rock spawns
-        ));
-
-        return locations;
-    }
-
-    private static List<ResourceLocationOption> getIronRockResourceLocations() {
-        List<ResourceLocationOption> locations = new ArrayList<>();
-
-        // Add iron rock locations with resource counts
-        // This would be expanded with actual iron mining locations
-
-        return locations;
-    }
-
-    private static List<ResourceLocationOption> getCoalRockResourceLocations() {
-        List<ResourceLocationOption> locations = new ArrayList<>();
-
-        // Add coal rock locations with resource counts
-        // This would be expanded with actual coal mining locations
-
-        return locations;
-    }
-
     private static List<LocationOption> getTinRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Lumbridge Swamp EAST Mine - new players' mine, 5 tin + 5 copper rocks (post-2006 layout)
+        // Lumbridge Swamp EAST Mine - new players' mine, 5 tin + 5 copper rocks
         locations.add(new LocationOption(
                 new WorldPoint(3229, 3148, 0),
                 "Lumbridge Swamp East Mine", false
@@ -313,13 +138,13 @@ public class MiningRockLocations {
                 "Dwarven Mine", false
         ));
 
-        // v0.4.0: Rimmington Mine - F2P, 2 tin rocks per wiki. Quiet alternative to Lumbridge.
+        // Rimmington Mine - F2P, 2 tin rocks per wiki. Quiet alternative to Lumbridge.
         locations.add(new LocationOption(
                 new WorldPoint(2978, 3236, 0),
                 "Rimmington Mine", false
         ));
 
-        // v0.4.0: Edgeville Dungeon - F2P underground, 2 tin per wiki. LOW UTILITY (monsters, far from bank).
+        // Edgeville Dungeon - F2P underground, 2 tin per wiki. LOW UTILITY (monsters, far from bank).
         locations.add(new LocationOption(
                 new WorldPoint(3088, 9870, 0),
                 "Edgeville Dungeon Mine", false
@@ -337,7 +162,7 @@ public class MiningRockLocations {
                 "Al Kharid Mine", false
         ));
 
-        // Lumbridge Swamp EAST Mine - new players' mine, 5 copper + 5 tin rocks (post-2006 layout)
+        // Lumbridge Swamp EAST Mine - new players' mine, 5 copper + 5 tin rocks
         locations.add(new LocationOption(
                 new WorldPoint(3229, 3148, 0),
                 "Lumbridge Swamp East Mine", false
@@ -357,13 +182,13 @@ public class MiningRockLocations {
                 "Dwarven Mine", false
         ));
 
-        // v0.4.0: Rimmington Mine - F2P, 5 copper rocks per wiki. Solid F2P alternative.
+        // Rimmington Mine - F2P, 5 copper rocks per wiki. Solid F2P alternative.
         locations.add(new LocationOption(
                 new WorldPoint(2978, 3236, 0),
                 "Rimmington Mine", false
         ));
 
-        // v0.4.0: Edgeville Dungeon - F2P underground, 2 copper per wiki. LOW UTILITY.
+        // Edgeville Dungeon - F2P underground, 2 copper per wiki. LOW UTILITY.
         locations.add(new LocationOption(
                 new WorldPoint(3088, 9870, 0),
                 "Edgeville Dungeon Mine", false
@@ -402,7 +227,7 @@ public class MiningRockLocations {
                 craftingGuildClayItems
         ));
 
-        // v0.4.0: Rimmington Mine - F2P, 2 clay rocks per wiki.
+        // Rimmington Mine - F2P, 2 clay rocks per wiki.
         locations.add(new LocationOption(
                 new WorldPoint(2978, 3236, 0),
                 "Rimmington Mine", false
@@ -414,7 +239,8 @@ public class MiningRockLocations {
     private static List<LocationOption> getIronRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild F2P area - 4 iron rocks (v0.5.8: live-verified F2P; old coord 3046,9756 was the chamber-divider door, not ore)
+        // Mining Guild F2P area - 4 iron rocks. Anchored on the ore field, not the
+        // chamber-divider door at (3046, 9756).
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
@@ -465,13 +291,13 @@ public class MiningRockLocations {
                 "Varrock South West Mine", false
         ));
 
-        // v0.4.0: Rimmington Mine - F2P, 6 iron rocks per wiki. Notable F2P iron spot.
+        // Rimmington Mine - F2P, 6 iron rocks per wiki. Notable F2P iron spot.
         locations.add(new LocationOption(
                 new WorldPoint(2978, 3236, 0),
                 "Rimmington Mine", false
         ));
 
-        // v0.4.0: Edgeville Dungeon - F2P underground, 3 iron per wiki. LOW UTILITY.
+        // Edgeville Dungeon - F2P underground, 3 iron per wiki. LOW UTILITY.
         locations.add(new LocationOption(
                 new WorldPoint(3088, 9870, 0),
                 "Edgeville Dungeon Mine", false
@@ -513,7 +339,7 @@ public class MiningRockLocations {
                 craftingGuildSilverItems
         ));
 
-        // v0.4.0: Edgeville Dungeon - F2P underground, 3 silver per wiki. LOW UTILITY.
+        // Edgeville Dungeon - F2P underground, 3 silver per wiki. LOW UTILITY.
         locations.add(new LocationOption(
                 new WorldPoint(3088, 9870, 0),
                 "Edgeville Dungeon Mine", false
@@ -525,7 +351,7 @@ public class MiningRockLocations {
     private static List<LocationOption> getCoalRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild F2P area - 37 coal rocks, the premier F2P coal spot (v0.5.8: live-verified F2P)
+        // Mining Guild F2P area - 37 coal rocks, the premier F2P coal spot
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
@@ -606,8 +432,8 @@ public class MiningRockLocations {
                 "Seers' Village Coal Trucks", true
         ));
 
-        // v0.4.0: Edgeville Dungeon - F2P underground, 6 COAL rocks per wiki (notable F2P count!).
-        // Caveat: monsters dense + long path to nearest bank (Edgeville). Slower than Dwarven Mine.
+        // Edgeville Dungeon - F2P underground, 6 coal rocks (notable F2P count).
+        // Caveat: dense monsters and a long path to the nearest bank (Edgeville). Slower than Dwarven Mine.
         locations.add(new LocationOption(
                 new WorldPoint(3088, 9870, 0),
                 "Edgeville Dungeon Mine", false
@@ -646,8 +472,8 @@ public class MiningRockLocations {
                 craftingGuildItems
         ));
 
-        // v0.4.0: Rimmington Mine - F2P, 2 gold rocks per wiki. Wiki: "the best way to mine gold
-        // ore until access to the Crafting Guild is acquired" -- this is the F2P gold spot.
+        // Rimmington Mine - F2P, 2 gold rocks. The best F2P gold spot until access to the
+        // Crafting Guild is acquired.
         locations.add(new LocationOption(
                 new WorldPoint(2978, 3236, 0),
                 "Rimmington Mine", false
@@ -656,34 +482,12 @@ public class MiningRockLocations {
         return locations;
     }
 
-    private static List<LocationOption> getGemRockLocations() {
-        List<LocationOption> locations = new ArrayList<>();
-
-        // Shilo Village Gem Mine - requires Shilo Village quest
-        Map<Quest, QuestState> shiloQuests = new HashMap<>();
-        shiloQuests.put(Quest.SHILO_VILLAGE, QuestState.FINISHED);
-        locations.add(new LocationOption(
-                new WorldPoint(2824, 2997, 0),
-                "Shilo Village Gem Mine", true,
-                shiloQuests,
-                new HashMap<>(),
-                new HashMap<>(),
-                new HashMap<>(),
-                new HashMap<>()
-        ));
-
-        // NOTE: Per OSRS Wiki Al Kharid mine does not host gem rocks; removed from this list.
-
-        return locations;
-    }
-
     private static List<LocationOption> getMithrilRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild F2P area - 5 mithril rocks, CHAMBER 1 cluster co-located with coal/iron, NO
-        // door transit (v0.5.11: re-anchored from the chamber-2 (3037,9773) guess to the verified
-        // chamber-1 cluster. Tiles: (3046,9733)(3047,9733)(3050,9738)(3052,9739)(3053,9737); anchor
-        // is the cluster center, all 5 within ~7 tiles).
+        // Mining Guild F2P area - 5 mithril rocks, chamber-1 cluster co-located with coal/iron,
+        // no door transit. Tiles: (3046,9733)(3047,9733)(3050,9738)(3052,9739)(3053,9737); the
+        // anchor is the cluster center, all 5 within ~7 tiles.
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
@@ -733,7 +537,7 @@ public class MiningRockLocations {
                 new HashMap<>()
         ));
 
-        // v0.4.0: Edgeville Dungeon - F2P underground, 1 mithril per wiki. LOW UTILITY.
+        // Edgeville Dungeon - F2P underground, 1 mithril per wiki. LOW UTILITY.
         locations.add(new LocationOption(
                 new WorldPoint(3088, 9870, 0),
                 "Edgeville Dungeon Mine", false
@@ -745,7 +549,7 @@ public class MiningRockLocations {
     private static List<LocationOption> getAdamantiteRockLocations() {
         List<LocationOption> locations = new ArrayList<>();
 
-        // Mining Guild F2P area - 2 adamantite rocks, north chamber past the door at 3046,9756 (v0.5.8: live-verified F2P; needs 70 Mining to mine)
+        // Mining Guild F2P area - 2 adamantite rocks, north chamber past the door at 3046,9756 (needs 70 Mining to mine)
         Map<Skill, Integer> miningGuildSkills = new HashMap<>();
         miningGuildSkills.put(Skill.MINING, 60);
         locations.add(new LocationOption(
@@ -797,7 +601,7 @@ public class MiningRockLocations {
 
         // NOTE: Per OSRS Wiki Central Fremennik Isles mine (Neitiznot) does not host adamantite; removed from this list.
 
-        // v0.4.0: Edgeville Dungeon - F2P underground, 2 adamantite per wiki. LOW UTILITY.
+        // Edgeville Dungeon - F2P underground, 2 adamantite per wiki. LOW UTILITY.
         locations.add(new LocationOption(
                 new WorldPoint(3088, 9870, 0),
                 "Edgeville Dungeon Mine", false

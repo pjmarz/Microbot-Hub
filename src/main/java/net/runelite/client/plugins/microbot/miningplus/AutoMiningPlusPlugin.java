@@ -26,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoMiningPlusPlugin extends Plugin {
-    public static final String version = "0.5.17";
+    public static final String version = "0.5.18";
     @Inject
     private AutoMiningPlusConfig config;
     @Provides
@@ -45,21 +45,20 @@ public class AutoMiningPlusPlugin extends Plugin {
 
     @Override
     protected void startUp() throws AWTException {
-        // v0.5.7: clear any stale pause flag from a previous session. Matches AIOFighterPlugin:132.
+        // Clear any stale pause flag from a previous session.
         Microbot.pauseAllScripts.compareAndSet(true, false);
         if (overlayManager != null) {
             overlayManager.add(autoMiningOverlay);
-            // v0.5.6: critical -- ButtonComponent.setOnClick stores the lambda, but
-            // hookMouseListener() is what actually wires it to RuneLite's mouse event system.
-            // Without this, the pause button looks rendered but clicks pass through to the game.
-            // Pattern copied from AIOFighterPlugin.startUp().
+            // ButtonComponent.setOnClick stores the lambda, but hookMouseListener() is what
+            // actually wires it to RuneLite's mouse event system. Without this, the pause
+            // button looks rendered but clicks pass through to the game.
             autoMiningOverlay.pauseButton.hookMouseListener();
         }
         autoMiningScript.run(config);
     }
 
     protected void shutDown() {
-        // v0.5.7: clear flag so other plugins enabled after us don't inherit our paused state.
+        // Clear the flag so other plugins enabled after us don't inherit our paused state.
         Microbot.pauseAllScripts.compareAndSet(true, false);
         autoMiningScript.shutdown();
         if (autoMiningOverlay != null) {
