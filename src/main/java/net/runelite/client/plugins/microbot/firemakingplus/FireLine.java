@@ -1,3 +1,4 @@
+// Adapted from the leaguesfiremaking plugin (FireLine).
 package net.runelite.client.plugins.microbot.firemakingplus;
 
 import lombok.Getter;
@@ -5,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.api.coords.WorldPoint;
 
 /**
- * A horizontal run of open tiles to lay fires along. Copied from leaguesfiremaking (own source set).
+ * A horizontal run of open tiles to lay fires along.
  */
 @Getter
 @RequiredArgsConstructor

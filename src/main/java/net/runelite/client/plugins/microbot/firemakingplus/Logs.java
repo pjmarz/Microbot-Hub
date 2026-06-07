@@ -1,3 +1,4 @@
+// Adapted from the leaguesfiremaking plugin (LogType).
 package net.runelite.client.plugins.microbot.firemakingplus;
 
 import lombok.Getter;
@@ -7,8 +8,7 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 
 /**
- * Logs burnable for Firemaking, with level requirements. Copied from the leaguesfiremaking LogType
- * (firemakingplus is its own Gradle source set, so shared data is copied rather than referenced).
+ * Logs burnable for Firemaking, with level requirements.
  */
 @Getter
 @RequiredArgsConstructor

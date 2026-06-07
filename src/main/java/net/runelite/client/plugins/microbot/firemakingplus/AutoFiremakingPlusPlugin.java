@@ -13,7 +13,7 @@ import javax.inject.Inject;
 import java.awt.*;
 
 @PluginDescriptor(
-        name = PluginDescriptor.Mocrosoft + "Auto Firemaking Plus",
+        name = "<html>[<font color=#BB86FC>P</font>] " + "Auto Firemaking Plus",
         description = "Firemaking trainer: add logs to a Forester's Campfire or light a line of fires, with stop conditions, target level, and overlay/pause.",
         tags = {"firemaking", "campfire", "skilling", "microbot", "plus"},
         authors = {"pjmarz"},
@@ -26,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoFiremakingPlusPlugin extends Plugin {
-    public static final String version = "0.2.1";
+    public static final String version = "0.2.2";
 
     @Inject
     private AutoFiremakingPlusConfig config;

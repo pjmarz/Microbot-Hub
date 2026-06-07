@@ -3,6 +3,8 @@ package net.runelite.client.plugins.microbot.firemakingplus;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Skill;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.ObjectID;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
 import net.runelite.client.plugins.microbot.api.tileobject.models.Rs2TileObjectModel;
@@ -19,26 +21,27 @@ import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
 import java.awt.event.KeyEvent;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * AutoFiremakingPlus v0.1.0 - Firemaking trainer with two selectable methods (Forester's Campfire
- * and Line firemaking) wrapped in the Plus layer (stop conditions, target level + clean shutdown,
- * overlay/pause, speed/league modes).
+ * Firemaking trainer with two selectable methods (Forester's Campfire and Line firemaking) wrapped
+ * in the Plus layer (stop conditions, target level + clean shutdown, overlay/pause, speed/league
+ * modes).
  *
- * <p>The LINE method ports the proven leaguesfiremaking loop (tinderbox-on-log, auto-step-west,
- * TileScanner line finding) with an added blocked-line guard. The CAMPFIRE method stands at a bank,
- * finds or lights a fire, then uses logs on it until the inventory is empty.</p>
+ * <p>The LINE method does tinderbox-on-log, auto-steps west, and uses TileScanner line finding with
+ * a blocked-line guard. The CAMPFIRE method stands at a bank, finds or lights a fire, then uses logs
+ * on it until the inventory is empty.</p>
  */
 @Slf4j
 public class AutoFiremakingPlusScript extends Script {
 
-    private static final int TINDERBOX_ID = 590;
+    private static final int TINDERBOX_ID = ItemID.TINDERBOX;
     private static final String TINDERBOX_NAME = "Tinderbox";
-    private static final int FIRE_ID = 26185;
+    private static final int FIRE_ID = ObjectID.FIRE;
     private static final int FIRE_ID_ALT = 49927;
-    // Using a log on a Forester's Campfire opens this "Burn" make-X dialog (same family as the
-    // leather 17694733 / staff 17694734 make interfaces); SPACE burns the whole inventory.
+    // Using a log on a Forester's Campfire opens this "Burn" make-X dialog; SPACE burns the whole
+    // inventory.
     private static final int BURN_INTERFACE_WIDGET = 17694735;
 
     private State state = State.SCANNING;
@@ -58,7 +61,7 @@ public class AutoFiremakingPlusScript extends Script {
 
     private boolean shutdownAfterCleanup = false;
 
-    // Campfire burn tracking (tick-driven, replaces the old 120s blocking wait).
+    // Campfire burn tracking (tick-driven).
     // lastLogCount = active-log count observed last tick (-1 = reset/unknown);
     // lastBurnProgressMs = last time the count dropped or we (re)initiated a burn.
     private int lastLogCount = -1;
@@ -88,11 +91,7 @@ public class AutoFiremakingPlusScript extends Script {
         shutdownAfterCleanup = false;
 
         Microbot.enableAutoRunOn = true;
-        Rs2Walker.disableTeleports = true; // keep banking on foot (the suite lesson)
-        // Antiban is identical to the rest of the Plus suite (smelting/smithing): apply the
-        // template and trust the standard gate. The earlier "freeze" was NOT antiban (the
-        // firemaking and smithing templates are byte-for-byte identical bar the Activity); it
-        // was a 120s blocking wait in runCampfire, now removed in favour of a tick-driven burn.
+        Rs2Walker.disableTeleports = true; // keep banking on foot
         Rs2Antiban.resetAntibanSettings();
         Rs2Antiban.antibanSetupTemplates.applyFiremakingSetup();
         if (config.speedMode()) {
@@ -140,10 +139,9 @@ public class AutoFiremakingPlusScript extends Script {
                     Rs2Keyboard.keyPress(arrowKeys[Rs2Random.between(0, arrowKeys.length - 1)]);
                 }
 
-                // Standard suite antiban gate (same as smelting): skip the tick while the global
-                // action cooldown is active. Safe here because the burn is tick-driven now, so the
-                // loop idles between burns and the cooldown clears normally.
-                if (Rs2AntibanSettings.actionCooldownActive) return;
+                // Skip the tick while the global action cooldown is active. Speed mode bypasses the
+                // gate entirely so it actually runs without antiban pacing.
+                if (!config.speedMode() && Rs2AntibanSettings.actionCooldownActive) return;
 
                 if (startPosition == null) startPosition = Rs2Player.getWorldLocation();
 
@@ -159,10 +157,12 @@ public class AutoFiremakingPlusScript extends Script {
                 } else {
                     runLine(config);
                 }
-                // Standard suite antiban pacing (same as smelting): arm the cooldown / micro-break
-                // by chance after each tick's work.
-                Rs2Antiban.actionCooldown();
-                Rs2Antiban.takeMicroBreakByChance();
+                // Arm the cooldown / micro-break by chance after each tick's work, unless speed mode
+                // has disabled antiban.
+                if (!config.speedMode()) {
+                    Rs2Antiban.actionCooldown();
+                    Rs2Antiban.takeMicroBreakByChance();
+                }
             } catch (Exception ex) {
                 Microbot.logStackTrace("AutoFiremakingPlusScript", ex);
             }
@@ -188,10 +188,9 @@ public class AutoFiremakingPlusScript extends Script {
         Rs2TileObjectModel target = findCampfire(anchor, 12);
 
         if (target == null) {
-            // No fire or campfire nearby: light our OWN fire with a tinderbox, then burn logs on
-            // it. Confirmed live that using logs on a self-lit fire (id 26185) opens the same Burn
-            // dialog as a Forester's Campfire, so the burn logic below handles either one. This is
-            // what makes the trainer self-sufficient: it no longer depends on someone else's fire.
+            // No fire or campfire nearby: light our own fire with a tinderbox, then burn logs on it.
+            // Using logs on a self-lit fire opens the same Burn dialog as a Forester's Campfire, so
+            // the burn logic below handles either one.
             if (!Rs2Inventory.hasItem(TINDERBOX_NAME)) {
                 Microbot.status = "No tinderbox - banking for one";
                 lastLogCount = -1;
@@ -231,8 +230,7 @@ public class AutoFiremakingPlusScript extends Script {
             return;
         }
         // Recently (re)initiated and still inside the grace window: give the burn time to tick
-        // before re-kicking. This replaces the old sleepUntil(..., 120000) blocking wait -- the
-        // loop stays responsive (pause/stop honoured every tick) and can never freeze for minutes.
+        // before re-kicking. The loop stays responsive (pause/stop honoured every tick).
         if (lastLogCount >= 0 && now - lastBurnProgressMs < 5000) {
             lastLogCount = count;
             Microbot.status = "Burning logs (" + count + " left)";
@@ -240,17 +238,16 @@ public class AutoFiremakingPlusScript extends Script {
         }
 
         // Fresh start, or the burn stalled with logs remaining -> (re)initiate it. Use a log on the
-        // campfire (menu-based, crowd-immune) -> "Burn" make-X dialog (widget 17694735) -> SPACE.
-        // Using a log is what yields XP; "Tend-to" is only the Forestry keep-alive (confirmed live).
-        // Select the log and wait for it to actually enter "use" mode before interacting, since
-        // useItemOnObject's internal 100ms check is too tight under antiban.
+        // campfire (menu-based) -> "Burn" make-X dialog (widget 17694735) -> SPACE. Using a log is
+        // what yields XP. Select the log and wait for it to actually enter "use" mode before
+        // interacting, since useItemOnObject's internal 100ms check is too tight under antiban.
         Microbot.status = "Adding logs to campfire";
         Rs2Inventory.use(activeLog.getItemId());
         if (!sleepUntil(Rs2Inventory::isItemSelected, 2000)) {
             Microbot.log("[Firemaking] log did not select; retrying next tick");
             return;
         }
-        Rs2GameObject.interact(target.getId());
+        Rs2GameObject.interact(target);
         if (sleepUntil(() -> Rs2Widget.getWidget(BURN_INTERFACE_WIDGET) != null, 5000)) {
             Rs2Keyboard.keyPress(KeyEvent.VK_SPACE);
             lastLogCount = count;
@@ -263,10 +260,9 @@ public class AutoFiremakingPlusScript extends Script {
 
     /**
      * Find a nearby Forester's Campfire (by name) or plain fire (by id) within radius of anchor.
-     * Queried on the CLIENT THREAD: the script loop runs on a background thread, and off-thread
-     * reads of the tile-object cache returned a STALE campfire that had already burned out (the live
-     * bug: it kept trying to use logs on a fire that was gone instead of lighting a new one). On the
-     * client thread the cache reflects the despawn, so this correctly returns null when no fire exists.
+     * Queried on the client thread: the script loop runs on a background thread, and off-thread reads
+     * of the tile-object cache can return a stale campfire that has already burned out. On the client
+     * thread the cache reflects the despawn, so this correctly returns null when no fire exists.
      */
     private Rs2TileObjectModel findCampfire(WorldPoint anchor, int radius) {
         return Microbot.getClientThread().runOnClientThreadOptional(() -> {
@@ -294,7 +290,7 @@ public class AutoFiremakingPlusScript extends Script {
         return null;
     }
 
-    // --- Line firemaking: ported from leaguesfiremaking, with a blocked-line guard. ---
+    // --- Line firemaking: light logs in a line stepping west, with a blocked-line guard. ---
 
     private void runLine(AutoFiremakingPlusConfig config) {
         switch (state) {
@@ -322,10 +318,13 @@ public class AutoFiremakingPlusScript extends Script {
             state = State.BANKING;
             return;
         }
-        FireLine line = TileScanner.findBestLine(startPosition, config.scanRadius());
+        // Scan once and derive both the best line and the blocked-row fallback from the same list
+        // (findFireLines returns lines already sorted best-first).
+        List<FireLine> lines = TileScanner.findFireLines(startPosition, config.scanRadius());
+        FireLine line = lines.isEmpty() ? null : lines.get(0);
         // Guard: if the best line is the same row we just got blocked on, pick a different row.
         if (line != null && line.getY() == blockedLineY) {
-            line = TileScanner.findFireLines(startPosition, config.scanRadius()).stream()
+            line = lines.stream()
                     .filter(l -> l.getY() != blockedLineY)
                     .findFirst().orElse(null);
         }

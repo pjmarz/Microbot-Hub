@@ -43,7 +43,6 @@ public class AutoFiremakingPlusOverlay extends OverlayPanel {
         pauseButton.setParentOverlay(this);
         pauseButton.setFont(FontManager.getRunescapeBoldFont());
         pauseButton.setOnClick(() -> {
-            Microbot.log("AutoFiremakingPlus: pause button click received -- toggling pauseAllScripts");
             Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
             if (Microbot.pauseAllScripts.get()) {
                 Rs2Walker.setTarget(null);
