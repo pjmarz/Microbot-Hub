@@ -19,10 +19,9 @@ import java.text.NumberFormat;
 import java.time.Duration;
 
 /**
- * Stats + Pause overlay for AutoFishingPlus. Mirrors AutoMiningPlusOverlay:
- * the Pause button toggles {@link Microbot#pauseAllScripts} and the parent plugin's startUp()
- * must call {@link ButtonComponent#hookMouseListener()} or the click passes through to the game
- * (the v0.5.6 mining lesson).
+ * Stats + Pause overlay for AutoFishingPlus. The Pause button toggles
+ * {@link Microbot#pauseAllScripts}; the parent plugin's startUp() must call
+ * {@link ButtonComponent#hookMouseListener()} or the click passes through to the game.
  */
 public class AutoFishingPlusOverlay extends OverlayPanel {
     private static final Color TITLE_COLOR = Color.decode("#77DD77");
@@ -123,12 +122,12 @@ public class AutoFishingPlusOverlay extends OverlayPanel {
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
-                // Profit estimate: cache the raw-fish GE price while it's in the pack so GP/hr
-                // survives after depositing. Approximate for mixed catches (uses whatever raw fish
-                // is currently held).
+                // Profit estimate: cache the catch GE price while it's in the pack so GP/hr
+                // survives after depositing. Approximate for mixed catches (uses whatever catch
+                // item is currently held). Skip burnt states, which have no meaningful value.
                 if (config.fishToCatch() != null) {
                     for (String n : config.fishToCatch().getItemNames()) {
-                        if (n.startsWith("Raw") && Rs2Inventory.hasItem(n)) {
+                        if (!n.startsWith("Burnt") && Rs2Inventory.hasItem(n)) {
                             int p = Microbot.getItemManager().getItemPrice(Rs2Inventory.get(n).getId());
                             if (p > 0) { cachedFishPrice = p; break; }
                         }

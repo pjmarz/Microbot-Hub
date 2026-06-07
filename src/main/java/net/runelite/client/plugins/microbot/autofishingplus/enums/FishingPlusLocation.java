@@ -11,9 +11,8 @@ import net.runelite.api.coords.WorldPoint;
  * walks the player to {@link #worldPoint} first and clears the inventory with its own
  * {@link BankingStrategy}.
  *
- * <p>All coordinates are reused from the base {@code FishingSpotLocation} enum (already shipped
- * in the client) or, for the Corsair Cove deposit box, captured in-game via the agent server.
- * Nothing here is sourced from memory.
+ * <p>Most coordinates are reused from the base {@code FishingSpotLocation} enum; the Corsair Cove
+ * deposit-box tile is the one addition.
  *
  * <p>The {@link Fish} a location offers is NOT enforced -- the player still picks the fish.
  * If the chosen fish is not available at the chosen location the spot finder simply idles and
@@ -26,9 +25,9 @@ public enum FishingPlusLocation {
     AUTO("Auto (nearest spot)", null, null, BankingStrategy.DROP, false),
 
     // ---- F2P ----
-    // Corsair Cove Resource Area lobster pier (base enum MYTHS_GUILD_NORTH). Deposit box captured
-    // in-game at (2569,2862). Requires The Corsair Curse + Dragon Slayer I for the free walk
-    // (no fare, no NPC/object interaction). The flagship F2P loop -- long but free bank walk.
+    // Corsair Cove Resource Area lobster pier (base enum MYTHS_GUILD_NORTH), with the resource-area
+    // deposit box. Requires The Corsair Curse + Dragon Slayer I for the free walk (no fare, no
+    // NPC/object interaction). The flagship F2P loop: long but free bank walk.
     CORSAIR_COVE("Corsair Cove (F2P)",
             new WorldPoint(2456, 2893, 0), new WorldPoint(2569, 2862, 0),
             BankingStrategy.DEPOSIT_BOX, false),

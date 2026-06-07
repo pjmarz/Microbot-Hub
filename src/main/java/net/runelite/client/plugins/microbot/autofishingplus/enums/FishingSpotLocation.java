@@ -6,7 +6,8 @@ import lombok.Getter;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.game.FishingSpot;
 
-// Mirror of the client's fishing-spot location data (the client does not expose this as a public enum).
+// Mirror of the base autofishing FishingSpotLocation data, derived from the RuneLite FishingSpot
+// enum (the client does not expose this location table as a public enum).
 @Getter
 public enum FishingSpotLocation
 {

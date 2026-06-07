@@ -2,6 +2,7 @@ package net.runelite.client.plugins.microbot.autofishingplus;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Experience;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.ObjectID;
 import net.runelite.api.Skill;
@@ -83,8 +84,10 @@ public class AutoFishingPlusScript extends Script {
         if (selectedLocation != FishingPlusLocation.AUTO && selectedLocation.getWorldPoint() != null) {
             fishingLocation = selectedLocation.getWorldPoint();
         }
+        // Default a failed isMember() read to false so the warning fires on the accounts most
+        // likely to be F2P (where the read is also most likely to fail).
         if (selectedLocation.isMembersOnly()
-                && !Microbot.getClientThread().runOnClientThreadOptional(Rs2Player::isMember).orElse(true)) {
+                && !Microbot.getClientThread().runOnClientThreadOptional(Rs2Player::isMember).orElse(false)) {
             Microbot.log("AutoFishingPlus: " + selectedLocation + " is members-only and this looks like an F2P world/account.");
         }
 
@@ -106,9 +109,10 @@ public class AutoFishingPlusScript extends Script {
                 return;
             }
 
-            // Accurate fish counter: one catch per Fishing XP increase. The 600ms tick is well
-            // below catch cadence, so one increment per XP drop is exact. Drives the overlay stat
-            // and the stopAfterFish target; also reused for the stopAfterXp check.
+            // Fish counter: one increment per Fishing XP increase. This is approximate, not exact:
+            // methods that yield multiple fish per XP event (e.g. barbarian fishing) under-count,
+            // and it cannot distinguish fish types. Drives the overlay stat and the stopAfterFish
+            // target; also reused for the stopAfterXp check.
             int currentXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                     Microbot.getClient().getSkillExperience(Skill.FISHING)).orElse(lastFishingXp);
             if (currentXp > lastFishingXp) {
@@ -163,7 +167,9 @@ public class AutoFishingPlusScript extends Script {
     private AutoFishingPlusState determineState() {
         if (Rs2Inventory.isFull()) {
             if (isSpecialFish(selectedFish)) return AutoFishingPlusState.PROCESSING_FISH;
-            if (config.cookFish() && !getRawFishInInventory().isEmpty()) return AutoFishingPlusState.COOKING;
+            if (config.cookFish() && !getRawFishInInventory().isEmpty() && getNearbyFireOrRange() != null) {
+                return AutoFishingPlusState.COOKING;
+            }
             return resolveBankingStrategy() == BankingStrategy.DROP
                     ? AutoFishingPlusState.DROPPING
                     : AutoFishingPlusState.DEPOSITING;
@@ -195,9 +201,9 @@ public class AutoFishingPlusScript extends Script {
     private void handleFishing() {
         Rs2NpcModel fishingSpot = findNearestFishingSpot();
         if (fishingSpot == null) {
-            // v0.2.3: no spot of the chosen fish is nearby. Don't busy-idle on the same null tick
-            // after tick. Walk back toward the anchor so a drifted/depleted spot can come back into
-            // range; if there is no anchor to walk to, stop with a clear status instead of spinning.
+            // No spot of the chosen fish is nearby. Don't busy-idle tick after tick: walk back
+            // toward the anchor so a drifted/depleted spot can come back into range; if there is
+            // no anchor to walk to, stop with a clear status instead of spinning.
             WorldPoint anchor = resolveFishingAnchor();
             WorldPoint here = Rs2Player.getWorldLocation();
             if (anchor != null && here != null && here.distanceTo(anchor) > 5) {
@@ -243,8 +249,12 @@ public class AutoFishingPlusScript extends Script {
     private void handleCooking() {
         TileObject fireOrRange = getNearbyFireOrRange();
         if (fireOrRange == null) {
-            log.error("There is no fire nearby, shutdown");
-            shutdown();
+            // No fire/range in range to cook at. Don't abandon a full pack of raw fish:
+            // fall back to the configured banking strategy so the catch is banked or dropped,
+            // consistent with the rest of the flow.
+            log.warn("AutoFishingPlus: Cook fish is on but no fire/range within range; banking/dropping the catch instead.");
+            currentState = cleanupState();
+            dispatch(currentState);
             return;
         }
 
@@ -285,13 +295,11 @@ public class AutoFishingPlusScript extends Script {
         }
 
         if (Rs2Bank.walkToBankAndUseBank()) {
-            // v0.2.3: tool retention by name instead of slot-locks. The old path locked the tool
-            // slots then called depositAll(), which only keeps the tool if the bank's "deposit
-            // ignores inventory locks" varbit is 0 -- and the widget dance that set it could fail
-            // on timing, dumping the whole inventory (the Draynor net-loss the journal flagged).
-            // lockAllBySlot also returns false when every slot is already locked, so its sleepUntil
-            // wrapper could spin to timeout even on success. depositAllExcept(names) keeps the tools
-            // directly and is the same mechanism the deposit-box path already uses reliably.
+            // Retain tools by name (depositAllExcept) rather than by slot lock. Slot-locking only
+            // keeps a tool if the bank's "deposit ignores inventory locks" varbit is 0, and the
+            // widget dance that sets it can fail on timing and dump the whole inventory.
+            // depositAllExcept(names) keeps the tools directly and is the same mechanism the
+            // deposit-box path uses.
             List<String> keep = toolsToKeep();
 
             // Empty the fish barrel (banks its catch) before depositing, and keep the barrel itself.
@@ -310,10 +318,6 @@ public class AutoFishingPlusScript extends Script {
      * Deposit-box banking for named locations (Corsair Cove). Walk to the box approach tile, then
      * deposit everything except the fishing tools. The return walk to the spot is handled by the
      * normal TRAVELING flow on the next tick.
-     *
-     * <p>Watch-point for live testing: the Corsair Cove box is a long (~112-tile) free overland
-     * walk from the lobster pier. If Rs2Walker exhausts retries on that haul, harden here with
-     * intermediate waypoints. No NPC/object interaction is required on this route.
      */
     private void handleDepositBox() {
         WorldPoint box = selectedLocation.getBankPoint();
@@ -411,8 +415,9 @@ public class AutoFishingPlusScript extends Script {
             return;
         }
         if (config.targetLevel() > 0) {
-            int level = Microbot.getClientThread().runOnClientThreadOptional(() ->
-                    Microbot.getClient().getRealSkillLevel(Skill.FISHING)).orElse(startSkillLevel);
+            // Derive level from the currentXp the loop already fetched on the client thread,
+            // avoiding a second cross-thread read every tick.
+            int level = Experience.getLevelForXp(currentXp);
             if (level >= config.targetLevel()) {
                 Microbot.log("AutoFishingPlus: reached target level (" + level + " >= "
                         + config.targetLevel() + "). Cleaning up then shutting down.");
@@ -471,7 +476,8 @@ public class AutoFishingPlusScript extends Script {
 
     private boolean isAtFishingLocation() {
         if (fishingLocation == null) return false;
-        return Rs2Player.getWorldLocation().distanceTo(fishingLocation) <= 5;
+        WorldPoint here = Rs2Player.getWorldLocation();
+        return here != null && here.distanceTo(fishingLocation) <= 5;
     }
 
     private void activateSpec() {
