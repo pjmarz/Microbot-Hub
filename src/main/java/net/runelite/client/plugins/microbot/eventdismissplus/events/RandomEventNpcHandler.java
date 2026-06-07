@@ -78,9 +78,9 @@ public class RandomEventNpcHandler implements BlockingEvent {
 
         boolean engage = shouldEngage(name);
 
-        // v0.2.0: random skip chance for antiban. Even if we WOULD engage, roll a die
-        // and force-dismiss with the configured probability. Real humans don't engage
-        // every event; some skip due to being busy / focused on their main activity.
+        // Random skip chance for antiban. Even if we would engage, roll a die and
+        // force-dismiss with the configured probability. Real humans don't engage every
+        // event; some skip due to being busy / focused on their main activity.
         String skipNote = null;
         if (engage && config.globalSkipChance() > 0) {
             int roll = Rs2Random.between(1, 101);
@@ -97,24 +97,26 @@ public class RandomEventNpcHandler implements BlockingEvent {
                 EventDismissPlusEventLog.append(name, EventDismissPlusEventLog.Action.ENGAGE,
                         EventDismissPlusEventLog.Outcome.OK, "");
 
-                // v0.2.2: defensive fallback at the execute() level, generalizing v0.2.1's
-                // lamp-only fallback to ANY engagement path. If engage() ran but the NPC
-                // is still on screen (e.g. Sandwich Lady's tray widget wasn't picked
-                // because we don't model widget interactions, Drunken Dwarf's yes/no
-                // option text didn't match, or any future event whose engagement is
-                // structurally incomplete), wait briefly for natural despawn then fall
-                // through to dismiss. Prevents BlockingEventManager re-fire loop.
-                //
-                // CSV log captures these as DISMISS/ERROR/"engagement fallback" so the
-                // empirical record shows WHICH events slip through. Telemetry drives
-                // v0.3.0+ priorities for proper engagement work.
+                // Defensive fallback for any engagement path. If engage() ran but the NPC is
+                // still on screen (e.g. Sandwich Lady's tray widget wasn't picked because we
+                // don't model widget interactions, Drunken Dwarf's yes/no option text didn't
+                // match, or any future event whose engagement is structurally incomplete),
+                // wait briefly for natural despawn then fall through to dismiss. Prevents a
+                // BlockingEventManager re-fire loop. The CSV log captures these as
+                // DISMISS/ERROR/"engagement fallback" so the empirical record shows which
+                // events slip through.
                 Global.sleepUntil(() -> !validate(), 3000);
                 if (validate()) {
                     Microbot.log("EventDismissPlus: " + name + " engagement didn't despawn NPC; falling back to dismiss");
                     EventDismissPlusEventLog.append(name, EventDismissPlusEventLog.Action.DISMISS,
                             EventDismissPlusEventLog.Outcome.ERROR, "engagement fallback");
                     try {
-                        dismiss(npc);
+                        // Re-resolve: npc was captured before a multi-second dialogue/sleep
+                        // and may now be stale (despawned/respawned).
+                        Rs2NpcModel fallbackNpc = getRandomEventNpc();
+                        if (fallbackNpc != null) {
+                            dismiss(fallbackNpc);
+                        }
                     } catch (Exception ex) {
                         Microbot.log("EventDismissPlus: fallback dismiss failed: " + ex.getMessage());
                     }
@@ -130,9 +132,13 @@ public class RandomEventNpcHandler implements BlockingEvent {
                     engage ? EventDismissPlusEventLog.Action.ENGAGE : EventDismissPlusEventLog.Action.DISMISS,
                     EventDismissPlusEventLog.Outcome.ERROR,
                     ex.getMessage() == null ? "" : ex.getMessage());
-            // Fall back to dismiss on any unexpected exception
+            // Fall back to dismiss on any unexpected exception. Re-resolve first: npc may be
+            // stale after a multi-second dialogue/sleep.
             try {
-                dismiss(npc);
+                Rs2NpcModel fallbackNpc = getRandomEventNpc();
+                if (fallbackNpc != null) {
+                    dismiss(fallbackNpc);
+                }
             } catch (Exception ignored) {
             }
         }
@@ -184,8 +190,7 @@ public class RandomEventNpcHandler implements BlockingEvent {
         npc.click("Talk-to");
         Rs2Dialogue.sleepUntilHasContinue();
 
-        RandomEventType type = RandomEventType.fromNpcName(name);
-        if (type != null && type.givesLamp()) {
+        if (RandomEventType.givesLamp(name)) {
             handleLampDialogue(name);
         } else {
             // Accept-and-acknowledge events (Sandwich Lady, Drunken Dwarf, Mysterious Old
@@ -200,13 +205,12 @@ public class RandomEventNpcHandler implements BlockingEvent {
      * "Yes please" option appears, then a skill picker. We click through, pick "Yes
      * please" if shown, then click the active skill.
      *
-     * <p>v0.2.1: takes the NPC name so the fallback path can log it. If the safety loop
-     * exits without claiming a lamp (e.g. Bee keeper's modern dialogue uses a
-     * help/decline question instead of the Genie-style "Yes please" + skill picker
-     * flow), falls through to {@link #tryDeclineFallback(String)} to close the dialogue
-     * via a decline option. Without this, the NPC stays on screen and
-     * BlockingEventManager re-fires the handler every few seconds (Pete's 2026-05-26
-     * Edgeville-dungeon repro: 5 "handled Bee keeper" log lines in 16 seconds).
+     * <p>The NPC name is passed so the fallback path can log it. If the safety loop exits
+     * without claiming a lamp (e.g. a modern dialogue uses a help/decline question instead
+     * of the Genie-style "Yes please" + skill picker flow), it falls through to
+     * {@link #tryDeclineFallback(String)} to close the dialogue via a decline option.
+     * Without this the NPC stays on screen and BlockingEventManager re-fires the handler
+     * every few seconds.
      */
     private void handleLampDialogue(String npcName) {
         int safety = 12;
@@ -227,9 +231,9 @@ public class RandomEventNpcHandler implements BlockingEvent {
             // Skill picker
             Skill targetSkill = pickLampSkill();
             if (targetSkill != null) {
-                String skillName = capitalize(targetSkill.getName());
-                if (Rs2Dialogue.hasDialogueOption(skillName)) {
-                    Rs2Dialogue.clickOption(skillName);
+                String skillName = targetSkill.getName();
+                if (Rs2Dialogue.hasDialogueOption(skillName, true)) {
+                    Rs2Dialogue.clickOption(skillName, true);
                     Global.sleep(Rs2Random.between(800, 1500));
                     // After skill is picked, dialog may continue with "you gained X xp"
                     advanceDialogueClicks(4);
@@ -239,23 +243,21 @@ public class RandomEventNpcHandler implements BlockingEvent {
             // No actionable state -- break out
             break;
         }
-        // v0.2.1: safety loop exited without claiming a lamp. The dialogue is still
-        // open (we never hit the skill-picker happy path). Fall through to common
-        // decline phrasings to close it cleanly.
+        // Safety loop exited without claiming a lamp; the dialogue is still open (we never
+        // hit the skill-picker happy path). Fall through to common decline phrasings to
+        // close it cleanly.
         tryDeclineFallback(npcName);
     }
 
     /**
-     * v0.2.1: defensive fallback for stuck lamp dialogues. Tries common decline
-     * phrasings to close the dialogue when the Genie-style flow ("Yes please" + skill
-     * picker) doesn't match the actual dialogue structure. Discovered via Bee keeper:
-     * its modern dialogue uses help/decline question text, so the existing handler's
-     * safety loop exhausted without action, the NPC stayed on screen, and
-     * BlockingEventManager looped the handler every ~4 seconds.
+     * Defensive fallback for stuck lamp dialogues. Tries common decline phrasings to close
+     * the dialogue when the Genie-style flow ("Yes please" + skill picker) doesn't match the
+     * actual dialogue structure (some events use a help/decline question instead, which would
+     * otherwise leave the NPC on screen and loop the handler).
      *
-     * <p>Logs to the CSV event log as DECLINE/OK on success, DECLINE/ERROR on hard
-     * miss. ERROR rows are the signal that the decline-text catalog needs widening or
-     * the event needs proper engagement.
+     * <p>Logs to the CSV event log as DECLINE/OK on success, DECLINE/ERROR on hard miss.
+     * ERROR rows are the signal that the decline-text catalog needs widening or the event
+     * needs proper engagement.
      */
     private void tryDeclineFallback(String npcName) {
         String[] declineTexts = {
@@ -288,9 +290,9 @@ public class RandomEventNpcHandler implements BlockingEvent {
     }
 
     private Skill pickLampSkill() {
-        // v0.2.6: user override. When Force lamp skill is set to a specific skill, use it
-        // directly and skip both auto-detect and the fallback. AUTO_DETECT (default) maps to
-        // null and preserves the original auto-detect -> fallback behavior below unchanged.
+        // User override: when Force lamp skill is set to a specific skill, use it directly and
+        // skip both auto-detect and the fallback. AUTO_DETECT (default) maps to null and uses
+        // the auto-detect -> fallback path below.
         EventDismissPlusConfig.LampSkillOverride override = config.forceLampSkill();
         if (override != null && override.getSkill() != null) {
             return override.getSkill();
@@ -311,17 +313,16 @@ public class RandomEventNpcHandler implements BlockingEvent {
                 Global.sleep(Rs2Random.between(400, 900));
                 continue;
             }
-            // v0.1.1: Mysterious Old Man's Maze variant interrupts the gift flow
-            // with a two-option dialog ("Sure, I like exploring mazes" / "Sorry,
-            // I'm busy"). Decline politely -- the Maze solver is v0.4.0 scope.
-            // Other accept-and-acknowledge events (Sandwich Lady, Drunken Dwarf,
-            // Rick Turpentine, Dr Jekyll, Frog Prince) don't use that option text,
-            // so this branch is Maze-specific in practice.
+            // Mysterious Old Man's Maze variant interrupts the gift flow with a two-option
+            // dialog ("Sure, I like exploring mazes" / "Sorry, I'm busy"). Decline politely;
+            // the Maze itself is not handled. Other accept-and-acknowledge events (Sandwich
+            // Lady, Drunken Dwarf, Rick Turpentine, Dr Jekyll, Frog Prince) don't use that
+            // option text, so this branch is Maze-specific in practice.
             if (Rs2Dialogue.hasDialogueOption("Sorry, I'm busy")) {
                 Rs2Dialogue.clickOption("Sorry, I'm busy");
                 Microbot.log("EventDismissPlus: declined Maze prompt");
-                // v0.2.0: log Maze decline separately so analytics can distinguish
-                // Old Man gift variant (ENGAGE) from Maze variant (DECLINE).
+                // Log the Maze decline separately so analytics can distinguish the Old Man
+                // gift variant (ENGAGE) from the Maze variant (DECLINE).
                 EventDismissPlusEventLog.append("Mysterious Old Man",
                         EventDismissPlusEventLog.Action.DECLINE,
                         EventDismissPlusEventLog.Outcome.OK,
@@ -337,10 +338,5 @@ public class RandomEventNpcHandler implements BlockingEvent {
     private void dismiss(Rs2NpcModel npc) {
         npc.click("Dismiss");
         Global.sleepUntil(() -> getRandomEventNpc() == null, 3000);
-    }
-
-    private static String capitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
     }
 }

@@ -30,7 +30,9 @@ public class EventDismissPlusScript extends Script {
 
     // Skill XP at the start of the current rolling window
     private final Map<Skill, Integer> windowStartXp = new EnumMap<>(Skill.class);
-    // Latest XP delta within the window
+    // Latest XP delta within the window. Written on the scheduled-executor tick and read from
+    // the BlockingEvent handler thread (getActiveSkill), so every access is guarded by
+    // synchronizing on the map to avoid a concurrent-modification data race.
     private final Map<Skill, Integer> recentXpDelta = new EnumMap<>(Skill.class);
     private long windowStartTime = 0;
 
@@ -58,7 +60,9 @@ public class EventDismissPlusScript extends Script {
     public boolean run(EventDismissPlusConfig config) {
         startTimeMillis = System.currentTimeMillis();
         windowStartTime = startTimeMillis;
-        recentXpDelta.clear();
+        synchronized (recentXpDelta) {
+            recentXpDelta.clear();
+        }
         windowStartXp.clear();
         eventsHandled = 0;
         lastEventName = null;
@@ -78,14 +82,15 @@ public class EventDismissPlusScript extends Script {
                     windowStartTime = now;
                 }
 
-                // Update deltas for all skills (skip OVERALL which is a derived total)
+                // Update deltas for all skills
                 for (Skill skill : Skill.values()) {
-                    if (skill == Skill.OVERALL) continue;
                     Integer start = windowStartXp.get(skill);
                     if (start == null) continue;
                     int currentXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                             Microbot.getClient().getSkillExperience(skill)).orElse(start);
-                    recentXpDelta.put(skill, currentXp - start);
+                    synchronized (recentXpDelta) {
+                        recentXpDelta.put(skill, currentXp - start);
+                    }
                 }
             } catch (Exception ex) {
                 Microbot.log("EventDismissPlusScript tick error: " + ex.getMessage());
@@ -97,11 +102,12 @@ public class EventDismissPlusScript extends Script {
 
     private void seedWindowSnapshot() {
         for (Skill skill : Skill.values()) {
-            if (skill == Skill.OVERALL) continue;
             int currentXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                     Microbot.getClient().getSkillExperience(skill)).orElse(0);
             windowStartXp.put(skill, currentXp);
-            recentXpDelta.put(skill, 0);
+            synchronized (recentXpDelta) {
+                recentXpDelta.put(skill, 0);
+            }
         }
     }
 
@@ -113,10 +119,12 @@ public class EventDismissPlusScript extends Script {
     public Skill getActiveSkill() {
         Skill best = null;
         int bestDelta = 0;
-        for (Map.Entry<Skill, Integer> entry : recentXpDelta.entrySet()) {
-            if (entry.getValue() > bestDelta) {
-                bestDelta = entry.getValue();
-                best = entry.getKey();
+        synchronized (recentXpDelta) {
+            for (Map.Entry<Skill, Integer> entry : recentXpDelta.entrySet()) {
+                if (entry.getValue() > bestDelta) {
+                    bestDelta = entry.getValue();
+                    best = entry.getKey();
+                }
             }
         }
         return best;

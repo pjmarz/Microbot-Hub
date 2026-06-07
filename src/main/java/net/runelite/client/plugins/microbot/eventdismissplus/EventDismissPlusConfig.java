@@ -74,7 +74,7 @@ public interface EventDismissPlusConfig extends Config {
     @ConfigItem(keyName = "engageGenie", name = "Engage Genie", description = "Rub lamp + apply to active skill. Off = dismiss.", position = 0, section = engagementSection)
     default boolean engageGenie() { return true; }
 
-    @ConfigItem(keyName = "engageSandwichLady", name = "Engage Sandwich Lady", description = "Accept food offering (1/64 chance for 542k gp stale baguette). Off = dismiss.", position = 1, section = engagementSection)
+    @ConfigItem(keyName = "engageSandwichLady", name = "Engage Sandwich Lady", description = "Talk to the Sandwich Lady. The plugin does not pick from the food tray (widget selection isn't modeled), so this typically clicks through and falls back to dismiss. Off = dismiss.", position = 1, section = engagementSection)
     default boolean engageSandwichLady() { return true; }
 
     @ConfigItem(keyName = "engageDrunkenDwarf", name = "Engage Drunken Dwarf", description = "Accept beer + kebab. Off = dismiss.", position = 2, section = engagementSection)
@@ -98,7 +98,7 @@ public interface EventDismissPlusConfig extends Config {
     @ConfigItem(keyName = "engageRickTurpentine", name = "Engage Rick Turpentine", description = "Accept loot (avg ~551gp, rare crystal key half). Off = dismiss.", position = 8, section = engagementSection)
     default boolean engageRickTurpentine() { return true; }
 
-    @ConfigItem(keyName = "engageDrJekyll", name = "Engage Dr Jekyll", description = "Accept potion (matches clean herb in inv, or Strength(2) if no herb). Off = dismiss.", position = 9, section = engagementSection)
+    @ConfigItem(keyName = "engageDrJekyll", name = "Engage Dr Jekyll", description = "Talk to Dr Jekyll and click through the dialogue to accept whatever potion he gives (game decides based on your herbs). The plugin does not pick a specific potion; if the dialogue stalls it falls back to dismiss. Off = dismiss.", position = 9, section = engagementSection)
     default boolean engageDrJekyll() { return true; }
 
     // --- Genie lamp handling ---

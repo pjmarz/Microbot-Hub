@@ -25,12 +25,12 @@ import java.awt.*;
  * </ul>
  *
  * <p>When either event's {@code validate()} returns true, Microbot interrupts whatever script
- * is currently running, executes the handler, then resumes. Same pattern WoodcuttingPlus uses
- * for its 9 Forestry events. User enables this plugin alongside any other plugin to benefit.
+ * is currently running, executes the handler, then resumes. The user enables this plugin
+ * alongside any other plugin to benefit.
  *
- * <p>v0.1.0 (Tier B): variable response delays, 10 engaged event types, Genie lamp completion
- * with auto-detected active skill, Strange Plant pickup. Everything else dismissed via the
- * universal {@code npc.click("Dismiss")} action.
+ * <p>Features: variable response delays, engaged high-value event types, Genie lamp completion
+ * with auto-detected active skill, and Strange Plant pickup. Everything else is dismissed via
+ * the universal {@code npc.click("Dismiss")} action.
  */
 @PluginDescriptor(
         name = PluginDescriptor.Mocrosoft + "Event Dismiss Plus",
@@ -46,7 +46,7 @@ import java.awt.*;
 )
 @Slf4j
 public class EventDismissPlusPlugin extends Plugin {
-    public static final String version = "0.2.6";
+    public static final String version = "0.2.7";
 
     @Inject
     private EventDismissPlusConfig config;

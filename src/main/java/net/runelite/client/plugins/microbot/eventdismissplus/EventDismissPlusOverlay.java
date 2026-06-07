@@ -21,7 +21,6 @@ public class EventDismissPlusOverlay extends OverlayPanel {
     EventDismissPlusOverlay(EventDismissPlusPlugin plugin) {
         super(plugin);
         this.plugin = plugin;
-        // Positioned below the skill-plugin overlays to avoid overlap.
         setPosition(OverlayPosition.TOP_RIGHT);
         setNaughty();
     }

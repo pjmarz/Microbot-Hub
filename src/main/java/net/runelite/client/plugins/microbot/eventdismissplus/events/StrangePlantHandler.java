@@ -1,5 +1,6 @@
 package net.runelite.client.plugins.microbot.eventdismissplus.events;
 
+import net.runelite.api.ObjectID;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.plugins.microbot.BlockingEvent;
 import net.runelite.client.plugins.microbot.BlockingEventPriority;
@@ -15,9 +16,9 @@ import net.runelite.client.plugins.microbot.util.player.Rs2Player;
  * BlockingEvent for the Strange Plant random event. Unlike other random events, this is a
  * {@code GameObject} (not an NPC), so {@code Rs2Npc.getRandomEventNPC()} doesn't catch it.
  *
- * <p>Detection: query the tile-object cache for the Strange Plant object ID (32956 per
- * OSRS Wiki). When found within a small radius of the player AND engagement is enabled,
- * click "Pick" to harvest the fruit (30% run-energy restore).
+ * <p>Detection: query the tile-object cache for {@link net.runelite.api.ObjectID#STRANGE_PLANT}.
+ * When found within a small radius of the player AND engagement is enabled, click "Pick" to
+ * harvest the fruit (30% run-energy restore).
  *
  * <p>If engagement is disabled, this handler returns false from {@code validate()} so the
  * BlockingEventManager doesn't interrupt anything for it. The plant despawns on its own
@@ -27,12 +28,11 @@ import net.runelite.client.plugins.microbot.util.player.Rs2Player;
  * <ul>
  *   <li>Harvests via the "Pick" action (the standard Strange Plant option). If the click cannot be
  *       made it logs and bails rather than blocking.</li>
- *   <li>Strange Plant object id: 32956.</li>
  * </ul>
  */
 public class StrangePlantHandler implements BlockingEvent {
 
-    private static final int STRANGE_PLANT_OBJECT_ID = 32956;
+    private static final int STRANGE_PLANT_OBJECT_ID = ObjectID.STRANGE_PLANT;
     private static final int SEARCH_RADIUS_TILES = 20;
 
     private final EventDismissPlusConfig config;
@@ -85,8 +85,6 @@ public class StrangePlantHandler implements BlockingEvent {
 
         try {
             if (!plant.click("Pick")) {
-                // Action verb might be different in-game. Smoke-test resolves; for now we just
-                // log and bail.
                 Microbot.log("StrangePlantHandler: 'Pick' action failed on object id "
                         + STRANGE_PLANT_OBJECT_ID + ". Investigate action verb.");
                 return true;

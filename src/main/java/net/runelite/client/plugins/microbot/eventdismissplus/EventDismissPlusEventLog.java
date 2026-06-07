@@ -10,7 +10,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 
 /**
- * v0.2.0: append-only CSV log of every random event EventDismissPlus handles.
+ * Append-only CSV log of every random event EventDismissPlus handles.
  *
  * <p>File location: {@code ~/.runelite/eventdismissplus-events.csv}.
  *
@@ -23,9 +23,9 @@ import java.time.Instant;
  * 2026-05-23T22:30:11Z,Genie,DISMISS,OK,random skip (antiban roll)
  * </pre>
  *
- * <p>Foundation for v0.3.0+ analytics: drop-rate empirical study, engagement-vs-dismiss
- * pattern verification, frequency-of-events over long soak. CSV chosen over JSON for
- * trivial downstream tooling (pandas, Excel, jq).
+ * <p>Supports downstream analytics (drop-rate study, engagement-vs-dismiss pattern
+ * verification, event frequency over a long soak). CSV chosen over JSON for trivial
+ * downstream tooling (pandas, Excel, jq).
  *
  * <p>Thread-safe: {@link #append} synchronizes on the class so concurrent BlockingEvent
  * handlers (NPC handler + Strange Plant handler) can't interleave their writes.
