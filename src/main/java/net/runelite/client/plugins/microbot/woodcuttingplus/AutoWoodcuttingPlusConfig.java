@@ -34,7 +34,7 @@ import net.runelite.client.plugins.microbot.woodcuttingplus.enums.WoodcuttingWal
         "<p></p>" +
         "<p>11. <strong>Speed mode:</strong> turns off Microbot antiban for a faster but more detectable bot. Throwaway accounts only.</p>" +
         "<p></p>" +
-        "<p>12. <strong>Stop conditions:</strong> set Stop after minutes, Stop after XP gained, or a Target level to shut the plugin down automatically. Leave any at 0 to ignore it. For Bank and Drop primaries the Target level banks or drops your inventory first.</p>" +
+        "<p>12. <strong>Stop conditions:</strong> set Stop after minutes, Stop after XP gained, or a Target level to shut the plugin down automatically. Leave any at 0 to ignore it. The Target level processes your current inventory first.</p>" +
         "<p></p>" +
         "<h3>Inventory management</h3>" +
         "<p>13. <strong>Primary action:</strong> what to do when your inventory fills. Bank logs, Drop logs, Burn logs on the spot, Burn logs at a campfire, or Fletch logs.</p>" +
@@ -51,12 +51,10 @@ import net.runelite.client.plugins.microbot.woodcuttingplus.enums.WoodcuttingWal
         "<p></p>" +
         "<p>19. <strong>Walk back:</strong> return to your initial spot or to the last tree you cut.</p>" +
         "<p></p>" +
-        "<p>20. <strong>String bows:</strong> string unstrung bows when a bowstring is in your inventory.</p>" +
-        "<p></p>" +
         "<h3>Forestry</h3>" +
-        "<p>21. <strong>Enable forestry:</strong> master switch for the Forestry helpers. Use a Forestry world for best results.</p>" +
+        "<p>20. <strong>Enable forestry:</strong> master switch for the Forestry helpers. Use a Forestry world for best results.</p>" +
         "<p></p>" +
-        "<p>22. <strong>Event toggles:</strong> turn each Forestry event on or off on its own. Egg, Entlings, Flowers, Fox, Hives, Leprechaun, Ritual, Root, and Struggling Sapling.</p>")
+        "<p>21. <strong>Event toggles:</strong> turn each Forestry event on or off on its own. Egg, Entlings, Flowers, Fox, Hives, Leprechaun, Ritual, Root, and Struggling Sapling.</p>")
 public interface AutoWoodcuttingPlusConfig extends Config {
     String configGroup = "WoodcuttingPlus";
     @ConfigSection(
@@ -218,7 +216,7 @@ public interface AutoWoodcuttingPlusConfig extends Config {
     @ConfigItem(
             keyName = "targetLevel",
             name = "Target level",
-            description = "Stop when Woodcutting reaches this level. Banks/drops inventory first (for BANK/DROP primaries). 0 = disabled.",
+            description = "Stop when Woodcutting reaches this level. Processes the current inventory first. 0 = disabled.",
             position = 13,
             section = generalSection
     )
@@ -265,7 +263,7 @@ public interface AutoWoodcuttingPlusConfig extends Config {
             keyName = "dropOrder",
             name = "Drop order",
             description = "Order to drop items",
-            position = 4,
+            position = 3,
             section = inventorySection
     )
     default InteractOrder interactOrder() {
@@ -275,7 +273,7 @@ public interface AutoWoodcuttingPlusConfig extends Config {
             keyName = "ItemsToBank",
             name = "Additional items to bank",
             description = "Extra items to bank (comma separated)",
-            position = 5,
+            position = 4,
             section = inventorySection
     )
     default String itemsToBank() {
@@ -285,7 +283,7 @@ public interface AutoWoodcuttingPlusConfig extends Config {
             keyName = "ItemsToKeep",
             name = "Items to keep when dropping",
             description = "Items to keep in inventory (comma separated)",
-            position = 6,
+            position = 5,
             section = inventorySection
     )
     default String itemsToKeep() {
@@ -296,24 +294,11 @@ public interface AutoWoodcuttingPlusConfig extends Config {
             keyName = "WalkBack",
             name = "Walk back",
             description = "Walk back to initial spot or last cut down",
-            position = 5,
+            position = 6,
             section = inventorySection
     )
     default WoodcuttingWalkBack walkBack() {
         return WoodcuttingWalkBack.LAST_LOCATION;
-    }
-
-   
-
-    @ConfigItem(
-            keyName = "StringBows",
-            name = "String bows",
-            description = "String unstrung bows if bowstring is available",
-            position = 8,
-            section = inventorySection
-    )
-    default boolean stringBows() {
-        return false;
     }
 
     @ConfigItem(

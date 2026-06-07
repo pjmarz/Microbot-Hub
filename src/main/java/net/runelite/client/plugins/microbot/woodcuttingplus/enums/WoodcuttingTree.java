@@ -8,36 +8,13 @@ import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 
 
 /**
- * Tree enum: 41 entries covering F2P + members + Forestry + quest-gated trees. Each entry
- * carries (gameObjectName, logItemName, logItemId, woodcuttingLevelRequired, interactAction).
+ * Tree enum covering F2P, members, Forestry and quest-gated trees. Each entry carries
+ * (gameObjectName, logItemName, logItemId, woodcuttingLevelRequired, interactAction).
  *
- * <h2>Source of truth</h2>
- * <ul>
- *   <li>Tree names + level reqs: <a href="https://oldschool.runescape.wiki/w/Tree">OSRS Wiki — Tree</a>
- *       (and the main <a href="https://oldschool.runescape.wiki/w/Woodcutting">Woodcutting</a> page)</li>
- *   <li>Item IDs: RuneLite client constants ({@code net.runelite.api.ItemID})</li>
- *   <li>Forked from upstream {@code chsami/Microbot-Hub/.../woodcutting/enums/WoodcuttingTree.java} v1.8.3</li>
- * </ul>
- *
- * <h2>Audit log</h2>
- * <ul>
- *   <li><b>Origin:</b> Forked verbatim from upstream. Audit script
- *       {@code tools/wiki-audit-trees.ps1} hits the OSRS Wiki Woodcutting + Tree pages (combined).
- *       16 of 16 common-name entries confirmed (TREE, OAK, WILLOW, TEAK, MAPLE, MAHOGANY, YEW,
- *       MAGIC, REDWOOD, ACHEY, HOLLOW, SULLIUSCEP, ARCTIC_PINE, BLISTERWOOD, MATURE_JUNIPER,
- *       JUNIPER). The remaining 25 entries are F2P/members variants (DYING, BURNT, JUNGLE_TREE,
- *       LIGHT_JUNGLE, MEDIUM_JUNGLE, DENSE_JUNGLE, JATOBA, etc.) that are real game objects but
- *       not necessarily on the main wiki Woodcutting page; per-tree cross-check deferred to
- *       v0.2.0+ when we expose the named-location dropdown.</li>
- * </ul>
- *
- * <h2>Known gaps</h2>
- * <ul>
- *   <li>Per-tree wiki cross-check covers only common names at v0.1.0. Quest-gated and
- *       Forestry-only trees verified via upstream code only.</li>
- *   <li>Level requirements verified by name presence in wiki, NOT by extracting the level
- *       value. Manual cross-check recommended before v1.0.0.</li>
- * </ul>
+ * <p>Tree names and level requirements are sourced from the OSRS Wiki
+ * (<a href="https://oldschool.runescape.wiki/w/Tree">Tree</a> and
+ * <a href="https://oldschool.runescape.wiki/w/Woodcutting">Woodcutting</a> pages). Item IDs come
+ * from the RuneLite client constants ({@code net.runelite.api.ItemID}).</p>
  */
 @Getter
 @RequiredArgsConstructor

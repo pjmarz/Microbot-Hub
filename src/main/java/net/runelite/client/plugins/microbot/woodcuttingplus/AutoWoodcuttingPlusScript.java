@@ -1,8 +1,6 @@
 package net.runelite.client.plugins.microbot.woodcuttingplus;
 
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.AnimationID;
-import net.runelite.api.GameObject;
 import net.runelite.api.Skill;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.ItemID;
@@ -60,9 +58,8 @@ public class AutoWoodcuttingPlusScript extends Script {
     );
 
     public static final int FORESTRY_DISTANCE = 15;
-    // Corsair Cove Resource Area deposit box. Captured in-game via the agent server; same point
-    // the fishing Plus plugin uses for this spot. F2P maple/yew trains here, so banking deposits
-    // logs at this box instead of the long walk to a full bank.
+    // Corsair Cove Resource Area deposit box. F2P maple/yew trains here, so banking deposits logs
+    // at this box instead of the long walk to a full bank.
     private static final WorldPoint CORSAIR_COVE_DEPOSIT_BOX = new WorldPoint(2569, 2862, 0);
     private static final List<WoodcuttingTree> PROGRESSIVE_TREE_ORDER = List.of(
             WoodcuttingTree.TREE,
@@ -89,10 +86,9 @@ public class AutoWoodcuttingPlusScript extends Script {
     // stopAfterMinutes / stopAfterXp check in the main loop.
     private long startTimeMillis = 0;
     private int startSkillXp = 0;
-    // v0.5.0: target-level cleanup flag. Intercepted in resetInventory's BANK and DROP cases
-    // before the state-flip-back to WOODCUTTING.
+    // target-level cleanup flag. Intercepted in resetInventory before each primary's state-flip-back
+    // to WOODCUTTING/FIREMAKING so we stop once the inventory has been processed.
     private boolean shutdownAfterCleanup = false;
-    public boolean isShutdownAfterCleanup() { return shutdownAfterCleanup; }
     @Inject
     public AutoWoodcuttingPlusScript(AutoWoodcuttingPlusPlugin plugin) {
         this.plugin = plugin;
@@ -132,7 +128,7 @@ public class AutoWoodcuttingPlusScript extends Script {
         Rs2Antiban.antibanSetupTemplates.applyWoodcuttingSetup();
         Rs2AntibanSettings.dynamicActivity = true;
         Rs2AntibanSettings.dynamicIntensity = true;
-        // speed mode single-flag flip. Throwaway-only.
+        // speed mode disables antiban entirely for throwaway accounts.
         if (config.speedMode()) {
             Rs2AntibanSettings.antibanEnabled = false;
         }
@@ -143,15 +139,14 @@ public class AutoWoodcuttingPlusScript extends Script {
         startTimeMillis = System.currentTimeMillis();
         startSkillXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getSkillExperience(Skill.WOODCUTTING)).orElse(0);
-        shutdownAfterCleanup = false; // v0.5.0
+        shutdownAfterCleanup = false;
         if (config.firemakeOnly()) {
             woodcuttingScriptState = WoodcuttingScriptState.FIREMAKING;
         }
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
             try {
-                // v0.5.1: pause check using global Microbot.pauseAllScripts (toggled via overlay
-                // button). Overlay reads the same flag to display [PAUSED] instead of the
-                // woodcuttingScriptState enum.
+                // pause check using the global Microbot.pauseAllScripts flag (toggled via the
+                // overlay button). The overlay reads the same flag to display [PAUSED].
                 if (Microbot.pauseAllScripts.get()) {
                     return;
                 }
@@ -175,9 +170,9 @@ public class AutoWoodcuttingPlusScript extends Script {
                     }
                 }
 
-                // v0.5.0: target-level check. Forces RESETTING for one cleanup pass (BANK or
-                // DROP, per primaryAction); the intercept in resetInventory shuts us down before
-                // the state-flip-back. For BURN/FLETCH, the script just runs out naturally.
+                // target-level check. Forces RESETTING for one cleanup pass; the intercept in
+                // resetInventory shuts us down before the state-flip-back, once the inventory has
+                // been processed by the active primary (BANK/DROP/BURN/FLETCH).
                 if (config.targetLevel() > 0 && !shutdownAfterCleanup) {
                     int currentLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                             Microbot.getClient().getRealSkillLevel(Skill.WOODCUTTING)).orElse(0);
@@ -208,8 +203,7 @@ public class AutoWoodcuttingPlusScript extends Script {
                         resetInventory(config);
                 }
             } catch (Exception ex) {
-                Microbot.log(ex.getMessage());
-                ex.printStackTrace();
+                Microbot.logStackTrace(getClass().getSimpleName(), ex);
             }
         }, 0, 100, TimeUnit.MILLISECONDS);
         return true;
@@ -353,7 +347,7 @@ public class AutoWoodcuttingPlusScript extends Script {
             case DROP:
                 var itemNames = Arrays.stream(config.itemsToKeep().split(",")).map(String::trim).toArray(String[]::new);
                 Rs2Inventory.dropAllExcept(false, config.interactOrder(), itemNames);
-                // v0.5.0: targetLevel cleanup done -- shutdown before resuming chopping.
+                // targetLevel cleanup done -- shutdown before resuming chopping.
                 if (shutdownAfterCleanup) {
                     Microbot.log("AutoWoodcuttingPlus: targetLevel cleanup (DROP) complete. Shutting down.");
                     shutdown();
@@ -364,7 +358,7 @@ public class AutoWoodcuttingPlusScript extends Script {
             case BANK:
                 if (!handleBanking(config))
                     return;
-                // v0.5.0: targetLevel cleanup done -- shutdown before resuming chopping.
+                // targetLevel cleanup done -- shutdown before resuming chopping.
                 if (shutdownAfterCleanup) {
                     Microbot.log("AutoWoodcuttingPlus: targetLevel cleanup (BANK) complete. Shutting down.");
                     shutdown();
@@ -377,7 +371,14 @@ public class AutoWoodcuttingPlusScript extends Script {
                 woodcuttingScriptState = WoodcuttingScriptState.FIREMAKING;
                 burnLog(config);
 
-                if (Rs2Inventory.contains(getActiveTree().getLog())) return;
+                if (Rs2Inventory.contains(getActiveTree().getLog())) return; // still burning
+
+                // targetLevel cleanup done once the inventory is clear -- shutdown before resuming.
+                if (shutdownAfterCleanup) {
+                    Microbot.log("AutoWoodcuttingPlus: targetLevel cleanup (BURN) complete. Shutting down.");
+                    shutdown();
+                    return;
+                }
 
                 walkBack(config);
 
@@ -389,6 +390,12 @@ public class AutoWoodcuttingPlusScript extends Script {
                 break;
             case FLETCH:
                 if (handleFletchingWorkflow(config)) {
+                    // targetLevel cleanup done -- shutdown before resuming chopping.
+                    if (shutdownAfterCleanup) {
+                        Microbot.log("AutoWoodcuttingPlus: targetLevel cleanup (FLETCH) complete. Shutting down.");
+                        shutdown();
+                        return;
+                    }
                     woodcuttingScriptState = WoodcuttingScriptState.WOODCUTTING;
                 }
                 break;
@@ -466,7 +473,7 @@ public class AutoWoodcuttingPlusScript extends Script {
             return true;
         }
         WorldPoint here = Rs2Player.getWorldLocation();
-        return here != null && here.distanceTo(CORSAIR_COVE_DEPOSIT_BOX) <= 30;
+        return here != null && here.distanceTo(CORSAIR_COVE_DEPOSIT_BOX) <= 10;
     }
 
     /**
@@ -609,18 +616,6 @@ public class AutoWoodcuttingPlusScript extends Script {
     private boolean isFiremake() {
         if (cannotLightFire) return false;
         return Rs2Player.isAnimating(1800) && BURNING_ANIMATION_IDS.contains(Rs2Player.getLastAnimationID());
-    }
-
-    private void fletchArrowShaft(AutoWoodcuttingPlusConfig config) {
-        Rs2Inventory.combineClosest("knife", getActiveTree().getLog());
-        sleepUntil(Rs2Widget::isProductionWidgetOpen, 5000);
-        Rs2Widget.clickWidget("arrow shafts");
-        Rs2Player.waitForAnimation();
-        sleepUntil(() -> !isFlectching(), 5000);
-    }
-
-    private boolean isFlectching() {
-        return Rs2Player.isAnimating(3000) && Rs2Player.getLastAnimationID() == AnimationID.FLETCHING_BOW_CUTTING;
     }
 
     private void walkBack(AutoWoodcuttingPlusConfig config) {

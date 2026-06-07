@@ -89,7 +89,7 @@ public class EggEvent implements BlockingEvent {
             // find nest without pheasants
             var emptyNests = nests.stream()
                     .filter(nest -> pheasants.stream()
-                            .noneMatch(pheasant -> pheasant.getWorldLocation() == nest.getWorldLocation()))
+                            .noneMatch(pheasant -> pheasant.getWorldLocation().equals(nest.getWorldLocation())))
                     .collect(Collectors.toList());
 
             Microbot.log("EggEvent: Interacting with the pheasant nest to collect an egg.");

@@ -40,8 +40,13 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
     private int logsChopped;
     private boolean firstRun = false;
 
-    // v0.5.1: Pause button toggles Microbot.pauseAllScripts (global flag).
-    // v0.5.6: public final so AutoWoodcuttingPlusPlugin.startUp() can call hookMouseListener().
+    // Cached GE price of the active tree's log, refreshed only when the log id changes. Avoids the
+    // per-frame ItemManager lookup the GP/hr line would otherwise do every render.
+    private int cachedLogId = -1;
+    private int cachedLogPrice = 0;
+
+    // Pause button toggles the global Microbot.pauseAllScripts flag. Public final so
+    // AutoWoodcuttingPlusPlugin.startUp() can call hookMouseListener() on it.
     public final ButtonComponent pauseButton;
 
     @Inject
@@ -61,9 +66,8 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
             Microbot.log("AutoWoodcuttingPlus: pause button click received -- toggling pauseAllScripts");
             Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
             if (Microbot.pauseAllScripts.get()) {
-                // v0.5.7: kill in-flight walker. Matches AIO Fighter (AIOFighterInfoOverlay:39).
-                // Without this, Rs2Walker keeps walking on its own executor after the script
-                // main loop pauses.
+                // kill the in-flight walker. Without this, Rs2Walker keeps walking on its own
+                // executor after the script main loop pauses.
                 Rs2Walker.setTarget(null);
             }
         });
@@ -88,7 +92,6 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
         }
         try {
             panelComponent.setPreferredSize(new Dimension(240, 350));
-            // v0.5.2: no clear -- preserves click-target registry for the Pause button.
 
             // Title
             panelComponent.getChildren().add(TitleComponent.builder()
@@ -96,7 +99,7 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
                     .color(TITLE_COLOR)
                     .build());
 
-            // Status (v0.5.1: show [PAUSED] when the global pause flag is on)
+            // Status (show [PAUSED] when the global pause flag is on)
             String displayStatus = Microbot.pauseAllScripts.get()
                     ? "[PAUSED]"
                     : this.plugin.AutoWoodcuttingPlusScript.woodcuttingScriptState.toString();
@@ -181,13 +184,12 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
                     .rightColor(NORMAL_TEXT_COLOR)
                     .build());
 
-            // GP/hr: gross profit (chopped logs are free, like mined ore). logPrice = GE price of
-            // the active tree's log item, logsChopped = the log counter. Raw log value only -- this
-            // does not count any fletched-product value, which is fine for v1. Guards runtime 0 and
-            // price 0 (some trees yield bark/charcoal/mushrooms with no single priced log -> 0).
+            // GP/hr: gross profit (chopped logs are free, like mined ore). Raw log value only; this
+            // does not count any fletched-product value. Guards runtime 0 and price 0 (some trees
+            // yield bark/charcoal/mushrooms with no single priced log -> 0).
             long gpPerHour = 0;
             if (tree != null && tree.getLogID() > 0 && secondsElapsed > 0) {
-                int logPrice = Microbot.getItemManager().getItemPrice(tree.getLogID());
+                int logPrice = getCachedLogPrice(tree.getLogID());
                 if (logPrice > 0) {
                     gpPerHour = (long) logsChopped * logPrice * 3600 / secondsElapsed;
                 }
@@ -205,7 +207,7 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
                     .rightColor(NORMAL_TEXT_COLOR)
                     .build());
 
-            // v0.5.0: target-level progress line.
+            // target-level progress line.
             if (config.targetLevel() > 0) {
                 int toGo = Math.max(0, config.targetLevel() - currentLevel);
                 panelComponent.getChildren().add(LineComponent.builder()
@@ -218,8 +220,7 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
             // Add a separator
             panelComponent.getChildren().add(LineComponent.builder().left("").build());
 
-            // v0.5.4: Pause button added unconditionally to win the click-bounds registration
-            // race against the first render. See AutoMiningPlusOverlay v0.5.4 comment for detail.
+            // Pause button added unconditionally so its click bounds register on the first render.
             pauseButton.setText(Microbot.pauseAllScripts.get() ? "Resume" : "Pause");
             panelComponent.getChildren().add(pauseButton);
 
@@ -257,6 +258,14 @@ public class AutoWoodcuttingPlusOverlay extends OverlayPanel {
             Microbot.logStackTrace(this.getClass().getSimpleName(), ex);
         }
         return super.render(graphics);
+    }
+
+    private int getCachedLogPrice(int logId) {
+        if (logId != cachedLogId) {
+            cachedLogId = logId;
+            cachedLogPrice = Microbot.getItemManager().getItemPrice(logId);
+        }
+        return cachedLogPrice;
     }
 
     private String formatDuration(Duration duration) {

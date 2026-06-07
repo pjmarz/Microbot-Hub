@@ -50,7 +50,7 @@ import static net.runelite.client.plugins.microbot.util.Global.sleepUntil;
 )
 @Slf4j
 public class AutoWoodcuttingPlusPlugin extends Plugin {
-    public static final String version = "0.6.4";
+    public static final String version = "0.6.5";
     @Inject
     @Getter(AccessLevel.MODULE)
     public AutoWoodcuttingPlusScript AutoWoodcuttingPlusScript;
@@ -92,12 +92,12 @@ public class AutoWoodcuttingPlusPlugin extends Plugin {
 
     @Override
     protected void startUp() throws AWTException {
-        // v0.5.7: clear any stale pause flag from a previous session.
+        // clear any stale pause flag from a previous session.
         Microbot.pauseAllScripts.compareAndSet(true, false);
         if (overlayManager != null) {
             overlayManager.add(woodcuttingOverlay);
-            // v0.5.6: see AutoMiningPlusPlugin v0.5.6 -- hookMouseListener wires setOnClick
-            // to RuneLite's mouse events. Without this, the pause button is dead.
+            // hookMouseListener wires the pause button's setOnClick to RuneLite's mouse events.
+            // Without it the pause button is dead.
             woodcuttingOverlay.pauseButton.hookMouseListener();
         }
         if (config.enableForestry())
@@ -106,7 +106,7 @@ public class AutoWoodcuttingPlusPlugin extends Plugin {
     }
 
     protected void shutDown() {
-        // v0.5.7: clear flag so other plugins enabled after us don't inherit our paused state.
+        // clear flag so other plugins enabled after us don't inherit our paused state.
         Microbot.pauseAllScripts.compareAndSet(true, false);
         AutoWoodcuttingPlusScript.shutdown();
         this.removeEvents();
@@ -132,7 +132,7 @@ public class AutoWoodcuttingPlusPlugin extends Plugin {
             woodcuttingOverlay.incrementLogsChopped();
         }
 
-        if (msg.equals("you can't light a fire here.")) {
+        if (msg.toLowerCase().startsWith("you can't light a fire here")) {
             AutoWoodcuttingPlusScript.cannotLightFire = true;
         }
 

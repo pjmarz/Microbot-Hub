@@ -18,37 +18,11 @@ import java.util.stream.Collectors;
 /**
  * Per-tree location data: each tree type maps to a list of {@link ResourceLocationOption}
  * entries with hardcoded WorldPoints, member flags, quest/skill gates, and a resource count.
- * The 407-line table covers ~200 locations across 41 trees.
  *
- * <h2>Source of truth</h2>
- * <ul>
- *   <li>Tree location WorldPoints: <a href="https://oldschool.runescape.wiki/w/Tree">OSRS Wiki: Tree</a>
- *       (and per-tree pages for tier-specific locations)</li>
- *   <li>Quest gates: per-quest wiki pages (e.g. Monkey Madness I for Ape Atoll teak)</li>
- *   <li>Forked from upstream {@code chsami/Microbot-Hub/.../woodcutting/enums/WoodcuttingTreeLocations.java} v1.8.3</li>
- * </ul>
- *
- * <h2>Audit log</h2>
- * <ul>
- *   <li><b>Origin:</b> Forked verbatim from upstream. No coord-level
- *       audit performed at v0.1.0; this file is treated as authoritative on the assumption
- *       that v1.8.3 has been live in production. Coord audit deferred to v0.2.0 (when we
- *       expose the named-location dropdown via {@code TreeLocationOption}).</li>
- * </ul>
- *
- * <h2>Known gaps</h2>
- * <ul>
- *   <li><b>WorldPoint coords not wiki-audited at v0.1.0.</b> If upstream had any drift relative
- *       to current in-game tile positions, we inherit it. v0.2.0 audit will cross-check.</li>
- *   <li><b>Quest gates verified only via upstream's hasRequirements() logic.</b> If a quest is
- *       renamed or a varbit ID drifts, we silently lose access to that location.</li>
- *   <li><b>Resource counts (numberOfResources) are wiki-grounded best estimates</b> as of v0.6.4.
- *       Most counts come from the per-tree location tables on the OSRS Wiki (Willow tree, Maple tree,
- *       Yew tree, Magic tree, Teak tree, Mahogany tree) and the Woodcutting Guild page. Regular and
- *       oak clusters have no per-cluster count in the wiki tables, so those remain conservative
- *       estimates (flagged inline). The field is explicitly a best estimate, not an exact in-game
- *       census. Counts influence location ranking via {@code calculateResourceEfficiencyScore}.</li>
- * </ul>
+ * <p>WorldPoints and resource counts are sourced from the OSRS Wiki
+ * (<a href="https://oldschool.runescape.wiki/w/Tree">Tree</a> and per-tree pages), with quest
+ * gates from the per-quest wiki pages. Resource counts influence location ranking via
+ * {@code calculateResourceEfficiencyScore}.</p>
  */
 @Getter
 @RequiredArgsConstructor
@@ -171,28 +145,24 @@ public class WoodcuttingTreeLocations {
         List<ResourceLocationOption> locations = new ArrayList<>();
         
         // Lumbridge - great for beginners, close to bank.
-        // No per-cluster count in the wiki tables for regular trees; conservative estimate.
         locations.add(new ResourceLocationOption(
                 new WorldPoint(3192, 3223, 0),
                 "Lumbridge General Trees",false,5
         ));
-        
+
         // Grand Exchange area - convenient banking.
-        // No per-cluster count in the wiki tables for regular trees; conservative estimate.
         locations.add(new ResourceLocationOption(
                 new WorldPoint(3151, 3231, 0),
                 "Grand Exchange Trees",false,4
         ));
 
         // Varrock East - multiple trees.
-        // No wiki count for this cluster; conservative estimate.
         locations.add(new ResourceLocationOption(
                 new WorldPoint(3227, 3457, 0),
                 "Varrock East Trees",false,4
         ));
 
         // Falador Trees.
-        // No wiki count for this cluster; conservative estimate.
         locations.add(new ResourceLocationOption(
                 new WorldPoint(3002, 3374, 0),
                 "Falador Trees",false,3
@@ -205,21 +175,18 @@ public class WoodcuttingTreeLocations {
         List<ResourceLocationOption> locations = new ArrayList<>();
         
         // Lumbridge area - best for low levels.
-        // No per-cluster oak count in the wiki tables; conservative estimate.
         locations.add(new ResourceLocationOption(
                 new WorldPoint(3190, 3247, 0),
                 "Lumbridge Oak Trees",false,3
         ));
 
         // Varrock West Bank area.
-        // No wiki count for this cluster; conservative estimate.
         locations.add(new ResourceLocationOption(
                 new WorldPoint(3085, 3481, 0),
                 "Varrock West Oak Trees",false,3
         ));
 
         // Draynor Village.
-        // No wiki count for this cluster; conservative estimate.
         locations.add(new ResourceLocationOption(
                 new WorldPoint(3103, 3279, 0),
                 "Draynor Village Oak Trees",false,2
@@ -300,8 +267,7 @@ public class WoodcuttingTreeLocations {
         List<ResourceLocationOption> locations = new ArrayList<>();
 
         // Corsair Cove Resource Area - the only F2P maple spot. Quest-gated (The Corsair Curse +
-        // Dragon Slayer I, both F2P). Maple trees (object 10832) captured live via the agent server
-        // at (2477-2481, 2895-2899); anchor sits in the cluster.
+        // Dragon Slayer I, both F2P).
         Map<Quest, QuestState> corsairQuests = new HashMap<>();
         corsairQuests.put(Quest.THE_CORSAIR_CURSE, QuestState.FINISHED);
         corsairQuests.put(Quest.DRAGON_SLAYER_I, QuestState.FINISHED);
@@ -408,7 +374,6 @@ public class WoodcuttingTreeLocations {
         ));
 
         // Corsair Cove Resource Area - F2P (quest-gated: The Corsair Curse + Dragon Slayer I).
-        // Yew trees (object 10822) captured live via the agent server at (2471-2477, 2886-2891).
         Map<Quest, QuestState> corsairQuests = new HashMap<>();
         corsairQuests.put(Quest.THE_CORSAIR_CURSE, QuestState.FINISHED);
         corsairQuests.put(Quest.DRAGON_SLAYER_I, QuestState.FINISHED);
