@@ -5,10 +5,8 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.api.ItemID;
 
 /**
- * Furnace jewellery products. Copied from the crafting/jewelry base (craftingplus is its own source
- * set), with the enchant-spell field dropped because AutoCraftingPlus does not enchant. Each entry
- * carries the gold/silver bar, the gem set into it (or {@link Gem#NONE}), the mould tool, and the
- * Crafting level required.
+ * Furnace jewellery products. Each entry carries the gold/silver bar, the gem set into it (or
+ * {@link Gem#NONE}), the mould tool, and the Crafting level required.
  */
 @Getter
 @RequiredArgsConstructor

@@ -1,8 +1,7 @@
 package net.runelite.client.plugins.microbot.craftingplus;
 
 /**
- * Which crafting activity AutoCraftingPlus performs. Furnace jewellery and the other base
- * activities are added in later versions.
+ * Which crafting activity AutoCraftingPlus performs.
  */
 public enum Activity {
     LEATHER("Leather"),

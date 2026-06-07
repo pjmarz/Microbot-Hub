@@ -2,6 +2,7 @@ package net.runelite.client.plugins.microbot.craftingplus;
 
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Skill;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
@@ -27,15 +28,15 @@ import java.util.concurrent.TimeUnit;
  * stringing, on a bank-and-do loop with the Plus layer (stop conditions, target level + clean
  * shutdown, overlay/pause, speed mode, league mode).
  *
- * <p>Leather (v0.1.1) forks the make-X interaction proven by the base DragonLeatherScript
- * (use needle + leather -&gt; make-X interface widget 17694733 -&gt; select the product). Gem
- * cutting (v0.1.0) forks GemsScript. Furnace jewellery is v0.2.0. Amethyst cutting and amulet
- * stringing are v0.4.0 (chisel/wool -&gt; make-X production dialog).</p>
+ * <p>Leather uses the needle + leather -&gt; make-X interface to select the product. Gem cutting and
+ * amethyst cutting use chisel on the material; amulet stringing uses a ball of wool. Furnace
+ * jewellery casts at a furnace from a gold/silver bar (plus a cut gem for gem pieces).</p>
  */
 @Slf4j
 public class AutoCraftingPlusScript extends Script {
 
-    private static final int MAKE_INTERFACE_WIDGET = 17694733; // make-X interface root (from DragonLeatherScript)
+    // Root component of the make-X / production (skill-multi) dialog, used to detect it is open.
+    private static final int MAKE_INTERFACE_WIDGET = InterfaceID.Skillmulti.BOTTOM_HOLDER;
 
     // Stats (read by AutoCraftingPlusOverlay).
     private long startTimeMillis = 0;
@@ -82,7 +83,7 @@ public class AutoCraftingPlusScript extends Script {
         activeAmulet = null;
 
         Microbot.enableAutoRunOn = true;
-        Rs2Walker.disableTeleports = true; // keep banking on foot (the RC v0.1.1 lesson)
+        Rs2Walker.disableTeleports = true; // keep banking on foot
         Rs2Antiban.resetAntibanSettings();
         if (config.speedMode()) {
             Rs2AntibanSettings.antibanEnabled = false;
@@ -125,7 +126,7 @@ public class AutoCraftingPlusScript extends Script {
 
                 if (config.leagueMode() && Rs2Player.checkIdleLogout(Rs2Random.between(500, 1500))) {
                     int[] arrowKeys = { KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT, KeyEvent.VK_UP, KeyEvent.VK_DOWN };
-                    Rs2Keyboard.keyPress(arrowKeys[Rs2Random.between(0, arrowKeys.length - 1)]);
+                    Rs2Keyboard.keyPress(arrowKeys[Rs2Random.between(0, arrowKeys.length)]);
                 }
 
                 if (Rs2AntibanSettings.actionCooldownActive) return;
@@ -358,16 +359,15 @@ public class AutoCraftingPlusScript extends Script {
         if (sleepUntil(() -> Rs2Widget.getWidget(MAKE_INTERFACE_WIDGET) != null, 5000)) {
             Rs2Widget.clickWidget(product.getProductName(), true);
             sleep(1800);
-            // Craft until the leather is used up OR thread runs out (v0.1.2: without the thread
-            // check this blocked the full timeout while leftover leather sat un-sewable, looking
-            // stopped; now it breaks immediately and the next tick banks to restock thread).
+            // Craft until the leather is used up OR thread runs out, so a thread shortage banks to
+            // restock immediately instead of waiting out the full timeout on un-sewable leather.
             sleepUntil(() -> !Rs2Inventory.hasItem(product.getMaterialId())
                     || !Rs2Inventory.hasItem(ItemID.THREAD), 60000);
             actionsCompleted++;
         }
     }
 
-    // --- Dragonhide leather (mirrors crafting/scripts/DragonLeatherScript) ---
+    // --- Dragonhide leather ---
 
     private void runDragonLeather(DragonLeather product) {
         if (!Rs2Player.getSkillRequirement(Skill.CRAFTING, product.getLevelRequired())) {
@@ -435,11 +435,10 @@ public class AutoCraftingPlusScript extends Script {
     }
 
     /**
-     * Mirrors DragonLeatherScript.handleCrafting: use needle on the dragon leather, wait for the
-     * make-X production dialog (widget 17694733), then press the piece's menuEntry digit to select
-     * it (body=1, vambraces=2, chaps=3 -- the number keys the dialog lists for that colour). The
-     * batch then sews until the leather runs out (chaps use 2, body uses 3 per piece) or thread runs
-     * out, at which point the next tick banks to restock.
+     * Use needle on the dragon leather, wait for the make-X production dialog, then press the piece's
+     * menuEntry digit to select it (body=1, vambraces=2, chaps=3 -- the number keys the dialog lists
+     * for that colour). The batch then sews until the leather runs out (chaps use 2, body uses 3 per
+     * piece) or thread runs out, at which point the next tick banks to restock.
      */
     private void craftDragonLeather(DragonLeather product) {
         Microbot.status = "Crafting " + product.getName();
@@ -501,7 +500,7 @@ public class AutoCraftingPlusScript extends Script {
         // If neither found (no materials banked), leave the prior pick; the caller reports + stops.
     }
 
-    // --- Gem cutting (v0.1.0, forked from GemsScript) ---
+    // --- Gem cutting ---
 
     private void runGems(AutoCraftingPlusConfig config) {
         updateActiveGem(config);
@@ -603,7 +602,7 @@ public class AutoCraftingPlusScript extends Script {
         actionsCompleted++;
     }
 
-    // --- Amethyst cutting (v0.4.0, chisel + amethyst -> make-X product, forked from GemsScript) ---
+    // --- Amethyst cutting (chisel + amethyst -> make-X product) ---
 
     /**
      * Cuts amethyst (item {@link ItemID#AMETHYST}) into the chosen product. Mirrors the GEM_CUTTING
@@ -669,16 +668,15 @@ public class AutoCraftingPlusScript extends Script {
     }
 
     /**
-     * Chisel on amethyst -&gt; wait for the production/make-X dialog (group 270) -&gt; click the chosen
-     * product by name (which makes the whole batch) -&gt; wait until the amethyst is used up. Mirrors
-     * the amethyst branch of crafting/scripts/GemsScript.
+     * Chisel on amethyst -&gt; wait for the production/make-X dialog -&gt; click the chosen product by
+     * name (which makes the whole batch) -&gt; wait until the amethyst is used up.
      */
     private void cutAmethyst(AmethystProduct product) {
         Microbot.status = "Cutting amethyst (" + product.getLabel() + ")";
         Rs2Inventory.use("chisel");
         Rs2Inventory.use(ItemID.AMETHYST);
-        // The production dialog header text lives in group 270; wait for it, then pick the product.
-        if (Rs2Widget.sleepUntilHasWidgetText("How many do you wish to make?", 270, 5, false, 5000)) {
+        // The production dialog header text lives in the skill-multi group; wait for it, then pick.
+        if (Rs2Widget.sleepUntilHasWidgetText("How many do you wish to make?", InterfaceID.SKILLMULTI, 5, false, 5000)) {
             Rs2Widget.clickWidget(product.getProductName(), true);
             sleep(1800);
             sleepUntil(() -> !Rs2Inventory.hasItem(ItemID.AMETHYST), 60000);
@@ -686,7 +684,7 @@ public class AutoCraftingPlusScript extends Script {
         }
     }
 
-    // --- Amulet stringing (v0.4.0, ball of wool on unstrung amulet -> make-X batch) ---
+    // --- Amulet stringing (ball of wool on unstrung amulet -> make-X batch) ---
 
     /**
      * Strings the chosen unstrung amulet "(u)" with a ball of wool. Using wool on the amulet opens a
@@ -714,8 +712,9 @@ public class AutoCraftingPlusScript extends Script {
         boolean isBankOpen = Rs2Bank.walkToBankAndUseBank();
         if (!isBankOpen || !Rs2Bank.isOpen()) return;
 
-        // Deposit strung amulets and any leftover wool / wrong-tier amulets, then restock.
-        Rs2Bank.depositAll(amulet.getStrungId());
+        // Deposit strung amulets and any leftover wool / wrong-tier amulets (stringing needs no tools),
+        // then restock. Depositing everything clears stale items if the Amulet config changed mid-run.
+        Rs2Bank.depositAll();
         sleep(400);
 
         if (shutdownAfterCleanup) {
@@ -760,7 +759,7 @@ public class AutoCraftingPlusScript extends Script {
         actionsCompleted++;
     }
 
-    // --- Furnace jewellery (v0.2.0, forked from crafting/jewelry JewelryScript) ---
+    // --- Furnace jewellery ---
 
     private void runJewellery(AutoCraftingPlusConfig config) {
         final Jewelry jewelry = config.jewellery();
@@ -847,10 +846,14 @@ public class AutoCraftingPlusScript extends Script {
         WorldPoint furnaceLoc = config.furnaceLocation().getFurnaceLocation();
         WorldPoint anchor = furnaceLoc != null ? furnaceLoc : Rs2Player.getWorldLocation();
 
-        Rs2TileObjectModel furnace = Microbot.getRs2TileObjectCache().query()
-                .withName("Furnace")
-                .where(o -> Rs2GameObject.hasAction(o, "Smelt"))
-                .nearest(anchor, 20);
+        // The tile-object cache query walks the live scene graph (player/world-view/scene/tick) with
+        // no internal client-thread hop, so the whole chain must run on the client thread.
+        Rs2TileObjectModel furnace = Microbot.getClientThread().runOnClientThreadOptional(() ->
+                Microbot.getRs2TileObjectCache().query()
+                        .withName("Furnace")
+                        .where(o -> Rs2GameObject.hasAction(o, "Smelt"))
+                        .nearest(anchor, 20)
+        ).orElse(null);
 
         if (furnace == null) {
             if (furnaceLoc != null && !Rs2Player.isMoving()) {

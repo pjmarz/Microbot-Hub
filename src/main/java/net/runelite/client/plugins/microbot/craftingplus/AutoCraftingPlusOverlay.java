@@ -46,7 +46,6 @@ public class AutoCraftingPlusOverlay extends OverlayPanel {
         pauseButton.setParentOverlay(this);
         pauseButton.setFont(FontManager.getRunescapeBoldFont());
         pauseButton.setOnClick(() -> {
-            Microbot.log("AutoCraftingPlus: pause button click received -- toggling pauseAllScripts");
             Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
             if (Microbot.pauseAllScripts.get()) {
                 Rs2Walker.setTarget(null);
@@ -107,20 +106,13 @@ public class AutoCraftingPlusOverlay extends OverlayPanel {
                         .build());
 
                 panelComponent.getChildren().add(LineComponent.builder()
-                        .left("Cut cycles:")
+                        .left("Batches:")
                         .right(String.valueOf(script.getActionsCompleted()))
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
-                // GP/hr: NET per item = product GE price minus the materials it consumes, branched
-                // on the active activity. The counter is batches (one full inventory crafted per
-                // increment), not items, so items = batches * a per-activity batch size estimate ->
-                // the "~" marks it an estimate. Can be negative. Guards runtime 0 and price 0; any
-                // item with no GE price drops that side to 0 (shows GP/hr 0 rather than mispricing).
-                //   LEATHER: product - leather. 1 leather/item, ~26 per inventory (less needle+thread).
-                //   GEM_CUTTING: cut gem - uncut gem. 1:1, ~27 per inventory (less chisel).
-                //   JEWELLERY: product - bar (- cut gem for gem jewellery). 1 bar (+1 gem)/item;
-                //     batch size mirrors the script's withdraw cap (13 with a gem, else 27).
+                // GP/hr is an estimate (the "~"): net per item (product price minus the materials it
+                // consumes) times an estimated per-batch item count. Can be negative; 0 if unpriced.
                 long gpPerHour = computeGpPerHour(runtimeMillis);
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("GP/hr:")
@@ -190,7 +182,7 @@ public class AutoCraftingPlusOverlay extends OverlayPanel {
                     if (productPrice <= 0) return 0;
                     int perCraft = dragon.getLeatherPerCraft(); // body 3, chaps 2, else 1
                     netPerItem = (long) productPrice - (long) leatherPrice * perCraft;
-                    itemsPerBatch = 27 / perCraft; // full inventory of dragon leather, less tools
+                    itemsPerBatch = 26 / perCraft; // full inventory of dragon leather, less needle + thread
                     break;
                 }
                 Leather product = script.getActiveSoftLeather() != null

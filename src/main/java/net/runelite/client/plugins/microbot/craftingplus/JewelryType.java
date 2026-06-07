@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.api.ItemID;
 
 /**
- * The bar a piece of jewellery is cast from. Copied from the crafting/jewelry base.
+ * The bar a piece of jewellery is cast from.
  */
 @Getter
 @RequiredArgsConstructor

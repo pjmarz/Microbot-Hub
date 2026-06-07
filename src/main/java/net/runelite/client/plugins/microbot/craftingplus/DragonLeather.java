@@ -6,11 +6,10 @@ import net.runelite.api.gameval.ItemID;
 
 /**
  * Dragonhide armour pieces (needle + thread + dragon leather -&gt; product via the make-X interface).
- * Repackaged copy of crafting/enums/DragonLeatherArmour so the Plus source set stays self-contained.
  *
  * <p>The make-X interface lists the colour's pieces and each is keyboard-selectable by a digit:
- * {@code menuEntry} is the number key that picks this piece (body=1, vambraces=2, chaps=3).
- * Mirrors how DragonLeatherScript presses {@code armour.getMenuEntry()} once the dialog opens.</p>
+ * {@code menuEntry} is the number key that picks this piece (body=1, vambraces=2, chaps=3), pressed
+ * once the dialog opens.</p>
  */
 @Getter
 @RequiredArgsConstructor

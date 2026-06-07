@@ -4,9 +4,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Cuttable gems with their Crafting level requirements (carried over from the crafting base).
- * Amethyst tip-making is a different mechanic (make-X widget); it has its own activity and lives in
- * AmethystProduct + the AMETHYST activity (added in v0.4.0).
+ * Cuttable gems with their Crafting level requirements. Amethyst tip-making is a different mechanic
+ * (make-X widget); it has its own activity and lives in AmethystProduct + the AMETHYST activity.
  */
 @Getter
 @RequiredArgsConstructor
