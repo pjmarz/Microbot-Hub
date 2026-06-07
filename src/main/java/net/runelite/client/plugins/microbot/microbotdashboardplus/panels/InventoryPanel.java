@@ -19,10 +19,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Inventory section. Grid of slot cells with name + qty. Empty slots render
- * faintly. v0.2.0 data source is the {@link PollSnapshot}; the poller doesn't
- * yet populate inventory items (deferred to a v0.2.0 follow-up commit that
- * wires up Rs2Inventory reads).
+ * Inventory section. Grid of slot cells with name + quantity, fed from the
+ * {@link PollSnapshot} (the poller reads items via Rs2Inventory). Noted items
+ * are styled distinctly.
  */
 public class InventoryPanel extends DashboardSection {
 

@@ -16,7 +16,6 @@ import javax.swing.SwingConstants;
 import javax.swing.border.LineBorder;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.util.Collections;
@@ -74,9 +73,8 @@ public class PlusPluginsPanel extends DashboardSection {
     private JPanel makeRow(PollSnapshot.PlusPluginStatus p) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
         row.setBackground(ColorScheme.DARK_GRAY_COLOR);
-        // v0.3.2: dropped active-state border tint. The button color (red Stop
-        // / green Start) is enough signal; the colored border was a redundant
-        // double-indicator that confused some users.
+        // No active-state border tint: the button color (red Stop / green Start)
+        // is enough signal, so a colored border would be a redundant indicator.
         row.setBorder(new LineBorder(ColorScheme.MEDIUM_GRAY_COLOR, 1));
 
         JLabel name = new JLabel(p.getDisplayName());
@@ -118,8 +116,4 @@ public class PlusPluginsPanel extends DashboardSection {
             log.warn("toggle plugin failed for {}: {}", p.getPluginClassName(), t.getMessage(), t);
         }
     }
-
-    // Avoid unused-import lint.
-    @SuppressWarnings("unused")
-    private static Component noop() { return null; }
 }

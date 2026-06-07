@@ -18,14 +18,12 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.GregorianCalendar;
 
 /**
  * Event Log section: rolling ring buffer of the last 10 state-change events
  * observed by the dashboard (login / logout / world hop). Spans full width.
  *
- * <p>v0.2.0 emits a minimal set of events derived from snapshot diffs. The
- * ring is in-memory only; persistence to disk happens in v0.2.x if needed.
+ * <p>Events are derived from snapshot diffs. The ring is in-memory only.
  */
 public class EventLogPanel extends DashboardSection {
 
@@ -120,9 +118,5 @@ public class EventLogPanel extends DashboardSection {
             setForeground(Color.WHITE);
             return this;
         }
-
-        // Suppress unused import warning for GregorianCalendar in some IDE configs.
-        @SuppressWarnings("unused")
-        private static GregorianCalendar noop() { return null; }
     }
 }

@@ -15,7 +15,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.util.function.Consumer;
@@ -153,15 +152,5 @@ public class DashboardPanel extends PluginPanel {
             revalidate();
             repaint();
         });
-    }
-
-    // -----------------------------------------------------------------
-    // Compatibility utility: avoids the "unused field" warning if any
-    // sub-component is detached later.
-    // -----------------------------------------------------------------
-
-    @SuppressWarnings("unused")
-    private static void hide(Component c) {
-        if (c != null) c.setVisible(false);
     }
 }

@@ -27,31 +27,12 @@ import java.awt.image.BufferedImage;
 /**
  * MicrobotDashboardPlus is part of the Microbot Plus suite.
  *
- * <p>v0.2.0 (Swing rewrite): the dashboard now opens in a native floating
- * RuneLite window instead of a browser tab. A compact sidebar panel lives in
- * the right-hand toolbar; clicking <strong>Open Dashboard</strong> launches
- * the full {@link DashboardWindow}.
- *
- * <h2>What changed from v0.1.x</h2>
- * <ul>
- *     <li>No more embedded HTTP server. No port binding, no firewall prompts.</li>
- *     <li>No dependency on the {@code [M] Agent Server} plugin. Reads game state
- *         in-process via {@link Microbot#getClient()} + Rs2 utility APIs.</li>
- *     <li>No more browser tab lifecycle headaches (auto-close, sea-of-tabs, etc.).</li>
- *     <li>Dashboard HTML/CSS/JS deleted from the JAR.</li>
- * </ul>
- *
- * <h2>v1.1.0 additions</h2>
- * <ul>
- *     <li>Watchdog panel reads the external restart-helper log again and shows
- *         health, last-seen, and uptime. Shows Unavailable when no watchdog log
- *         is present.</li>
- *     <li>Skills panel shows an ETA to a target level (or the next level while
- *         training) from the rolling XP per hour.</li>
- *     <li>Antiban State panel tells a silent stall apart from an intentional
- *         anti-AFK pause (micro break, action cooldown, global pause, blocking
- *         event).</li>
- * </ul>
+ * <p>The dashboard opens in a native floating RuneLite window. A compact
+ * sidebar panel lives in the right-hand toolbar; clicking
+ * <strong>Open Dashboard</strong> launches the full {@link DashboardWindow}.
+ * Game state is read in-process via {@link Microbot#getClient()} and the Rs2
+ * utility APIs, so there is no embedded HTTP server and no Agent Server
+ * dependency.
  *
  * <h2>Known limitations</h2>
  * <ul>
@@ -62,7 +43,7 @@ import java.awt.image.BufferedImage;
  * </ul>
  */
 @PluginDescriptor(
-        name = PluginDescriptor.Mocrosoft + "Microbot Dashboard Plus",
+        name = "<html>[<font color=#BB86FC>P</font>] " + "Microbot Dashboard Plus",
         description = "Native Swing monitoring dashboard for your Microbot session. Floating window plus a compact sidebar panel. No HTTP, no Agent Server dependency.",
         tags = {"dashboard", "monitoring", "microbot", "plus"},
         authors = {"pjmarz"},
@@ -76,7 +57,7 @@ import java.awt.image.BufferedImage;
 @Slf4j
 public class MicrobotDashboardPlusPlugin extends Plugin {
 
-    public static final String version = "1.1.0";
+    public static final String version = "1.1.1";
 
     @Inject
     private MicrobotDashboardPlusConfig config;
@@ -216,10 +197,8 @@ public class MicrobotDashboardPlusPlugin extends Plugin {
     }
 
     /**
-     * Programmatic 16x16 dashboard icon. v0.2.2 polish: dark background with
-     * a small "rising chart line" in RuneLite green to evoke the dashboard.
-     * A hand-designed PNG icon (16x16 + 32x32, hosted on chsami.github.io)
-     * lands in v1.0.0 with the upstream PR-prep artwork pass.
+     * Programmatic 16x16 dashboard icon: a dark background with a small
+     * "rising chart line" in RuneLite green to evoke the dashboard.
      */
     private static BufferedImage buildPlaceholderIcon() {
         BufferedImage img = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);

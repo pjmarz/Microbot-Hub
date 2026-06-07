@@ -8,7 +8,7 @@ import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
 
 /**
- * Configuration for the MicrobotDashboardPlus plugin (v0.3.0).
+ * Configuration for the MicrobotDashboardPlus plugin.
  *
  * <p>Sections:
  * <ul>

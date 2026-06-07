@@ -51,9 +51,9 @@ import java.util.function.Consumer;
  * Floating Swing window that hosts all dashboard sections.
  *
  * <p>Mirrors the RuneLite Var Inspector pattern: a top-level JFrame
- * independent of the client window. Lifecycle is managed by the plugin;
- * v0.2.0 closes the window via {@link WindowConstants#HIDE_ON_CLOSE} so the
- * sidebar "Open Dashboard" button can re-show it.
+ * independent of the client window. Lifecycle is managed by the plugin; the
+ * window closes via {@link WindowConstants#HIDE_ON_CLOSE} so the sidebar
+ * "Open Dashboard" button can re-show it.
  *
  * <p>Layout: 2-column GridBagLayout for the section grid, plus 3 full-width
  * sections (Plus Plugins, Event Dismiss Stats, Event Log) that span both

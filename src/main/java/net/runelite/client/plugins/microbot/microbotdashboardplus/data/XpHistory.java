@@ -17,9 +17,10 @@ import java.util.Map;
  *         (default 5 minutes) used to compute XP/hr</li>
  * </ul>
  *
- * <p>Thread-safety: not synchronized internally. Callers (the poller) must
- * serialize {@link #record(Skill, int)} calls. UI reads via the snapshot, not
- * directly.
+ * <p>Thread-safety: record() runs on the client thread while the read methods
+ * (getSamples, xpPerHour, deltaSinceBaseline, baselineFor) run on the EDT
+ * during paint. All public methods are synchronized so the per-skill deques
+ * and baseline map are never mutated and iterated concurrently.
  */
 public class XpHistory {
 
@@ -34,7 +35,7 @@ public class XpHistory {
     /**
      * Record an XP observation. First call per skill establishes the baseline.
      */
-    public void record(Skill skill, int currentXp) {
+    public synchronized void record(Skill skill, int currentXp) {
         baselineXp.putIfAbsent(skill, currentXp);
 
         long now = System.currentTimeMillis();
@@ -50,7 +51,7 @@ public class XpHistory {
     }
 
     /** XP gained since the first observation for this skill. */
-    public int deltaSinceBaseline(Skill skill, int currentXp) {
+    public synchronized int deltaSinceBaseline(Skill skill, int currentXp) {
         Integer baseline = baselineXp.get(skill);
         return baseline == null ? 0 : Math.max(0, currentXp - baseline);
     }
@@ -60,7 +61,7 @@ public class XpHistory {
      * Returns 0 if fewer than 2 samples in that window or if no XP has been
      * gained in it.
      */
-    public int xpPerHour(Skill skill) {
+    public synchronized int xpPerHour(Skill skill) {
         Deque<Sample> samples = samplesBySkill.get(skill);
         if (samples == null || samples.size() < 2) {
             return 0;
@@ -89,7 +90,7 @@ public class XpHistory {
     }
 
     /** Reset all tracking. Used on plugin reload or "Clear" action. */
-    public void reset() {
+    public synchronized void reset() {
         baselineXp.clear();
         samplesBySkill.clear();
     }
@@ -98,7 +99,7 @@ public class XpHistory {
      * Snapshot of all samples for a skill, oldest first. Used by the XP chart
      * for time-series rendering. Returned list is a defensive copy.
      */
-    public java.util.List<SamplePoint> getSamples(Skill skill) {
+    public synchronized java.util.List<SamplePoint> getSamples(Skill skill) {
         Deque<Sample> samples = samplesBySkill.get(skill);
         if (samples == null) return java.util.Collections.emptyList();
         java.util.List<SamplePoint> out = new java.util.ArrayList<>(samples.size());
@@ -109,7 +110,7 @@ public class XpHistory {
     }
 
     /** Baseline XP for a skill (the first observation we ever recorded). 0 if none. */
-    public int baselineFor(Skill skill) {
+    public synchronized int baselineFor(Skill skill) {
         Integer b = baselineXp.get(skill);
         return b == null ? 0 : b;
     }

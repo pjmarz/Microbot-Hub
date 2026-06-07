@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Event Dismiss stats section.
  *
- * <p>v0.2.1: reads aggregated counts from
+ * <p>Reads aggregated counts from
  * {@code ~/.runelite/eventdismissplus-events.csv} via the poller. Each row is
  * one event name (Genie, Strange Plant, etc.) with engaged / dismissed /
  * declined / errors / total counts. Rows sorted by total descending.

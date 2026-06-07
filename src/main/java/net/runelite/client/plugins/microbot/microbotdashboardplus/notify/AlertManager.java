@@ -27,6 +27,9 @@ public class AlertManager {
     private final Set<String> fired = new HashSet<>();
 
     public synchronized void setThresholdsFromConfig(String csv) {
+        // Re-arm the once-per-session dedupe so adjusted or re-added thresholds
+        // can fire again after the user edits config.
+        resetFired();
         Map<Skill, Integer> next = new EnumMap<>(Skill.class);
         if (csv == null || csv.trim().isEmpty()) {
             this.thresholds = next;

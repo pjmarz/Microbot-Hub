@@ -48,7 +48,20 @@ public class DiscordNotifier {
 
     public boolean isConfigured() {
         String u = webhookUrl;
-        return u != null && u.startsWith("https://") && u.contains("discord");
+        if (u == null || u.isEmpty()) return false;
+        try {
+            URI uri = URI.create(u);
+            if (!"https".equalsIgnoreCase(uri.getScheme())) return false;
+            String host = uri.getHost();
+            if (host == null) return false;
+            host = host.toLowerCase();
+            boolean validHost = host.equals("discord.com") || host.equals("discordapp.com")
+                    || host.endsWith(".discord.com") || host.endsWith(".discordapp.com");
+            String path = uri.getPath();
+            return validHost && path != null && path.startsWith("/api/webhooks/");
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     public synchronized void start() {

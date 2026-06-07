@@ -28,9 +28,9 @@ import java.util.function.Consumer;
  *         {@link #detach()} cleanup on plugin shutdown.</li>
  * </ul>
  *
- * <p>v0.2.1 polish: switched from BorderLayout(WEST/EAST) + FlowLayout to
- * GridBagLayout so JLabel doesn't auto-ellipsize when its preferred width is
- * calculated tightly against the custom RuneLite font.
+ * <p>The header uses GridBagLayout rather than BorderLayout(WEST/EAST) +
+ * FlowLayout so the title JLabel doesn't auto-ellipsize when its preferred
+ * width is calculated tightly against the custom RuneLite font.
  */
 public abstract class DashboardSection extends JPanel {
 

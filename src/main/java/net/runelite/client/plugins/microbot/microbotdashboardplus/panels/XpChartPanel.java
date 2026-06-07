@@ -24,8 +24,7 @@ import java.util.List;
 
 /**
  * XP-over-time chart. Custom Java2D paint, no dependency on external charting
- * libraries. Replaces the Chart.js implementation from the v0.4.0 browser
- * dashboard.
+ * libraries.
  *
  * <p>Controls (in section header): skill JComboBox + window JComboBox.
  * Default selection: Mining @ 30 minute window. Y axis: XP gained relative

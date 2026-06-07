@@ -19,10 +19,8 @@ import java.awt.Dimension;
  * the bottom of the floating window. Default ON; users untick
  * {@code showGuide} in the Layout config once they're familiar.
  *
- * <p>v0.3.3: moved the verbose ConfigInformation reference here so the
- * launcher-side description stays terse. Content is static HTML rendered into
- * a {@link JEditorPane} so we get hyperlinks, bullets, and bold formatting for
- * free.
+ * <p>Content is static HTML rendered into a {@link JEditorPane} so we get
+ * hyperlinks, bullets, and bold formatting for free.
  */
 public class GuidePanel extends DashboardSection {
 
