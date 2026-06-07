@@ -5,7 +5,6 @@ import net.runelite.client.plugins.microbot.smithingplus.data.AnvilItem;
 import net.runelite.client.plugins.microbot.smithingplus.data.AnvilLocationOption;
 import net.runelite.client.plugins.microbot.smithingplus.data.BankLocationOption;
 import net.runelite.client.plugins.microbot.smithingplus.data.Bars;
-import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
 
 @ConfigGroup("SmithingPlus")
 @ConfigInformation("<h2>Auto Smithing Plus</h2>" +
@@ -30,14 +29,9 @@ import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
         "<p>9. <strong>Stop conditions:</strong> the bot shuts down when any limit you set is reached. Stop after minutes caps runtime, Stop after XP caps Smithing XP gained, and Target level stops once your Smithing level reaches it. Each value of 0 means no limit. The bot deposits its inventory before stopping.</p>" +
         "<p></p>" +
         "<h3>Banking</h3>" +
-        "<p>10. <strong>Use bank:</strong> run the full loop of bank, withdraw bars and hammer, walk to the anvil, smith, then deposit the finished items.</p>" +
+        "<p>10. <strong>Preferred bank:</strong> override the closest by distance choice with a specific bank.</p>" +
         "<p></p>" +
-        "<p>11. <strong>Preferred bank:</strong> override the closest by distance choice with a specific bank.</p>" +
-        "<p></p>" +
-        "<p>12. <strong>Items to bank and keep:</strong> two comma separated lists matched against item names. Items to bank wins. Leave it empty to deposit everything except your keep list. Keep defaults hold the hammer and any bar you are smithing.</p>" +
-        "<p></p>" +
-        "<h3>Dropping</h3>" +
-        "<p>13. <strong>Drop order:</strong> not used. Smithing always banks the finished items.</p>")
+        "<p>11. <strong>Items to bank and keep:</strong> two comma separated lists matched against item names. Items to bank wins. Leave it empty to deposit everything except your keep list. Keep defaults hold the hammer and any bar you are smithing.</p>")
 public interface AutoSmithingPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)
@@ -45,9 +39,6 @@ public interface AutoSmithingPlusConfig extends Config {
 
     @ConfigSection(name = "Banking", description = "Banking settings", position = 1)
     String bankingSection = "bankingSection";
-
-    @ConfigSection(name = "Dropping", description = "Dropping settings (parity; smithing always banks)", position = 2)
-    String droppingSection = "droppingSection";
 
     // --- General section ---
 
@@ -193,17 +184,6 @@ public interface AutoSmithingPlusConfig extends Config {
     // --- Banking section ---
 
     @ConfigItem(
-            keyName = "useBank",
-            name = "Use bank",
-            description = "Standard cycle: bank -> withdraw bars + hammer -> walk to anvil -> smith -> deposit items.",
-            position = 0,
-            section = bankingSection
-    )
-    default boolean useBank() {
-        return true;
-    }
-
-    @ConfigItem(
             keyName = "bankLocation",
             name = "Preferred bank",
             description = "AUTO_NEAREST = closest by raw distance.",
@@ -242,18 +222,5 @@ public interface AutoSmithingPlusConfig extends Config {
     )
     default String itemsToKeep() {
         return "hammer,bar";
-    }
-
-    // --- Dropping section ---
-
-    @ConfigItem(
-            keyName = "dropOrder",
-            name = "Drop order",
-            description = "Not used. Smithing always banks the finished items.",
-            position = 0,
-            section = droppingSection
-    )
-    default InteractOrder interactOrder() {
-        return InteractOrder.STANDARD;
     }
 }

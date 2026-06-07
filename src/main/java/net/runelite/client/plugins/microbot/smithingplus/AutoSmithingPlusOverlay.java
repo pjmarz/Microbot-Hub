@@ -21,8 +21,8 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * rebuilt overlay matching AutoWoodcuttingPlus standard.
- * Shows runtime, Smithing XP gained, XP/hr, smith cycles, current level + delta, status.
+ * Overlay showing runtime, Smithing XP gained, XP/hr, smith cycles, current level + delta,
+ * GP/hr estimate, and status.
  */
 public class AutoSmithingPlusOverlay extends OverlayPanel {
     private static final Color TITLE_COLOR = new Color(0, 170, 0);
@@ -30,12 +30,16 @@ public class AutoSmithingPlusOverlay extends OverlayPanel {
     private static final Color NORMAL_TEXT_COLOR = Color.WHITE;
     private static final Color HIGHLIGHT_COLOR = new Color(255, 235, 145);
 
+    // Inventory capacity. A loose hammer occupies one slot, leaving 27 for bars; with the hammer on
+    // the tool belt all 28 slots hold bars. Used to convert smith cycles to items for the GP/hr line.
+    private static final int INVENTORY_SLOTS = 28;
+
     private final AutoSmithingPlusPlugin plugin;
     private final Client client;
-    private final AutoSmithingPlusConfig config; // v0.5.0
+    private final AutoSmithingPlusConfig config;
 
-    // v0.5.1: Pause button toggles Microbot.pauseAllScripts (global flag).
-    // v0.5.6: public final so AutoSmithingPlusPlugin.startUp() can call hookMouseListener().
+    // Pause button toggles Microbot.pauseAllScripts (global flag). Public final so the plugin's
+    // startUp() can call hookMouseListener().
     public final ButtonComponent pauseButton;
 
     @Inject
@@ -52,12 +56,10 @@ public class AutoSmithingPlusOverlay extends OverlayPanel {
         pauseButton.setParentOverlay(this);
         pauseButton.setFont(FontManager.getRunescapeBoldFont());
         pauseButton.setOnClick(() -> {
-            Microbot.log("AutoSmithingPlus: pause button click received -- toggling pauseAllScripts");
             Microbot.pauseAllScripts.set(!Microbot.pauseAllScripts.get());
             if (Microbot.pauseAllScripts.get()) {
-                // v0.5.7: kill in-flight walker. Matches AIO Fighter (AIOFighterInfoOverlay:39).
-                // Without this, Rs2Walker keeps walking on its own executor after the script
-                // main loop pauses.
+                // Kill in-flight walker. Without this, Rs2Walker keeps walking on its own executor
+                // after the script main loop pauses.
                 Rs2Walker.setTarget(null);
             }
         });
@@ -67,7 +69,7 @@ public class AutoSmithingPlusOverlay extends OverlayPanel {
     public Dimension render(Graphics2D graphics) {
         try {
             panelComponent.setPreferredSize(new Dimension(240, 300));
-            // v0.5.2: no clear -- preserves click-target registry for the Pause button.
+            // No clear: preserves the click-target registry for the Pause button.
 
             panelComponent.getChildren().add(TitleComponent.builder()
                     .text("AutoSmithingPlus v" + AutoSmithingPlusPlugin.version)
@@ -123,11 +125,11 @@ public class AutoSmithingPlusOverlay extends OverlayPanel {
                         .build());
 
                 // GP/hr: NET profit per item = product GE price minus the bars it consumes. The
-                // counter is smith cycles; each "Smith All" works a full inventory of bars (27
-                // slots after the hammer), so items per cycle is roughly 27 / bars-per-item. Can be
-                // negative when bars cost more than the product. Guards runtime 0 and price 0; the
-                // product price is 0 for items whose name doesn't follow the "Tier base" pattern.
-                // The "~" marks it an estimate (cycle->item conversion).
+                // counter is smith cycles; each "Smith All" works a full inventory of bars, so
+                // items per cycle is roughly freeBarSlots / bars-per-item. Can be negative when
+                // bars cost more than the product. Guards runtime 0 and price 0; the product price
+                // is 0 for items whose name doesn't follow the "Tier base" pattern. The "~" marks
+                // it an estimate (cycle->item conversion).
                 long gpPerHour = 0;
                 Bars activeBar = script.getActiveBar();
                 AnvilItem activeItem = script.getActiveItem();
@@ -138,7 +140,7 @@ public class AutoSmithingPlusOverlay extends OverlayPanel {
                     if (productPrice > 0) {
                         long netPerItem = (long) productPrice - (long) barPrice * activeItem.getRequiredBars();
                         long itemsSmithed = (long) script.getActionsCompleted()
-                                * (27 / activeItem.getRequiredBars());
+                                * (freeBarSlots() / activeItem.getRequiredBars());
                         gpPerHour = netPerItem * itemsSmithed * 3600000L / runtimeMillis;
                     }
                 }
@@ -154,7 +156,7 @@ public class AutoSmithingPlusOverlay extends OverlayPanel {
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
-                // v0.5.0: target-level progress line.
+                // target-level progress line.
                 if (config.targetLevel() > 0) {
                     int toGo = Math.max(0, config.targetLevel() - currentLevel);
                     panelComponent.getChildren().add(LineComponent.builder()
@@ -171,8 +173,8 @@ public class AutoSmithingPlusOverlay extends OverlayPanel {
                         .build());
             }
 
-            // v0.5.4: Pause button added unconditionally to win the click-bounds registration
-            // race against the first render. See AutoMiningPlusOverlay v0.5.4 comment for detail.
+            // Pause button added unconditionally to win the click-bounds registration race
+            // against the first render.
             pauseButton.setText(Microbot.pauseAllScripts.get() ? "Resume" : "Pause");
             panelComponent.getChildren().add(pauseButton);
 
@@ -180,6 +182,11 @@ public class AutoSmithingPlusOverlay extends OverlayPanel {
             Microbot.logStackTrace(this.getClass().getSimpleName(), ex);
         }
         return super.render(graphics);
+    }
+
+    /** Inventory slots available for bars: all 28 with the hammer on the tool belt, else 27. */
+    private int freeBarSlots() {
+        return config.hammerOnToolBelt() ? INVENTORY_SLOTS : INVENTORY_SLOTS - 1;
     }
 
     private String formatDuration(Duration duration) {

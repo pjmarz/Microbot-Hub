@@ -30,34 +30,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * AutoSmithingPlus v0.2.0.
- *
- * <p>v0.1.0 shipped the auto-travel MVP + bank cycle + speed mode. v0.2.0 adds:
- * <ul>
- *   <li><b>Bronze-only pre-flight</b> at LUMBRIDGE_RUSTED (refuses non-bronze bar)</li>
- *   <li><b>Members-only pre-flight</b> for items like CLAWS (refuses on F2P)</li>
- *   <li><b>LUMBRIDGE_RUSTED walk-to coord fix</b> (now points at the anvil tile, not the furnace)</li>
- *   <li><b>maxPlayersInArea + autohop</b> ported from MiningPlus</li>
- *   <li><b>League mode</b> arrow-key press to defeat idle-logout</li>
- *   <li><b>CSV itemsToBank / itemsToKeep</b> replaces v0.1.0's hardcoded depositAllExcept</li>
- *   <li><b>dropOrder</b> config item for parity</li>
- * </ul>
- *
- * <h2>Deferred to v0.2.1+</h2>
- * <ul>
- *   <li>Smithing-level pre-flight (e.g. refuse Rune Plate Body at Smithing 1). Needs the
- *       AnvilItemLevels table (26 items x 6 bars = 156 entries).</li>
- *   <li>Toolbelt hammer: handled in v0.6.5 via the "Hammer on tool belt" config toggle. The OSRS
- *       tool belt has no varbit/Rs2 helper in this client, so it cannot be auto-detected; the
- *       toggle lets the user declare it and the bot then stops requiring a loose hammer.</li>
- *   <li>Progressive smith. Picks highest-XP item for current level + bar.</li>
- * </ul>
+ * AutoSmithingPlus: smiths bars into items at a configured anvil, with a bank cycle, autohop,
+ * pre-flight validation (bronze-only anvils, members-only items, Smithing level), and a
+ * progressive mode that picks the best item for the current level and bar tier.
  */
 @Slf4j
 public class AutoSmithingPlusScript extends Script {
 
     private static final int ANVIL_WIDGET_CONTAINER = 312;
     private static final int ANVIL_MAKE_QTY_CHILD = 7; // "All" multiplier in the smithing widget
+    // Player varp holding the anvil make-quantity; when it already equals the bar count "All" is
+    // selected and re-clicking the multiplier is redundant.
+    private static final int ANVIL_MAKE_QTY_VARP = 2224;
+    // Animation-poll window (ms) used to treat the player as busy while a smith batch runs.
+    private static final int SMITH_ANIM_TIMEOUT_MS = 2400;
 
     State state = State.SMITHING;
 
@@ -67,12 +53,12 @@ public class AutoSmithingPlusScript extends Script {
     private int startSkillLevel = 0;
     private int actionsCompleted = 0;
 
-    // v0.5.0: target-level cleanup flag. Intercepted after deposit in handleBankAndWithdraw.
+    // target-level cleanup flag. Intercepted after deposit in handleBankAndWithdraw.
     private boolean shutdownAfterCleanup = false;
 
-    // v0.5.8: smith stall detection. If smith clicks produce no Smithing XP across several
-    // attempts, the selected item is greyed (above our Smithing level, or wrong bar for it) and
-    // the bot would loop forever clicking it -- "looks frozen". Track XP between attempts and bail.
+    // smith stall detection. If smith clicks produce no Smithing XP across several attempts, the
+    // selected item is greyed (above our Smithing level, or wrong bar for it) and the bot would
+    // loop forever clicking it ("looks frozen"). Track XP between attempts and bail.
     private int smithLastAttemptXp = -1;
     private int smithNoProgressAttempts = 0;
 
@@ -100,8 +86,8 @@ public class AutoSmithingPlusScript extends Script {
         startSkillLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getRealSkillLevel(Skill.SMITHING)).orElse(1);
         actionsCompleted = 0;
-        shutdownAfterCleanup = false; // v0.5.0
-        smithLastAttemptXp = -1;      // v0.5.8: reset stall detection
+        shutdownAfterCleanup = false;
+        smithLastAttemptXp = -1;      // reset stall detection
         smithNoProgressAttempts = 0;
 
         Rs2Walker.disableTeleports = true;
@@ -112,7 +98,7 @@ public class AutoSmithingPlusScript extends Script {
             Rs2AntibanSettings.antibanEnabled = false;
         }
 
-        // Pre-flight checks (v0.2.0). Refuse-start with a chat log if the config is incoherent.
+        // Pre-flight checks. Refuse-start with a chat log if the config is incoherent.
         if (config.anvilLocation() != null && config.anvilLocation().isBronzeOnly()
                 && config.selectedBar() != Bars.BRONZE) {
             Microbot.log("Pre-flight FAILED: anvil " + config.anvilLocation().getDisplayName()
@@ -121,9 +107,9 @@ public class AutoSmithingPlusScript extends Script {
             super.shutdown();
             return false;
         }
-        // v0.6.0: item/level pre-flight. Progressive mode validates that SOME item is makeable at
-        // the chosen bar for our level; manual mode validates the user's specific item + bar
-        // (members gate + Smithing-level gate). The v0.5.8 stall-detection stays as a backstop.
+        // item/level pre-flight. Progressive mode validates that SOME item is makeable at the
+        // chosen bar for our level; manual mode validates the user's specific item + bar (members
+        // gate + Smithing-level gate). The stall-detection stays as a backstop.
         if (config.progressiveSmith()) {
             AnvilItem progBest = AnvilItem.bestForLevel(config.selectedBar(), startSkillLevel, Rs2Player.isMember());
             if (progBest == null) {
@@ -155,8 +141,8 @@ public class AutoSmithingPlusScript extends Script {
                 if (!super.run()) return;
                 if (!Microbot.isLoggedIn()) return;
 
-                // v0.5.1: pause check using global Microbot.pauseAllScripts (toggled via overlay
-                // button). Stats keep accumulating naturally during pause.
+                // Pause check using global Microbot.pauseAllScripts (toggled via overlay button).
+                // Stats keep accumulating naturally during pause.
                 if (Microbot.pauseAllScripts.get()) {
                     Microbot.status = "[PAUSED]";
                     return;
@@ -181,7 +167,7 @@ public class AutoSmithingPlusScript extends Script {
                     }
                 }
 
-                // v0.5.0: target-level check.
+                // target-level check.
                 if (config.targetLevel() > 0 && !shutdownAfterCleanup) {
                     int currentLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                             Microbot.getClient().getRealSkillLevel(Skill.SMITHING)).orElse(startSkillLevel);
@@ -218,7 +204,7 @@ public class AutoSmithingPlusScript extends Script {
                     initialPlayerLocation = anvilChoice.getWorldPoint();
                 }
 
-                if (Rs2Player.isMoving() || Rs2Player.isAnimating(2400)) return;
+                if (Rs2Player.isMoving() || Rs2Player.isAnimating(SMITH_ANIM_TIMEOUT_MS)) return;
 
                 // Autohop: only relevant while actively smithing at the anvil (busy/PK risk).
                 if (state == State.SMITHING && config.maxPlayersInArea() > 0) {
@@ -250,8 +236,8 @@ public class AutoSmithingPlusScript extends Script {
 
     @Override
     public void shutdown() {
-        // v0.5.8: reset the disableTeleports flag set in run() so it doesn't leak to the next
-        // plugin that uses Rs2Walker. Matches the AutoSmeltingPlus lifecycle fix.
+        // Reset the disableTeleports flag set in run() so it doesn't leak to the next plugin that
+        // uses Rs2Walker.
         Rs2Walker.disableTeleports = false;
         super.shutdown();
         Rs2Antiban.resetAntibanSettings();
@@ -340,16 +326,18 @@ public class AutoSmithingPlusScript extends Script {
             return;
         }
 
-        // Click "All" multiplier so the smith runs through the whole inventory of bars.
-        Rs2Widget.clickWidget(ANVIL_WIDGET_CONTAINER, ANVIL_MAKE_QTY_CHILD);
-        sleep(180, 480);
+        // Click "All" multiplier only when the make-quantity is not already maxed, so we don't
+        // fire a redundant click + sleep every cycle once "All" is selected.
+        if (Microbot.getVarbitPlayerValue(ANVIL_MAKE_QTY_VARP) < Rs2Inventory.count(bar.getId())) {
+            Rs2Widget.clickWidget(ANVIL_WIDGET_CONTAINER, ANVIL_MAKE_QTY_CHILD);
+            sleep(180, 480);
+        }
 
-        // v0.5.8: stall detection. Compare Smithing XP since the previous smith click. If 4
-        // consecutive clicks produce no XP, the item is greyed (above our Smithing level, or the
-        // wrong bar for it) and we'd loop forever on a no-op click. Bail with a clear message.
-        // Reactive guard in place of the per-item AnvilItemLevels table (still deferred); also
-        // catches a drifted widget child id. XP recorded BEFORE the smith, so a working cycle's
-        // gain registers by the next click and resets the counter (bank trips don't false-trip it).
+        // Stall detection. Compare Smithing XP since the previous smith click. If 4 consecutive
+        // clicks produce no XP, the item is greyed (above our Smithing level, or the wrong bar for
+        // it) and we'd loop forever on a no-op click. Bail with a clear message. Also catches a
+        // drifted widget child id. XP recorded BEFORE the smith, so a working cycle's gain registers
+        // by the next click and resets the counter (bank trips don't false-trip it).
         int smithXpNow = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getSkillExperience(Skill.SMITHING)).orElse(smithLastAttemptXp);
         if (smithLastAttemptXp >= 0 && smithXpNow <= smithLastAttemptXp) {
@@ -366,10 +354,14 @@ public class AutoSmithingPlusScript extends Script {
         }
         smithLastAttemptXp = smithXpNow;
 
-        // Click the chosen item's child slot.
+        // Click the chosen item's child slot. Count the cycle only if smithing actually started:
+        // a greyed/no-op click never animates, while a real "Smith All" does, so the counter and
+        // the overlay's GP/hr estimate track real cycles instead of blind clicks.
         Rs2Widget.clickWidget(ANVIL_WIDGET_CONTAINER, item.getChildId());
-        sleep(600, 1200);
-        actionsCompleted++; // count completed smith cycles
+        boolean started = sleepUntil(() -> Rs2Player.isAnimating(SMITH_ANIM_TIMEOUT_MS), 1200);
+        if (started) {
+            actionsCompleted++;
+        }
     }
 
     // --- RESETTING state ---
@@ -389,7 +381,7 @@ public class AutoSmithingPlusScript extends Script {
         AnvilItem item = activeItem(config);
         sleepUntil(() -> !Rs2Inventory.hasItem(item.getName()), 3000);
 
-        // v0.5.0: targetLevel cleanup done -- shutdown before re-withdrawing hammer/bars.
+        // targetLevel cleanup done: shutdown before re-withdrawing hammer/bars.
         if (shutdownAfterCleanup) {
             Microbot.log("AutoSmithingPlus: targetLevel cleanup complete. Shutting down.");
             Rs2Bank.closeBank();
@@ -397,8 +389,8 @@ public class AutoSmithingPlusScript extends Script {
             return;
         }
 
-        // Withdraw hammer if missing. v0.6.5: skipped entirely when the hammer is on the tool belt
-        // (config toggle) -- no loose hammer is needed in that case.
+        // Withdraw hammer if missing. Skipped entirely when the hammer is on the tool belt (config
+        // toggle), since no loose hammer is needed in that case.
         if (!config.hammerOnToolBelt() && !Rs2Inventory.hasItem(ItemID.HAMMER)) {
             if (!Rs2Bank.hasItem(ItemID.HAMMER)) {
                 Microbot.log("No hammer in inventory or bank. Tick 'Hammer on tool belt' in config "
@@ -508,11 +500,11 @@ public class AutoSmithingPlusScript extends Script {
     }
 
     /**
-     * v0.6.5: hammer present for smithing? A hammer in the inventory satisfies it (the original
-     * path), and so does the new "Hammer on tool belt" config opt-in. The OSRS tool belt is not
-     * exposed by any varbit or Rs2 helper in this client/API version, so it cannot be auto-detected
-     * from code; the toggle is how the user declares it. With the toggle on we never require or
-     * withdraw a loose hammer, since the tool belt one is always available at the anvil.
+     * Hammer present for smithing? A hammer in the inventory satisfies it, and so does the "Hammer
+     * on tool belt" config opt-in. The OSRS tool belt is not exposed by any varbit or Rs2 helper in
+     * this client/API version, so it cannot be auto-detected from code; the toggle is how the user
+     * declares it. With the toggle on we never require or withdraw a loose hammer, since the tool
+     * belt one is always available at the anvil.
      */
     private boolean hasHammer(AutoSmithingPlusConfig config) {
         return config.hammerOnToolBelt() || Rs2Inventory.hasItem(ItemID.HAMMER);

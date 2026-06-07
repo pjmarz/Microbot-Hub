@@ -26,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoSmithingPlusPlugin extends Plugin {
-    public static final String version = "0.6.5";
+    public static final String version = "0.6.6";
 
     @Inject
     private AutoSmithingPlusConfig config;
@@ -47,12 +47,11 @@ public class AutoSmithingPlusPlugin extends Plugin {
 
     @Override
     protected void startUp() throws AWTException {
-        // v0.5.7: clear any stale pause flag from a previous session.
+        // Clear any stale pause flag from a previous session.
         Microbot.pauseAllScripts.compareAndSet(true, false);
         if (overlayManager != null) {
             overlayManager.add(overlay);
-            // v0.5.6: see AutoMiningPlusPlugin v0.5.6 -- hookMouseListener is what actually
-            // wires setOnClick to RuneLite's mouse events.
+            // hookMouseListener is what actually wires setOnClick to RuneLite's mouse events.
             overlay.pauseButton.hookMouseListener();
         }
         script.run(config);
@@ -60,7 +59,7 @@ public class AutoSmithingPlusPlugin extends Plugin {
 
     @Override
     protected void shutDown() {
-        // v0.5.7: clear flag so other plugins enabled after us don't inherit our paused state.
+        // Clear flag so other plugins enabled after us don't inherit our paused state.
         Microbot.pauseAllScripts.compareAndSet(true, false);
         script.shutdown();
         if (overlay != null) {
