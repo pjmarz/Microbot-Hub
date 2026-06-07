@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.api.gameval.ItemID;
 
 /**
- * Combination-rune recipes for the binding-necklace method (v0.3.0).
+ * Combination-rune recipes for the binding-necklace method.
  *
  * <p>A combination rune fuses two elements. You craft it at one element's altar while carrying the
  * OTHER element's runes plus pure essence, with a binding necklace worn for a guaranteed bind. A worn

@@ -105,27 +105,39 @@ public class AutoRunecraftPlusOverlay extends OverlayPanel {
                         .build());
 
                 panelComponent.getChildren().add(LineComponent.builder()
-                        .left("Trips:")
-                        .right(String.valueOf(script.getActionsCompleted()))
+                        .left("Crafts:")
+                        .right(String.valueOf(script.getCraftsCompleted()))
                         .rightColor(NORMAL_TEXT_COLOR)
                         .build());
 
-                // GP/hr: NET = runePrice * runesCrafted - essencePrice * essenceUsed, over runtime.
-                // The script counts craft actions, not runes, so we derive both from Runecraft XP:
-                // essenceUsed = xpGained / altar.xpPerEssence (exact -- bonus runes give no extra XP),
-                // and runesCrafted is estimated as 1 rune per essence (lower bound; the multiple-runes
-                // -per-essence bonus at higher levels is not counted, so this under-states profit at
-                // high levels). The "~" marks this estimate. runePrice is name-resolved + cached (the
-                // altar enum carries only the rune name, not its item id); essencePrice is a direct id
-                // lookup. Guards runtime 0 and price 0. NET can be negative (essence dearer than rune).
+                // GP/hr: NET profit per hour, derived from Runecraft XP rather than the craft counter.
+                // essenceUsed = xpGained / (altar.xpPerEssence * essence.xpMultiplier); the multiplier
+                // accounts for daeyalt's +50% XP per essence. Bonus runes give no extra XP, so this is
+                // the exact essence consumed. runesCrafted is estimated as one rune per essence (lower
+                // bound; the multiple-runes-per-essence bonus at higher levels is not counted), hence
+                // the "~". Prices are cached id lookups; getItemPrice by id is cheap, name search is
+                // not. NET can be negative (inputs dearer than the product).
                 long gpPerHour = 0;
                 Altars activeAltar = script.getAltar();
-                if (activeAltar != null && runtimeMillis > 1000 && activeAltar.getXpPerEssence() > 0) {
-                    long essenceUsed = Math.round(xpGained / activeAltar.getXpPerEssence());
+                EssenceType essenceType = script.getEssenceType();
+                ComboRune comboRune = script.getComboRune();
+                double xpMultiplier = essenceType != null ? essenceType.getXpMultiplier() : 1.0;
+                if (activeAltar != null && runtimeMillis > 1000
+                        && activeAltar.getXpPerEssence() > 0 && xpMultiplier > 0) {
+                    long essenceUsed = Math.round(xpGained / (activeAltar.getXpPerEssence() * xpMultiplier));
                     long runesCrafted = essenceUsed; // lower bound: 1 rune per essence
-                    int runePrice = runePrice(activeAltar);
                     int essencePrice = Microbot.getItemManager().getItemPrice(script.getEssenceId());
-                    long net = runePrice * runesCrafted - (long) essencePrice * essenceUsed;
+                    long net;
+                    if (comboRune != null && comboRune.isCombo()) {
+                        // Combo binding consumes one pure essence + one secondary rune per combo rune.
+                        int comboPrice = comboRunePrice(comboRune);
+                        int secondaryRunePrice = Microbot.getItemManager().getItemPrice(comboRune.getSecondaryRuneId());
+                        net = (long) comboPrice * runesCrafted
+                                - ((long) essencePrice + secondaryRunePrice) * essenceUsed;
+                    } else {
+                        int runePrice = runePrice(activeAltar);
+                        net = (long) runePrice * runesCrafted - (long) essencePrice * essenceUsed;
+                    }
                     gpPerHour = net * 3600000L / runtimeMillis;
                 }
                 panelComponent.getChildren().add(LineComponent.builder()
@@ -188,7 +200,28 @@ public class AutoRunecraftPlusOverlay extends OverlayPanel {
     }
 
     private int resolveRuneId(Altars altar) {
-        String runeName = altar.getRuneName();
+        return resolveRuneIdByName(altar.getRuneName());
+    }
+
+    // Cache the resolved combo-rune item id so the name search runs only when the active combo
+    // changes, not every render frame.
+    private ComboRune cachedComboRune;
+    private int cachedComboRuneId = 0;
+
+    /**
+     * GE price of the combination rune {@code comboRune} produces. The enum carries the combo rune's
+     * display name (e.g. "Mist rune") but not its item id, so we resolve the id once via a name search
+     * and cache it. Returns 0 when no item matches.
+     */
+    private int comboRunePrice(ComboRune comboRune) {
+        if (comboRune != cachedComboRune) {
+            cachedComboRune = comboRune;
+            cachedComboRuneId = resolveRuneIdByName(comboRune.getDisplayName());
+        }
+        return cachedComboRuneId > 0 ? Microbot.getItemManager().getItemPrice(cachedComboRuneId) : 0;
+    }
+
+    private int resolveRuneIdByName(String runeName) {
         if (runeName == null) {
             return 0;
         }

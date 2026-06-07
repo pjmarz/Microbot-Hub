@@ -22,12 +22,12 @@ import java.awt.event.KeyEvent;
 import java.util.concurrent.TimeUnit;
 
 /**
- * AutoRunecraftPlus v0.1.0.
+ * AutoRunecraftPlus.
  *
  * <p>Forks the chillRunecraft essence-&gt;altar-&gt;craft-&gt;bank loop and wraps it in the Plus
  * layer (stop conditions, target level + clean shutdown, overlay/pause, speed mode, league mode).
- * v0.1.0 uses Pure essence (the proven path; works at every altar). Rune essence + pouch fill/empty
- * are the v0.2.0 increment.</p>
+ * Supports pure/rune/daeyalt essence, essence pouches (fill/empty/repair), and binding-necklace
+ * combination runes.</p>
  */
 @Slf4j
 public class AutoRunecraftPlusScript extends Script {
@@ -39,12 +39,13 @@ public class AutoRunecraftPlusScript extends Script {
     private static final int BINDING_NECKLACE_ID = 5521;
     private static final String BINDING_NECKLACE_NAME = "Binding necklace";
 
-    // Essence + pouch settings, resolved from config in run() (v0.2.0).
+    // Essence + pouch settings, resolved from config in run().
     private int essenceId;
     private String essenceName;
+    private EssenceType essenceType = EssenceType.PURE;
     private boolean usePouches;
 
-    // Combo-rune settings, resolved from config in run() (v0.3.0). comboRune == NONE keeps the normal
+    // Combo-rune settings, resolved from config in run(). comboRune == NONE keeps the normal
     // single-rune path entirely unchanged.
     private ComboRune comboRune = ComboRune.NONE;
     private int spareBindingNecklaces;
@@ -57,7 +58,7 @@ public class AutoRunecraftPlusScript extends Script {
     private long startTimeMillis = 0;
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
-    private int actionsCompleted = 0;
+    private int craftsCompleted = 0;
 
     // Set when targetLevel is reached; intercepted after the deposit step in handleBanking so we
     // shut down before withdrawing more essence.
@@ -66,9 +67,11 @@ public class AutoRunecraftPlusScript extends Script {
     public long getStartTimeMillis() { return startTimeMillis; }
     public int getStartSkillXp() { return startSkillXp; }
     public int getStartSkillLevel() { return startSkillLevel; }
-    public int getActionsCompleted() { return actionsCompleted; }
+    public int getCraftsCompleted() { return craftsCompleted; }
     public Altars getAltar() { return altar; }
     public int getEssenceId() { return essenceId; }
+    public EssenceType getEssenceType() { return essenceType; }
+    public ComboRune getComboRune() { return comboRune; }
 
     public boolean run(AutoRunecraftPlusConfig config) {
         comboRune = config.comboRune();
@@ -79,19 +82,21 @@ public class AutoRunecraftPlusScript extends Script {
         // recipe always wants pure essence).
         if (comboRune.isCombo()) {
             altar = comboRune.getAltar();
-            essenceId = EssenceType.PURE.getItemId();
-            essenceName = EssenceType.PURE.getItemName();
+            essenceType = EssenceType.PURE;
         } else {
             altar = config.altar();
-            essenceId = config.essenceType().getItemId();
-            essenceName = config.essenceType().getItemName();
+            essenceType = config.essenceType();
         }
+        essenceId = essenceType.getItemId();
+        essenceName = essenceType.getItemName();
         // Pouches are deliberately disabled in combo mode. Combo crafting must keep pure essence and
         // the secondary runes at an exact 1:1 count, and each altar click also burns one secondary
         // talisman plus one binding-necklace charge. Mixing that with the fill/empty pouch dance is
         // the most error-prone, least testable path, so combo trips do a single full-inventory bind
         // (one click) per trip: essence count == secondary rune count, one talisman, one charge.
-        usePouches = config.usePouches() && !comboRune.isCombo();
+        // Essence pouches also cannot hold daeyalt essence, so disable them for daeyalt too rather
+        // than spinning the fill loop that can never succeed.
+        usePouches = config.usePouches() && !comboRune.isCombo() && essenceType != EssenceType.DAEYALT;
         initialise = true;
         state = State.BANKING;
 
@@ -100,7 +105,7 @@ public class AutoRunecraftPlusScript extends Script {
                 Microbot.getClient().getSkillExperience(Skill.RUNECRAFT)).orElse(0);
         startSkillLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getRealSkillLevel(Skill.RUNECRAFT)).orElse(1);
-        actionsCompleted = 0;
+        craftsCompleted = 0;
         shutdownAfterCleanup = false;
 
         // Combo runes have a hard level requirement; below it the altar simply will not bind, so refuse
@@ -112,10 +117,9 @@ public class AutoRunecraftPlusScript extends Script {
         }
 
         Microbot.enableAutoRunOn = true;
-        // v0.1.1: keep the running loop on foot. Without this the walker's nearest-bank fallback
-        // treats the free Lumbridge Home Teleport as a cheap transport edge and "home-teles to
-        // Lumbridge bank" instead of walking to the geographically-nearest bank (e.g. Edgeville
-        // for the Body altar). Matches AutoSmeltingPlus / AutoMiningPlus.
+        // Keep the loop on foot. Without this the walker's nearest-bank fallback treats the free
+        // Lumbridge Home Teleport as a cheap transport edge and home-teles to Lumbridge bank instead
+        // of walking to the geographically-nearest bank (e.g. Edgeville for the Body altar).
         Rs2Walker.disableTeleports = true;
         Rs2Antiban.resetAntibanSettings();
         Rs2Antiban.antibanSetupTemplates.applyRunecraftingSetup();
@@ -165,7 +169,7 @@ public class AutoRunecraftPlusScript extends Script {
                 // League mode: periodic key press resets the idle-logout.
                 if (config.leagueMode() && Rs2Player.checkIdleLogout(Rs2Random.between(500, 1500))) {
                     int[] arrowKeys = { KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT, KeyEvent.VK_UP, KeyEvent.VK_DOWN };
-                    Rs2Keyboard.keyPress(arrowKeys[Rs2Random.between(0, arrowKeys.length - 1)]);
+                    Rs2Keyboard.keyPress(arrowKeys[Rs2Random.between(0, arrowKeys.length)]);
                 }
 
                 if (Rs2AntibanSettings.actionCooldownActive) return;
@@ -179,6 +183,7 @@ public class AutoRunecraftPlusScript extends Script {
                             || (usePouches && Rs2Inventory.hasAnyPouch() && !Rs2Inventory.allPouchesEmpty());
                     boolean comboReady = !comboRune.isCombo()
                             || (Rs2Inventory.hasItem(comboRune.getSecondaryRuneId())
+                                && Rs2Inventory.hasItem(comboRune.getSecondaryTalismanId())
                                 && (Rs2Equipment.isWearing(BINDING_NECKLACE_NAME, false)
                                     || Rs2Inventory.hasItem(BINDING_NECKLACE_ID)));
                     state = (haveTalismanOrTiara && haveEssence && comboReady) ? State.WALKING_TO_ALTAR : State.BANKING;
@@ -248,8 +253,11 @@ public class AutoRunecraftPlusScript extends Script {
                         Microbot.status = comboRune.isCombo() ? "Crafting combo runes" : "Crafting runes";
                         Rs2Inventory.useItemOnObject(essenceId, altar.getAltarID());
                         Rs2Random.wait(600, 1200);
-                        sleepUntil(() -> Rs2Player.waitForXpDrop(Skill.RUNECRAFT));
-                        actionsCompleted++;
+                        // Only count the craft when XP actually dropped; a timeout means the
+                        // interaction missed and nothing was crafted.
+                        if (Rs2Player.waitForXpDrop(Skill.RUNECRAFT)) {
+                            craftsCompleted++;
+                        }
                         break;
 
                     case EXITING_ALTAR:
@@ -471,7 +479,7 @@ public class AutoRunecraftPlusScript extends Script {
     @Override
     public void shutdown() {
         super.shutdown();
-        Rs2Walker.disableTeleports = false; // v0.1.1: reset the shared flag for other plugins
+        Rs2Walker.disableTeleports = false; // reset the shared flag for other plugins
         Rs2Antiban.resetAntibanSettings();
     }
 }

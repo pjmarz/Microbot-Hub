@@ -1,8 +1,8 @@
 package net.runelite.client.plugins.microbot.runecraftplus;
 
 /**
- * Runecraft loop phases. BANKING doubles as the reset/deposit step (the "RESETTING" of the suite
- * pattern). targetLevel cleanup routes through BANKING for a final deposit before shutdown.
+ * Runecraft loop phases. BANKING doubles as the reset/deposit step; targetLevel cleanup routes
+ * through BANKING for a final deposit before shutdown.
  */
 enum State
 {
