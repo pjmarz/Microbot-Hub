@@ -4,7 +4,6 @@ import net.runelite.client.config.*;
 import net.runelite.client.plugins.microbot.smeltingplus.data.BankLocationOption;
 import net.runelite.client.plugins.microbot.smeltingplus.data.Bars;
 import net.runelite.client.plugins.microbot.smeltingplus.data.FurnaceLocationOption;
-import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
 
 @ConfigGroup("SmeltingPlus")
 @ConfigInformation("<h2>Auto Smelting Plus</h2>" +
@@ -27,14 +26,9 @@ import net.runelite.client.plugins.microbot.util.inventory.InteractOrder;
         "<p>8. <strong>Stop conditions:</strong> the bot shuts down when any limit you set is hit. Stop after minutes ends after that much runtime. Stop after XP ends after that much Smithing XP. Target level ends when Smithing reaches that level and deposits first. Set any to 0 to ignore it.</p>" +
         "<p></p>" +
         "<h3>Banking</h3>" +
-        "<p>9. <strong>Use bank:</strong> runs the normal cycle of bank, withdraw ores, walk to the furnace, smelt, then walk back.</p>" +
+        "<p>9. <strong>Preferred bank:</strong> overrides the nearest by distance pick. AUTO NEAREST uses the closest one.</p>" +
         "<p></p>" +
-        "<p>10. <strong>Preferred bank:</strong> overrides the nearest by distance pick. AUTO NEAREST uses the closest one.</p>" +
-        "<p></p>" +
-        "<p>11. <strong>Items to bank and Items to keep:</strong> comma separated name matches. Items to bank deposits anything whose name contains a listed word. Items to keep is never deposited. If Items to bank is empty the bot deposits everything except your keep list.</p>" +
-        "<p></p>" +
-        "<h3>Dropping</h3>" +
-        "<p>12. <strong>Drop order:</strong> the order to drop items when not banking. Smelting always banks, so this is unused for now and kept for parity.</p>")
+        "<p>10. <strong>Items to bank and Items to keep:</strong> comma separated name matches. Items to bank deposits anything whose name contains a listed word. Items to keep is never deposited. If Items to bank is empty the bot deposits everything except your keep list.</p>")
 public interface AutoSmeltingPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "General settings", position = 0)
@@ -42,9 +36,6 @@ public interface AutoSmeltingPlusConfig extends Config {
 
     @ConfigSection(name = "Banking", description = "Banking settings", position = 1)
     String bankingSection = "bankingSection";
-
-    @ConfigSection(name = "Dropping", description = "Dropping settings (mostly for parity; smelting deposits, doesn't drop)", position = 2)
-    String droppingSection = "droppingSection";
 
     // --- General section ---
 
@@ -181,17 +172,6 @@ public interface AutoSmeltingPlusConfig extends Config {
     // --- Banking section ---
 
     @ConfigItem(
-            keyName = "useBank",
-            name = "Use bank",
-            description = "Standard smelting cycle: bank -> withdraw ores -> walk to furnace -> smelt -> walk back.",
-            position = 0,
-            section = bankingSection
-    )
-    default boolean useBank() {
-        return true;
-    }
-
-    @ConfigItem(
             keyName = "bankLocation",
             name = "Preferred bank",
             description = "AUTO_NEAREST = closest by raw distance.",
@@ -229,22 +209,5 @@ public interface AutoSmeltingPlusConfig extends Config {
     )
     default String itemsToKeep() {
         return "coal bag,ring of forging,gauntlets of goldsmithing";
-    }
-
-    // --- Dropping section ---
-
-    /**
-     * Unused for now (smelting always banks); reserved for a future "drop bars" mode
-     * and for cross-plugin config parity.
-     */
-    @ConfigItem(
-            keyName = "dropOrder",
-            name = "Drop order",
-            description = "Order to drop items when not banking. Currently unused; reserved for parity.",
-            position = 0,
-            section = droppingSection
-    )
-    default InteractOrder interactOrder() {
-        return InteractOrder.STANDARD;
     }
 }

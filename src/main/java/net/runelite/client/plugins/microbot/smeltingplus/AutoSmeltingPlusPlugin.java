@@ -26,7 +26,7 @@ import java.awt.*;
 )
 @Slf4j
 public class AutoSmeltingPlusPlugin extends Plugin {
-    public static final String version = "0.5.15";
+    public static final String version = "0.5.16";
 
     @Inject
     private AutoSmeltingPlusConfig config;
@@ -47,12 +47,12 @@ public class AutoSmeltingPlusPlugin extends Plugin {
 
     @Override
     protected void startUp() throws AWTException {
-        // v0.5.7: clear any stale pause flag from a previous session.
+        // Clear any stale pause flag from a previous session.
         Microbot.pauseAllScripts.compareAndSet(true, false);
         if (overlayManager != null) {
             overlayManager.add(overlay);
-            // v0.5.6: wires the pause button's setOnClick lambda to RuneLite's mouse event
-            // system. Without this, setOnClick is a no-op. See AutoMiningPlusPlugin v0.5.6.
+            // Wires the pause button's setOnClick lambda to RuneLite's mouse event system.
+            // Without this, setOnClick is a no-op.
             overlay.pauseButton.hookMouseListener();
         }
         script.run(config);
@@ -60,7 +60,7 @@ public class AutoSmeltingPlusPlugin extends Plugin {
 
     @Override
     protected void shutDown() {
-        // v0.5.7: clear flag so other plugins enabled after us don't inherit our paused state.
+        // Clear flag so other plugins enabled after us don't inherit our paused state.
         Microbot.pauseAllScripts.compareAndSet(true, false);
         script.shutdown();
         if (overlay != null) {
@@ -69,7 +69,7 @@ public class AutoSmeltingPlusPlugin extends Plugin {
         overlayManager.remove(overlay);
     }
 
-    /** overlay reads script stats via this getter. */
+    /** Overlay reads script stats via this getter. */
     public AutoSmeltingPlusScript getScript() {
         return script;
     }

@@ -8,46 +8,13 @@ import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import java.util.Map;
 
 /**
- * Smithing bar recipes — what ores at what quantities produce each bar.
+ * Smithing bar recipes: what ores at what quantities produce each bar, plus the required
+ * Smithing level.
  *
- * <h2>Source of truth</h2>
- * <ul>
- *   <li>Recipe table: <a href="https://oldschool.runescape.wiki/w/Smithing/Smelting_bars">OSRS Wiki — Smithing/Smelting bars</a></li>
- *   <li>Smithing level requirements: same page</li>
- *   <li>Item IDs: RuneLite client constants ({@code net.runelite.api.gameval.ItemID})</li>
- * </ul>
- *
- * <h2>Audit log</h2>
- * <ul>
- *   <li><b>Origin:</b> Forked verbatim from upstream
- *       {@code chsami/Microbot-Hub/.../smelting/enums/Bars.java}. Recipes match the wiki
- *       Smelting bars table as of fork date.</li>
- *   <li><b>2026-05-14:</b> Ran new {@code tools/wiki-audit-bars.ps1} against
- *       the OSRS Wiki Smithing page. 9 of 9 bars confirmed by name. One fuzzy level warning
- *       on Iron bar (level 15 not found in 200-char window near "Iron bar") is a false
- *       positive caused by table-structure formatting; level 15 verified manually on the wiki.
- *       Required by the progressive-smelt feature, which keys off
- *       {@code getRequiredSmithingLevel()}.</li>
- *   <li><b>2026-05-25 (v0.5.9):</b> Dropped MOLTEN_GLASS entry. The default
- *       {@code itemsToBank="bar"} filter missed it (fixed generically in v0.5.8 via
- *       auto-augment), but the underlying smelt path was never functional either:
- *       glassblowing in OSRS uses a use-item-on-furnace interaction, not the smelt widget
- *       that {@code AutoSmeltingPlusScript.smeltAtFurnace} invokes. Enum is now 9 of 9 actual
- *       metal bars. See Known gaps below.</li>
- * </ul>
- *
- * <h2>Known gaps</h2>
- * <ul>
- *   <li><b>Glassblowing not supported.</b> Molten glass production (Bucket of sand + Soda ash
- *       to Molten glass) uses a use-item-on-furnace interaction, not the smelt widget.
- *       Re-adding it requires a separate widget path in {@code smeltAtFurnace} plus
- *       inventory composition handling (sand + ash to glass + empty bucket).</li>
- *   <li><b>Cannonballs are handled by upstream AutoCannonballSmelter</b>, not here. Steel bar
- *       to cannonball uses an Edgeville-furnace-specific mould interaction; out of scope.</li>
- *   <li><b>Silver/Gold jewellery</b> (rings, necklaces, amulets) uses jewellery moulds at a
- *       furnace via a separate widget. The existing upstream {@code crafting/jewelry} plugin
- *       is the cleaner home for that flow.</li>
- * </ul>
+ * <p>Recipes and level requirements follow the
+ * <a href="https://oldschool.runescape.wiki/w/Smithing/Smelting_bars">OSRS Wiki Smelting bars
+ * table</a>. Item IDs come from RuneLite client constants
+ * ({@code net.runelite.api.gameval.ItemID}).
  */
 @Getter
 @RequiredArgsConstructor

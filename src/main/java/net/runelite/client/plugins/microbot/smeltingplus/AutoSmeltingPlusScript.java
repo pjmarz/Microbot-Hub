@@ -32,19 +32,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * AutoSmeltingPlus v0.2.0.
+ * Smelts ores into bars at a configured furnace.
  *
- * <p>v0.1.x shipped the auto-travel MVP + bank routing + speed mode. v0.2.0 adds the WC borrows:
- * <ul>
- *   <li><b>Progressive smelt</b>: auto-pick highest bar the player can smelt given Smithing level
- *       + bank ore stock. Re-evaluated each bank trip.</li>
- *   <li><b>Max players in area + autohop</b>: world-hop when busy. Borrowed verbatim from
- *       AutoMiningPlus v0.1.x.</li>
- *   <li><b>League mode</b>: periodic arrow-key press to reset the game's idle-logout.</li>
- *   <li><b>CSV itemsToBank / itemsToKeep</b>: replaces v0.1.x's hardcoded
- *       {@code depositAllExcept(COAL_BAG_ID)}. Inclusion list first, exclusion list as fallback.</li>
- *   <li><b>dropOrder</b>: config item present for parity; not yet used at v0.2.0.</li>
- * </ul>
+ * <p>Supports progressive bar selection (auto-pick the highest bar the player's Smithing level
+ * and bank ore stock can support, re-evaluated each bank trip), world-hopping when the furnace
+ * area gets crowded, an anti-AFK arrow-key press, and CSV-driven deposit/keep lists.
  */
 @Slf4j
 public class AutoSmeltingPlusScript extends Script {
@@ -60,20 +52,19 @@ public class AutoSmeltingPlusScript extends Script {
     private long startTimeMillis = 0;
     private int startSkillXp = 0;
     private int startSkillLevel = 0;
-    // v0.5.15: now an exact bar count, not a smelt-cycle count. Each Smithing XP increase is one
-    // bar produced (one bar per smelt, any tier), mirroring AutoMiningPlus's per-ore counter.
+    // Exact bar count: each Smithing XP increase is one bar produced (one bar per smelt, any tier).
     private int actionsCompleted = 0;
-    // v0.5.15: last-seen Smithing XP for the accurate per-bar counter. Seeded to startSkillXp in run().
+    // Last-seen Smithing XP for the per-bar counter. Seeded to startSkillXp in run().
     private int lastSmithingXp = 0;
 
-    // v0.5.0: set when targetLevel is reached; intercepted after the deposit step in
+    // Set when targetLevel is reached; intercepted after the deposit step in
     // handleBankAndWithdraw so we shutdown before withdrawing new ores.
     private boolean shutdownAfterCleanup = false;
 
     public long getStartTimeMillis() { return startTimeMillis; }
     public int getStartSkillXp() { return startSkillXp; }
     public int getStartSkillLevel() { return startSkillLevel; }
-    /** Exact count of bars smelted (one per Smithing XP increase). v0.5.15. */
+    /** Exact count of bars smelted (one per Smithing XP increase). */
     public int getActionsCompleted() { return actionsCompleted; }
     /** The bar currently being smelted (resolves progressive mode), for the overlay GP/hr line. */
     public Bars getActiveBar() { return activeBar; }
@@ -92,8 +83,8 @@ public class AutoSmeltingPlusScript extends Script {
         startSkillLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
                 Microbot.getClient().getRealSkillLevel(Skill.SMITHING)).orElse(1);
         actionsCompleted = 0;
-        lastSmithingXp = startSkillXp; // v0.5.15: seed accurate per-bar counter
-        shutdownAfterCleanup = false; // v0.5.0: reset target-level cleanup flag on startup
+        lastSmithingXp = startSkillXp; // seed per-bar counter
+        shutdownAfterCleanup = false; // reset target-level cleanup flag on startup
 
         Rs2Walker.disableTeleports = true;
         Rs2Antiban.resetAntibanSettings();
@@ -108,18 +99,16 @@ public class AutoSmeltingPlusScript extends Script {
                 if (!super.run()) return;
                 if (!Microbot.isLoggedIn()) return;
 
-                // v0.5.1: pause check using global Microbot.pauseAllScripts (toggled via overlay
-                // button). Stats keep accumulating naturally during pause.
+                // Pause check using global Microbot.pauseAllScripts (toggled via overlay button).
+                // Stats keep accumulating naturally during pause.
                 if (Microbot.pauseAllScripts.get()) {
                     Microbot.status = "[PAUSED]";
                     return;
                 }
 
-                // v0.5.15: accurate bar counter. Read Smithing XP once per tick; each increase is
-                // one bar produced (one bar per smelt, any tier). The 600ms tick is well below
-                // smelt cadence, so one increment per XP drop is exact. Replaces the old
-                // per-cycle actionsCompleted++ in smeltAtFurnace, so the overlay GP/hr can use the
-                // real bar count instead of the cycle->bars estimate. Mirrors AutoMiningPlus.
+                // Bar counter. Read Smithing XP once per tick; each increase is one bar produced
+                // (one bar per smelt, any tier). The 600ms tick is well below smelt cadence, so one
+                // increment per XP drop is exact.
                 int currentSmithingXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
                         Microbot.getClient().getSkillExperience(Skill.SMITHING)).orElse(lastSmithingXp);
                 if (currentSmithingXp > lastSmithingXp) {
@@ -135,18 +124,15 @@ public class AutoSmeltingPlusScript extends Script {
                     super.shutdown();
                     return;
                 }
-                if (config.stopAfterXp() > 0) {
-                    int currentXp = Microbot.getClientThread().runOnClientThreadOptional(() ->
-                            Microbot.getClient().getSkillExperience(Skill.SMITHING)).orElse(startSkillXp);
-                    if (currentXp - startSkillXp >= config.stopAfterXp()) {
-                        Microbot.log("AutoSmeltingPlus: reached stopAfterXp (" + (currentXp - startSkillXp)
-                                + " XP). Shutting down.");
-                        super.shutdown();
-                        return;
-                    }
+                if (config.stopAfterXp() > 0
+                        && currentSmithingXp - startSkillXp >= config.stopAfterXp()) {
+                    Microbot.log("AutoSmeltingPlus: reached stopAfterXp (" + (currentSmithingXp - startSkillXp)
+                            + " XP). Shutting down.");
+                    super.shutdown();
+                    return;
                 }
 
-                // v0.5.0: target-level check. Trips RESETTING for one final deposit pass,
+                // Target-level check. Trips RESETTING for one final deposit pass,
                 // then shutdownAfterCleanup short-circuits before withdrawing new ores.
                 if (config.targetLevel() > 0 && !shutdownAfterCleanup) {
                     int currentLevel = Microbot.getClientThread().runOnClientThreadOptional(() ->
@@ -163,8 +149,7 @@ public class AutoSmeltingPlusScript extends Script {
                     }
                 }
 
-                // League mode: periodic key press resets the idle-logout. Pattern from
-                // AutoMiningPlus :73-76.
+                // League mode: periodic key press resets the idle-logout.
                 if (config.leagueMode() && Rs2Player.checkIdleLogout(Rs2Random.between(500, 1500))) {
                     int[] arrowKeys = { KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT, KeyEvent.VK_UP, KeyEvent.VK_DOWN };
                     Rs2Keyboard.keyPress(arrowKeys[Rs2Random.between(0, arrowKeys.length - 1)]);
@@ -200,7 +185,6 @@ public class AutoSmeltingPlusScript extends Script {
                 if (Rs2Player.isMoving() || Rs2Player.isAnimating(6500)) return;
 
                 // Autohop: only relevant while smelting at the furnace (busy/PK risk).
-                // Pattern from AutoMiningPlus :114-145.
                 if (state == State.SMELTING && config.maxPlayersInArea() > 0) {
                     if (hopIfCrowded(config)) return;
                 }
@@ -230,8 +214,8 @@ public class AutoSmeltingPlusScript extends Script {
 
     @Override
     public void shutdown() {
-        // v0.5.9: reset disableTeleports flag set in run() so it doesn't leak to other plugins
-        // sharing Rs2Walker. Same lifecycle-hygiene shape as the v0.5.7 pauseAllScripts reset.
+        // Reset disableTeleports flag set in run() so it doesn't leak to other plugins
+        // sharing Rs2Walker.
         Rs2Walker.disableTeleports = false;
         super.shutdown();
         Rs2Antiban.resetAntibanSettings();
@@ -261,8 +245,11 @@ public class AutoSmeltingPlusScript extends Script {
         Bars best = null;
         for (Bars b : Bars.values()) {
             if (b.getRequiredSmithingLevel() > smithing) continue;
+            // Require enough ore for a full-inventory batch before promoting to this tier, so we
+            // don't switch up for a single bar and thrash back down on the next bank trip.
+            int batchBars = b.maxBarsForFullInventory();
             boolean hasOres = b.getRequiredMaterials().entrySet().stream()
-                    .allMatch(e -> Rs2Bank.hasBankItem(e.getKey().toString(), e.getValue(), true));
+                    .allMatch(e -> Rs2Bank.hasBankItem(e.getKey().toString(), e.getValue() * batchBars, true));
             if (!hasOres) continue;
             if (best == null || b.getRequiredSmithingLevel() > best.getRequiredSmithingLevel()) {
                 best = b;
@@ -282,6 +269,9 @@ public class AutoSmeltingPlusScript extends Script {
                         Microbot.getClient().getTopLevelWorldView().players().stream()
                                 .filter(p -> p != null && p != Microbot.getClient().getLocalPlayer())
                                 .filter(p -> {
+                                    // With distanceToStray 0 only players on the exact same tile count.
+                                    // At a furnace players stand on adjacent tiles, so set a positive
+                                    // distance for autohop to be effective.
                                     if (config.distanceToStray() == 0) {
                                         return p.getWorldLocation().equals(localLocation);
                                     }
@@ -346,8 +336,6 @@ public class AutoSmeltingPlusScript extends Script {
         Rs2Widget.sleepUntilHasWidgetText("What would you like to smelt?", 270, 5, false, 4000);
         Rs2Widget.clickWidget(activeBar.getName());
         Rs2Widget.sleepUntilHasNotWidgetText("What would you like to smelt?", 270, 5, false, 4000);
-        // v0.5.15: bar counting moved to the accurate XP-drop detector at the top of the tick.
-        // The old per-cycle actionsCompleted++ was here.
     }
 
     // --- RESETTING state ---
@@ -366,7 +354,7 @@ public class AutoSmeltingPlusScript extends Script {
         depositByCsv(config);
         sleepUntil(() -> !Rs2Inventory.isFull(), 3000);
 
-        // v0.5.0: targetLevel cleanup done -- shutdown before withdrawing new ores.
+        // targetLevel cleanup done: shutdown before withdrawing new ores.
         if (shutdownAfterCleanup) {
             Microbot.log("AutoSmeltingPlus: targetLevel cleanup complete. Shutting down.");
             Rs2Bank.closeBank();
@@ -423,10 +411,9 @@ public class AutoSmeltingPlusScript extends Script {
         List<String> keepNames = parseCsv(config.itemsToKeep());
 
         if (!bankNames.isEmpty()) {
-            // v0.5.8: auto-augment with active bar's first word so non-"bar"-suffix outputs
-            // (e.g. MOLTEN_GLASS = "Molten glass") don't slip through the default "bar" filter.
-            // Mirrors AutoMiningPlus v0.4.1 deposit-filter auto-augment. For the 9 metal bars
-            // the first word ("bronze"/"iron"/etc.) is a no-op since they already match via "bar".
+            // Auto-augment with the active bar's first word so an output whose name does not contain
+            // "bar" still gets deposited under the default "bar" filter. For the metal bars the first
+            // word ("bronze"/"iron"/etc.) is a no-op since they already match via "bar".
             List<String> filterNames = new ArrayList<>(bankNames);
             if (activeBar != null && activeBar.getName() != null) {
                 String firstWord = activeBar.getName().split("\\s+")[0].toLowerCase();
@@ -505,8 +492,13 @@ public class AutoSmeltingPlusScript extends Script {
         for (Map.Entry<Ores, Integer> req : activeBar.getRequiredMaterials().entrySet()) {
             String oreName = req.getKey().toString();
             int oneBarCost = req.getValue();
-            int totalAmount = Rs2Inventory.hasItem(COAL_BAG_ID)
+            // getWithdrawalsWithCoalBag can return an empty map for a pathological capacity; guard
+            // against unboxing null and fall back to the no-coal-bag amount.
+            Integer coalBagAmt = Rs2Inventory.hasItem(COAL_BAG_ID)
                     ? activeBar.getWithdrawalsWithCoalBag(Rs2Inventory.capacity()).get(req.getKey())
+                    : null;
+            int totalAmount = (coalBagAmt != null)
+                    ? coalBagAmt
                     : activeBar.maxBarsForFullInventory() * oneBarCost;
             if (!Rs2Bank.hasBankItem(oreName, totalAmount, true)) {
                 Microbot.log("Bank lacks " + totalAmount + " " + oreName + " for "
