@@ -16,7 +16,7 @@ public enum RangeMode
 {
     AUTO("Auto (detect)"),
     MELEE("Melee (1)"),
-    RANGED("Ranged (weapon)"),
+    RANGED("Ranged (7)"),
     MAGIC("Magic (10)");
 
     private final String label;

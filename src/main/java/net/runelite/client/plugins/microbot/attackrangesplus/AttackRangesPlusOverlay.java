@@ -33,9 +33,11 @@ import java.util.Set;
  * of sight, outlined along its boundary so it "molds" around walls. Optionally also draws the same
  * for the player you are fighting (their weapon's reach), clipped to their line of sight.
  *
- * <p>Performance: the line-of-sight set and the projected fill/outline paths are cached per region
- * and rebuilt only when that region's tile/radius or the camera changes, so a static scene paints
- * one fill plus one stroke per region instead of doing work per tile every frame.</p>
+ * <p>Performance: the line-of-sight set and the projected fill/outline paths are cached per region.
+ * The LOS set is rebuilt when the region's origin/radius changes or once per game tick (so dynamic
+ * obstacles that change reachability are picked up); the projected paths are rebuilt on those changes
+ * or when the camera moves. A static scene therefore paints one fill plus one stroke per region per
+ * frame instead of doing work per tile every frame.</p>
  */
 class AttackRangesPlusOverlay extends Overlay
 {
@@ -51,6 +53,15 @@ class AttackRangesPlusOverlay extends Overlay
     // Shared camera state; a change invalidates every region's projected paths.
     private boolean haveCamera = false;
     private int camX, camY, camZ, camPitch, camYaw;
+
+    // Radius derivation (and the line-of-sight set) are refreshed at most once per game tick rather
+    // than per render frame: the resolved radius depends on an enum/struct varbit chain that does not
+    // change between ticks, and recomputing the LOS set each tick picks up dynamic obstacles (doors,
+    // gates, walls) that change reachability while the player stands still.
+    private int lastTick = -1;
+    private int cachedPlayerRadius;
+    private int cachedOpponentWeaponId = Integer.MIN_VALUE;
+    private int cachedOpponentRadius;
 
     @Inject
     private AttackRangesPlusOverlay(Client client, AttackRangesPlusCalc rangesCalc, AttackRangesPlusConfig config)
@@ -91,8 +102,16 @@ class AttackRangesPlusOverlay extends Overlay
                 || ncamX != camX || ncamY != camY || ncamZ != camZ
                 || ncamPitch != camPitch || ncamYaw != camYaw;
 
+        final int tick = client.getTickCount();
+        final boolean tickChanged = tick != lastTick;
+        if (tickChanged)
+        {
+            cachedPlayerRadius = rangesCalc.getPlayerRangeRadius();
+            lastTick = tick;
+        }
+
         final boolean havePlayer = playerRegion.update(
-                local.getWorldArea(), wv, local.getWorldLocation(), rangesCalc.getPlayerRangeRadius(), cameraChanged);
+                local.getWorldArea(), wv, local.getWorldLocation(), cachedPlayerRadius, cameraChanged, tickChanged);
 
         boolean haveOpponent = false;
         if (config.showOpponent())
@@ -104,17 +123,24 @@ class AttackRangesPlusOverlay extends Overlay
                 final int weaponId = opp.getPlayerComposition() != null
                         ? opp.getPlayerComposition().getEquipmentId(KitType.WEAPON)
                         : -1;
+                if (weaponId != cachedOpponentWeaponId)
+                {
+                    cachedOpponentRadius = rangesCalc.getWeaponRadius(weaponId);
+                    cachedOpponentWeaponId = weaponId;
+                }
                 haveOpponent = opponentRegion.update(
-                        opp.getWorldArea(), wv, opp.getWorldLocation(), rangesCalc.getWeaponRadius(weaponId), cameraChanged);
+                        opp.getWorldArea(), wv, opp.getWorldLocation(), cachedOpponentRadius, cameraChanged, tickChanged);
             }
             else
             {
                 opponentRegion.clear();
+                cachedOpponentWeaponId = Integer.MIN_VALUE;
             }
         }
         else
         {
             opponentRegion.clear();
+            cachedOpponentWeaponId = Integer.MIN_VALUE;
         }
 
         camX = ncamX;
@@ -228,7 +254,7 @@ class AttackRangesPlusOverlay extends Overlay
         private GeneralPath fill;
         private GeneralPath outline;
 
-        boolean update(WorldArea area, WorldView wv, WorldPoint o, int r, boolean cameraChanged)
+        boolean update(WorldArea area, WorldView wv, WorldPoint o, int r, boolean cameraChanged, boolean tickChanged)
         {
             if (area == null || o == null || r <= 0)
             {
@@ -236,7 +262,9 @@ class AttackRangesPlusOverlay extends Overlay
                 return false;
             }
 
-            final boolean setChanged = !o.equals(origin) || r != radius;
+            // A new tick forces an LOS recompute even when the origin and radius are unchanged, so a
+            // door/gate/wall toggling reachability under a stationary player is picked up.
+            final boolean setChanged = !o.equals(origin) || r != radius || tickChanged;
             if (setChanged)
             {
                 set = computeAttackable(area, wv, o, r);

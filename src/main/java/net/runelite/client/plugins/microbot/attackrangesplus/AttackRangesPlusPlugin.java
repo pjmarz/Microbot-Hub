@@ -12,9 +12,9 @@ import javax.inject.Inject;
 
 @Slf4j
 @PluginDescriptor(
-        name = PluginDescriptor.Mocrosoft + "Attack Ranges Plus",
+        name = "<html>[<font color=#BB86FC>P</font>] " + "Attack Ranges Plus",
         description = "Draws your attack range (and optionally your target's), auto-detected from your weapon and clipped to line of sight.",
-        tags = {"range", "pvp", "combat", "overlay", "microbot", "plus"},
+        tags = {"range", "pvp", "combat", "overlay"},
         authors = {"pjmarz"},
         version = AttackRangesPlusPlugin.version,
         minClientVersion = "2.0.13",
@@ -25,7 +25,7 @@ import javax.inject.Inject;
 )
 public class AttackRangesPlusPlugin extends Plugin
 {
-    public static final String version = "0.2.2";
+    public static final String version = "0.2.3";
 
     @Inject
     private OverlayManager overlayManager;
