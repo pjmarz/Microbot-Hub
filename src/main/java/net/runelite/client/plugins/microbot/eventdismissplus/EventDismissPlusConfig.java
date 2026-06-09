@@ -15,11 +15,12 @@ import net.runelite.client.config.Range;
 @ConfigGroup("EventDismissPlus")
 @ConfigInformation("<h2>Event Dismiss Plus</h2>" +
         "<h3>Version: " + EventDismissPlusPlugin.version + "</h3>" +
-        "<p>Companion plugin: enable alongside any skill plugin (Mining/Smelting/Smithing/WC, AIO Fighter, etc.) to handle random events automatically.</p>" +
-        "<p><strong>Default behavior:</strong> dismiss everything with a 2-5 second human-like delay. Engage with high-value events (Genie lamps, food drops, Frog Token, etc.) per the toggles below.</p>" +
-        "<p><strong>Genie lamps</strong> auto-detect the skill you're currently training (via XP delta tracking over a 30-second rolling window) and apply there. Falls back to the configured skill if auto-detect finds nothing.</p>" +
-        "<p><strong>Force lamp skill:</strong> if you train two skills at once and auto-detect keeps guessing wrong, set Force lamp skill to the one you want. Leave it on Auto detect to keep the normal behavior.</p>" +
-        "<p>Uses Microbot's global BlockingEvent framework: it interrupts any running script when an event fires, then resumes.</p>")
+        "<p>Run this alongside any skilling or combat plugin to handle random events for you.</p>" +
+        "<p><strong>Default:</strong> dismiss every event with a short human-like delay. Turn on the toggles below to engage the worthwhile ones (Genie lamp, Sandwich Lady, Frog Prince, and more) instead of dismissing.</p>" +
+        "<p><strong>Genie lamps:</strong> auto-detects the skill you are training, from XP gained in the last 30 seconds, and uses the lamp there. If it cannot tell, it uses your fallback skill.</p>" +
+        "<p><strong>Force lamp skill:</strong> if you train two skills at once and auto-detect guesses wrong, set this to the skill you want. Leave it on Auto detect for normal use.</p>" +
+        "<p><strong>Timing:</strong> a response delay range plus a random skip chance keep the reactions human. Tune both in the section below.</p>" +
+        "<p>It uses the client's blocking-event system: when an event fires it pauses your other script, handles it, then resumes.</p>")
 public interface EventDismissPlusConfig extends Config {
 
     @ConfigSection(name = "General", description = "Response delay + general settings", position = 0)
