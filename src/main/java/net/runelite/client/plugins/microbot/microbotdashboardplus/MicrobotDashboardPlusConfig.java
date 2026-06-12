@@ -41,14 +41,16 @@ import net.runelite.client.config.Range;
     "<p></p>" +
     "<p>7. <strong>Notify on random event:</strong> posts when a new random-event row is logged (engaged, dismissed, or declined).</p>" +
     "<p></p>" +
-    "<p>8. <strong>Notify on session start or stop:</strong> posts when the plugin enables or disables. Off by default.</p>" +
+    "<p>8. <strong>Notify on pet drop:</strong> banner plus Discord post when you receive a pet (detected from the funny-feeling game messages).</p>" +
     "<p></p>" +
-    "<p>9. <strong>Notify on alert threshold:</strong> posts when a configured Alert Threshold is crossed.</p>" +
+    "<p>9. <strong>Notify on session start or stop:</strong> posts when the plugin enables or disables. Off by default.</p>" +
+    "<p></p>" +
+    "<p>10. <strong>Notify on alert threshold:</strong> posts when a configured Alert Threshold is crossed.</p>" +
     "<p></p>" +
     "<h3>Alerts</h3>" +
-    "<p>10. <strong>Alert thresholds:</strong> comma-separated SKILL:LEVEL pairs, for example MINING:60, WOODCUTTING:80. Use uppercase OSRS skill names. A crossing fires an in-dashboard banner and, if enabled above, a Discord notification.</p>" +
+    "<p>11. <strong>Alert thresholds:</strong> comma-separated SKILL:LEVEL pairs, for example MINING:60, WOODCUTTING:80. Use uppercase OSRS skill names. A crossing fires an in-dashboard banner and, if enabled above, a Discord notification.</p>" +
     "<p></p>" +
-    "<p>11. <strong>Skill targets (ETA):</strong> comma-separated SKILL:LEVEL pairs, for example MINING:70, AGILITY:60. The Skills section shows an ETA to each target from the current XP per hour. A skill with no target still shows an ETA to its next level while it is being trained.</p>" +
+    "<p>12. <strong>Skill targets (ETA):</strong> comma-separated SKILL:LEVEL pairs, for example MINING:70, AGILITY:60. The Skills section shows an ETA to each target from the current XP per hour. A skill with no target still shows an ETA to its next level while it is being trained.</p>" +
     "<p></p>" +
     "<h3>Panels of note</h3>" +
     "<p><strong>Watchdog:</strong> reads the external restart helper log and shows its health, how long ago it was last seen, uptime, last event, last restart, and total restarts. Shows Unavailable if you do not run the watchdog.</p>" +
@@ -187,10 +189,21 @@ public interface MicrobotDashboardPlusConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "notifyPetDrop",
+            name = "Notify on pet drop",
+            description = "Fire the in-dashboard banner and (if a webhook is set) a Discord message when you receive a pet, detected from the funny-feeling game messages.",
+            position = 3,
+            section = notificationsSection
+    )
+    default boolean notifyPetDrop() {
+        return true;
+    }
+
+    @ConfigItem(
             keyName = "notifySessionLifecycle",
             name = "Notify on session start/stop",
             description = "Send a Discord message when the dashboard plugin enables (session start) or disables (session stop).",
-            position = 3,
+            position = 4,
             section = notificationsSection
     )
     default boolean notifySessionLifecycle() {
@@ -201,7 +214,7 @@ public interface MicrobotDashboardPlusConfig extends Config {
             keyName = "notifyAlerts",
             name = "Notify on alert threshold",
             description = "Send a Discord message when any configured Alert Threshold is crossed (see Alerts section).",
-            position = 4,
+            position = 5,
             section = notificationsSection
     )
     default boolean notifyAlerts() {
